@@ -1,1 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thalyn for Developers — Unity Adapter Coming Soon</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #E1B64A;
+    --gold-light: #f0cc6e;
+    --gold-dim: #9a7a2a;
+    --forest-deep: #060e06;
+    --cream-dim: #c9b99a;
+    --text-dim: #8a7a5a;
+  }
 
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+
+  body {
+    background: var(--forest-deep);
+    color: var(--cream-dim);
+    font-family: 'Crimson Pro', Georgia, serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 40px 24px;
+    text-align: center;
+  }
+
+  .wordmark {
+    width: clamp(180px, 28vw, 300px);
+    filter: drop-shadow(0 0 30px rgba(225,182,74,0.25));
+    margin-bottom: 32px;
+    opacity: 0.8;
+  }
+
+  .adapter-label {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.5em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .adapter-label::before, .adapter-label::after {
+    content: '';
+    width: 32px;
+    height: 1px;
+    background: var(--gold-dim);
+  }
+
+  h1 {
+    font-family: 'Cinzel Decorative', serif;
+    font-size: clamp(28px, 5vw, 52px);
+    font-weight: 900;
+    color: var(--gold-light);
+    margin-bottom: 20px;
+    line-height: 1.15;
+  }
+
+  p {
+    font-size: clamp(16px, 2vw, 20px);
+    font-style: italic;
+    font-weight: 300;
+    color: var(--text-dim);
+    max-width: 560px;
+    margin: 0 auto 40px;
+    line-height: 1.75;
+  }
+
+  .coming-tag {
+    display: inline-block;
+    padding: 8px 24px;
+    border: 1px solid rgba(225,182,74,0.25);
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 48px;
+  }
+
+  .features-teaser {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 56px;
+  }
+
+  .feat {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    opacity: 0.7;
+  }
+
+  .form-row {
+    display: flex;
+    gap: 0;
+    max-width: 420px;
+    margin: 0 auto 32px;
+  }
+
+  .form-row input {
+    flex: 1;
+    padding: 14px 18px;
+    background: rgba(225,182,74,0.04);
+    border: 1px solid rgba(225,182,74,0.15);
+    border-right: none;
+    color: var(--cream-dim);
+    font-family: 'Crimson Pro', serif;
+    font-size: 16px;
+    outline: none;
+  }
+
+  .form-row input::placeholder { color: var(--text-dim); }
+
+  .form-row button {
+    padding: 14px 24px;
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
+    color: #060e06;
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .form-row button:hover { opacity: 0.9; }
+
+  .back-link {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    text-decoration: none;
+    transition: color 0.3s;
+    padding-bottom: 3px;
+    border-bottom: 1px solid rgba(225,182,74,0.15);
+  }
+
+  .back-link:hover { color: var(--gold-light); }
+
+  .thalyn-mark {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    opacity: 0.4;
+    transition: opacity 0.4s;
+  }
+
+  .thalyn-mark:hover { opacity: 0.85; }
+  .thalyn-mark img { height: 64px; filter: drop-shadow(0 0 10px rgba(225,182,74,0.2)); }
+</style>
+</head>
+<body>
+
+  <img class="wordmark" src="../library_logo_650x360_transparent.png" alt="Thalyn">
+
+  <p class="adapter-label">Unity Adapter</p>
+
+  <h1>Game-ready scenes.<br>Coming to Unity.</h1>
+
+  <div class="coming-tag">In Development</div>
+
+  <p>The same emotionally intelligent world generation — delivering game-ready scenes directly into Unity URP. Full mesh export, correct topology, LOD support, and atmosphere baked in.</p>
+
+  <div class="features-teaser">
+    <span class="feat">Unity URP</span>
+    <span class="feat">FBX Export</span>
+    <span class="feat">LOD Support</span>
+    <span class="feat">Correct Topology</span>
+    <span class="feat">Atmosphere Baked</span>
+  </div>
+
+  <form action="https://formspree.io/f/hello@thalyn.world" method="POST" style="width:100%;max-width:420px;margin:0 auto 32px;">
+    <div class="form-row">
+      <input type="email" name="email" placeholder="your@email.com — notify me" required>
+      <input type="hidden" name="_subject" value="Thalyn Unity Adapter Waitlist">
+      <button type="submit">Notify Me</button>
+    </div>
+  </form>
+
+  <a href="../" class="back-link">← Return to Thalyn</a>
+
+<a href="../" class="thalyn-mark">
+  <img src="../thalyn_figure_gold.png" alt="Thalyn">
+</a>
+
+</body>
+</html>
