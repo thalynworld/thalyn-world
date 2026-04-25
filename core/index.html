@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Thalyn for Roblox — Unique Worlds. No Studio Expertise Required.</title>
-<meta name="description" content="Generate unique, emotionally coherent Roblox worlds. Exports directly to .rbxl. No code, no Studio expertise, no generic asset packs. From £19.99.">
+<title>Thalyn Core — Emotionally Intelligent World Generation</title>
+<meta name="description" content="Thalyn Core is the full world generation platform — built on environmental psychology, driven by emotional intent. No code. No modelling. Worlds that feel exactly right.">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -17,7 +17,6 @@
     --cream: #f2e8d5;
     --cream-dim: #c9b99a;
     --text-dim: #8a7a5a;
-    --roblox-red: #e74c3c;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -32,7 +31,17 @@
     overflow-x: hidden;
   }
 
-  /* Nav */
+  /* Grain */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.35;
+  }
+
   nav {
     position: fixed;
     top: 0; left: 0; right: 0;
@@ -54,82 +63,131 @@
     letter-spacing: 0.1em;
   }
 
-  .nav-badge {
+  .nav-links {
+    display: flex;
+    gap: 28px;
+    list-style: none;
+  }
+
+  .nav-links a {
     font-family: 'Cinzel', serif;
     font-size: 10px;
-    letter-spacing: 0.3em;
-    color: var(--gold-dim);
+    letter-spacing: 0.25em;
     text-transform: uppercase;
+    color: var(--text-dim);
+    text-decoration: none;
+    transition: color 0.3s;
   }
+
+  .nav-links a:hover { color: var(--gold-light); }
 
   /* Hero */
   .hero {
-    min-height: 100vh;
+    min-height: 80vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 120px 24px 80px;
+    padding: 140px 24px 100px;
     position: relative;
-    background: radial-gradient(ellipse 80% 60% at 50% 40%, rgba(30,60,30,0.3) 0%, transparent 70%);
+    overflow: hidden;
   }
 
-  .hero-inner {
-    max-width: 860px;
+  .hero-bg {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 70% at 50% 30%, rgba(30,70,30,0.2) 0%, transparent 70%),
+      linear-gradient(180deg, #060e06 0%, #0a160a 100%);
+  }
+
+  .hero-beam {
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 1px;
+    height: 50%;
+    background: linear-gradient(180deg, transparent 0%, rgba(225,182,74,0.3) 50%, transparent 100%);
+    filter: blur(6px);
+    animation: beamPulse 4s ease-in-out infinite;
+  }
+
+  @keyframes beamPulse {
+    0%,100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+
+  .hero-content {
+    position: relative;
     text-align: center;
+    max-width: 800px;
   }
 
-  .hero-adapter {
+  .hero-eyebrow {
     font-family: 'Cinzel', serif;
     font-size: 11px;
     letter-spacing: 0.5em;
     text-transform: uppercase;
     color: var(--gold-dim);
-    margin-bottom: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
+    margin-bottom: 32px;
   }
 
-  .hero-adapter::before, .hero-adapter::after {
-    content: '';
-    width: 40px;
-    height: 1px;
-    background: var(--gold-dim);
+  .hero-wordmark {
+    width: clamp(220px, 38vw, 460px);
+    filter: drop-shadow(0 0 50px rgba(225,182,74,0.3));
+    margin-bottom: 32px;
   }
 
-  .hero-title {
-    font-family: 'Cinzel Decorative', serif;
-    font-size: clamp(32px, 6vw, 64px);
-    font-weight: 900;
-    color: var(--gold-light);
-    line-height: 1.1;
-    margin-bottom: 24px;
-    text-shadow: 0 0 60px rgba(225,182,74,0.2);
-  }
-
-  .hero-sub {
-    font-size: clamp(18px, 2.5vw, 24px);
+  .hero-tagline {
+    font-size: clamp(18px, 2.5vw, 26px);
     font-style: italic;
     font-weight: 300;
     color: var(--cream-dim);
-    margin-bottom: 48px;
-    line-height: 1.6;
+    margin-bottom: 12px;
   }
+
+  .hero-sub {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--gold-dim);
+    text-transform: uppercase;
+    margin-bottom: 48px;
+  }
+
+  .hero-emotions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 48px;
+  }
+
+  .emotion-pill {
+    padding: 5px 16px;
+    border: 1px solid rgba(225,182,74,0.25);
+    border-radius: 100px;
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    transition: all 0.3s;
+  }
+
+  .emotion-pill:hover { border-color: var(--gold); color: var(--gold-light); }
 
   .hero-ctas {
     display: flex;
     gap: 16px;
     justify-content: center;
     flex-wrap: wrap;
-    margin-bottom: 64px;
   }
 
   .btn-primary {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 16px 36px;
+    padding: 15px 34px;
     background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
     color: #060e06;
     font-family: 'Cinzel', serif;
@@ -138,18 +196,18 @@
     letter-spacing: 0.2em;
     text-transform: uppercase;
     text-decoration: none;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 30px rgba(225,182,74,0.3);
+    transition: all 0.3s;
+    box-shadow: 0 4px 28px rgba(225,182,74,0.28);
   }
 
-  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 40px rgba(225,182,74,0.5); }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 40px rgba(225,182,74,0.45); }
 
   .btn-secondary {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 15px 36px;
-    border: 1px solid rgba(225,182,74,0.35);
+    padding: 14px 34px;
+    border: 1px solid rgba(225,182,74,0.3);
     color: var(--gold-dim);
     font-family: 'Cinzel', serif;
     font-size: 12px;
@@ -157,8 +215,8 @@
     letter-spacing: 0.2em;
     text-transform: uppercase;
     text-decoration: none;
-    background: rgba(225,182,74,0.04);
-    transition: all 0.3s ease;
+    background: rgba(225,182,74,0.03);
+    transition: all 0.3s;
   }
 
   .btn-secondary:hover { border-color: var(--gold); color: var(--gold-light); transform: translateY(-2px); }
@@ -200,109 +258,88 @@
     background: linear-gradient(90deg, transparent, rgba(225,182,74,0.15), transparent);
   }
 
-  /* Pain section */
-  .pain { background: var(--forest-deep); }
+  /* For Who */
+  .forwhom { background: var(--forest-deep); }
 
-  .pain-grid {
+  .audience-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 2px;
-    margin-top: 48px;
-  }
-
-  .pain-card {
-    padding: 32px 28px;
-    background: rgba(225,182,74,0.03);
-    border: 1px solid rgba(225,182,74,0.08);
-  }
-
-  .pain-card .icon {
-    font-size: 28px;
-    margin-bottom: 12px;
-    display: block;
-    filter: grayscale(0.5);
-  }
-
-  .pain-card h3 {
-    font-family: 'Cinzel', serif;
-    font-size: 13px;
-    letter-spacing: 0.1em;
-    color: var(--cream-dim);
-    margin-bottom: 10px;
-  }
-
-  .pain-card p {
-    font-size: 15px;
-    color: var(--text-dim);
-    line-height: 1.65;
-  }
-
-  /* Solution */
-  .solution { background: linear-gradient(180deg, var(--forest-deep) 0%, var(--forest) 100%); }
-
-  .solution-intro {
-    font-size: clamp(18px, 2.2vw, 23px);
-    font-style: italic;
-    font-weight: 300;
-    color: var(--cream-dim);
-    line-height: 1.8;
-    margin-bottom: 56px;
-    max-width: 720px;
-  }
-
-  .solution-intro em {
-    color: var(--gold-light);
-    font-style: normal;
-  }
-
-  .benefit-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    border: 1px solid rgba(225,182,74,0.1);
-  }
-
-  .benefit {
-    display: grid;
-    grid-template-columns: 48px 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
     gap: 24px;
-    padding: 28px 32px;
-    border-bottom: 1px solid rgba(225,182,74,0.06);
-    align-items: start;
-    transition: background 0.3s;
+    margin-top: 56px;
   }
 
-  .benefit:last-child { border-bottom: none; }
-  .benefit:hover { background: rgba(225,182,74,0.03); }
+  .audience-card {
+    padding: 44px 36px;
+    border: 1px solid rgba(225,182,74,0.1);
+    background: rgba(6,14,6,0.5);
+    position: relative;
+    overflow: hidden;
+    transition: all 0.4s;
+  }
 
-  .benefit-num {
+  .audience-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  .audience-card:hover::before { opacity: 1; }
+  .audience-card:hover { border-color: rgba(225,182,74,0.22); }
+
+  .audience-icon { font-size: 28px; margin-bottom: 18px; display: block; }
+
+  .audience-card h3 {
     font-family: 'Cinzel Decorative', serif;
-    font-size: 28px;
-    font-weight: 900;
-    color: rgba(225,182,74,0.2);
-    line-height: 1;
-    padding-top: 4px;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--gold-light);
+    margin-bottom: 6px;
   }
 
-  .benefit-content h3 {
-    font-family: 'Cinzel', serif;
+  .audience-subtitle {
     font-size: 14px;
-    letter-spacing: 0.12em;
-    color: var(--gold);
-    margin-bottom: 8px;
-    text-transform: uppercase;
+    color: var(--gold-dim);
+    font-style: italic;
+    margin-bottom: 18px;
   }
 
-  .benefit-content p {
+  .audience-card p {
     font-size: 16px;
     color: var(--text-dim);
-    line-height: 1.75;
+    line-height: 1.8;
+    margin-bottom: 18px;
   }
 
-  /* How easy */
-  .howEasy { background: var(--forest-deep); }
+  .audience-points {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
 
-  .steps {
+  .audience-points li {
+    font-size: 14px;
+    color: var(--text-dim);
+    padding-left: 18px;
+    position: relative;
+  }
+
+  .audience-points li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    color: var(--gold-dim);
+    font-size: 11px;
+  }
+
+  /* How it works */
+  .howitworks { background: linear-gradient(180deg, var(--forest-deep) 0%, var(--forest) 100%); }
+
+  .steps-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 2px;
@@ -310,16 +347,17 @@
   }
 
   .step {
-    padding: 40px 32px;
+    padding: 40px 28px;
     background: rgba(225,182,74,0.03);
     border: 1px solid rgba(225,182,74,0.08);
-    text-align: center;
-    position: relative;
+    transition: background 0.3s;
   }
+
+  .step:hover { background: rgba(225,182,74,0.05); }
 
   .step-num {
     font-family: 'Cinzel Decorative', serif;
-    font-size: 56px;
+    font-size: 52px;
     font-weight: 900;
     color: rgba(225,182,74,0.12);
     line-height: 1;
@@ -329,234 +367,146 @@
   .step h3 {
     font-family: 'Cinzel', serif;
     font-size: 13px;
-    letter-spacing: 0.15em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--gold);
     margin-bottom: 12px;
   }
 
-  .step p {
-    font-size: 15px;
-    color: var(--text-dim);
-    line-height: 1.7;
-  }
+  .step p { font-size: 15px; color: var(--text-dim); line-height: 1.7; }
 
-  /* Features grid */
-  .features { background: linear-gradient(180deg, var(--forest-deep) 0%, var(--forest-mid) 100%); }
+  /* Capabilities */
+  .capabilities { background: var(--forest-deep); }
 
-  .feat-grid {
+  .cap-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 24px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0;
     margin-top: 48px;
+    border: 1px solid rgba(225,182,74,0.08);
   }
 
-  .feat-card {
-    padding: 32px 28px;
-    border: 1px solid rgba(225,182,74,0.1);
-    background: rgba(6,14,6,0.5);
-    transition: all 0.3s ease;
+  .cap-item {
+    padding: 36px 28px;
+    border-right: 1px solid rgba(225,182,74,0.06);
+    border-bottom: 1px solid rgba(225,182,74,0.06);
+    transition: background 0.3s;
+    text-align: center;
   }
 
-  .feat-card:hover { border-color: rgba(225,182,74,0.25); }
+  .cap-item:hover { background: rgba(225,182,74,0.03); }
 
-  .feat-card h3 {
+  .cap-item h3 {
     font-family: 'Cinzel', serif;
-    font-size: 13px;
+    font-size: 12px;
     letter-spacing: 0.15em;
     text-transform: uppercase;
     color: var(--gold);
     margin-bottom: 10px;
   }
 
-  .feat-card p {
+  .cap-item p { font-size: 14px; color: var(--text-dim); line-height: 1.65; }
+
+  /* Founder */
+  .founder { background: linear-gradient(180deg, var(--forest-deep) 0%, var(--forest-mid) 50%, var(--forest-deep) 100%); }
+
+  .founder-text {
+    font-size: clamp(18px, 2.2vw, 22px);
+    font-style: italic;
+    font-weight: 300;
+    color: var(--cream-dim);
+    line-height: 1.9;
+    max-width: 740px;
+  }
+
+  .founder-text p { margin-bottom: 24px; }
+  .founder-text p:last-child { margin-bottom: 0; }
+  .founder-text em { color: var(--gold-light); font-style: normal; }
+
+  .founder-sig {
+    margin-top: 48px;
+    padding-top: 28px;
+    border-top: 1px solid rgba(225,182,74,0.12);
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    color: var(--gold-dim);
+    letter-spacing: 0.1em;
+  }
+
+  /* Research teaser */
+  .research { background: var(--forest-deep); }
+
+  .research-inner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 72px;
+    align-items: start;
+  }
+
+  .research-text p {
+    font-size: 17px;
+    color: var(--text-dim);
+    line-height: 1.85;
+    margin-bottom: 20px;
+  }
+
+  .research-text em { color: var(--cream-dim); font-style: italic; }
+
+  .research-quote {
+    padding: 36px;
+    border-left: 2px solid var(--gold-dim);
+    background: rgba(225,182,74,0.03);
+  }
+
+  .research-quote blockquote {
+    font-size: clamp(17px, 1.8vw, 21px);
+    font-style: italic;
+    font-weight: 300;
+    color: var(--cream-dim);
+    line-height: 1.8;
+    margin-bottom: 18px;
+  }
+
+  .research-quote cite {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--gold-dim);
+    text-transform: uppercase;
+    font-style: normal;
+  }
+
+  .research-quote p {
+    margin-top: 20px;
     font-size: 15px;
     color: var(--text-dim);
     line-height: 1.7;
   }
 
-  .feat-tag {
-    display: inline-block;
-    margin-top: 12px;
-    padding: 3px 10px;
-    background: rgba(225,182,74,0.08);
-    border: 1px solid rgba(225,182,74,0.15);
-    font-family: 'Cinzel', serif;
-    font-size: 9px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
-  }
-
-  /* Pricing */
-  .pricing {
-    background: var(--forest-deep);
+  /* Mission */
+  .mission {
+    background: linear-gradient(180deg, var(--forest-deep) 0%, #030808 100%);
     text-align: center;
+    padding: 100px 24px;
   }
 
-  .price-card {
-    display: inline-block;
-    padding: 56px 72px;
-    border: 1px solid rgba(225,182,74,0.25);
-    background: rgba(225,182,74,0.03);
-    margin-top: 48px;
-    position: relative;
+  .mission-statement {
+    font-family: 'Crimson Pro', serif;
+    font-size: clamp(20px, 3vw, 30px);
+    font-style: italic;
+    font-weight: 300;
+    color: var(--cream-dim);
+    max-width: 720px;
+    margin: 0 auto 32px;
+    line-height: 1.7;
   }
 
-  .price-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
-  }
-
-  .price-amount {
-    font-family: 'Cinzel Decorative', serif;
-    font-size: clamp(48px, 7vw, 80px);
-    font-weight: 900;
-    color: var(--gold-light);
-    line-height: 1;
-    margin-bottom: 8px;
-    text-shadow: 0 0 40px rgba(225,182,74,0.3);
-  }
-
-  .price-period {
+  .mission-gaelic {
     font-family: 'Cinzel', serif;
     font-size: 12px;
     letter-spacing: 0.3em;
     color: var(--gold-dim);
     text-transform: uppercase;
-    margin-bottom: 32px;
-  }
-
-  .price-includes {
-    list-style: none;
-    text-align: left;
-    margin-bottom: 40px;
-  }
-
-  .price-includes li {
-    font-size: 16px;
-    color: var(--cream-dim);
-    padding: 8px 0;
-    border-bottom: 1px solid rgba(225,182,74,0.06);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .price-includes li::before {
-    content: '✦';
-    color: var(--gold-dim);
-    font-size: 10px;
-    flex-shrink: 0;
-  }
-
-  .price-note {
-    font-size: 14px;
-    color: var(--text-dim);
-    font-style: italic;
-    margin-top: 16px;
-  }
-
-  /* Early access form */
-  .access { background: linear-gradient(180deg, var(--forest-deep) 0%, var(--forest) 100%); }
-
-  .form-wrap {
-    max-width: 540px;
-    margin: 48px auto 0;
-  }
-
-  .form-intro {
-    font-size: 17px;
-    color: var(--text-dim);
-    font-style: italic;
-    margin-bottom: 32px;
-    text-align: center;
-  }
-
-  .field {
-    margin-bottom: 16px;
-  }
-
-  .field label {
-    display: block;
-    font-family: 'Cinzel', serif;
-    font-size: 10px;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
-    margin-bottom: 8px;
-  }
-
-  .field input, .field textarea, .field select {
-    width: 100%;
-    padding: 14px 18px;
-    background: rgba(225,182,74,0.04);
-    border: 1px solid rgba(225,182,74,0.15);
-    color: var(--cream-dim);
-    font-family: 'Crimson Pro', serif;
-    font-size: 17px;
-    outline: none;
-    transition: border-color 0.3s;
-    appearance: none;
-  }
-
-  .field input:focus, .field textarea:focus, .field select:focus {
-    border-color: rgba(225,182,74,0.4);
-  }
-
-  .field input::placeholder { color: var(--text-dim); }
-
-  .field textarea { height: 100px; resize: vertical; }
-
-  .field select option { background: var(--forest-deep); }
-
-  .submit-btn {
-    width: 100%;
-    padding: 18px;
-    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
-    color: #060e06;
-    font-family: 'Cinzel', serif;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.25em;
-    text-transform: uppercase;
-    border: none;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    margin-top: 8px;
-    box-shadow: 0 4px 30px rgba(225,182,74,0.25);
-  }
-
-  .submit-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 40px rgba(225,182,74,0.4);
-  }
-
-  /* FAQ */
-  .faq { background: var(--forest-deep); }
-
-  .faq-list { margin-top: 48px; }
-
-  .faq-item {
-    border-bottom: 1px solid rgba(225,182,74,0.08);
-    padding: 28px 0;
-  }
-
-  .faq-q {
-    font-family: 'Cinzel', serif;
-    font-size: 14px;
-    letter-spacing: 0.08em;
-    color: var(--gold-light);
-    margin-bottom: 12px;
-  }
-
-  .faq-a {
-    font-size: 16px;
-    color: var(--text-dim);
-    line-height: 1.75;
   }
 
   /* Footer */
@@ -568,7 +518,7 @@
   }
 
   .footer-wordmark {
-    width: clamp(140px, 20vw, 220px);
+    width: clamp(160px, 22vw, 260px);
     margin-bottom: 24px;
     opacity: 0.8;
     filter: drop-shadow(0 0 20px rgba(225,182,74,0.2));
@@ -594,15 +544,12 @@
 
   .footer-links a:hover { color: var(--gold-light); }
 
-  .footer-figure {
-    margin: 32px 0 16px;
-  }
-
   .footer-figure img {
     height: 90px;
     opacity: 0.6;
     filter: drop-shadow(0 0 16px rgba(225,182,74,0.25));
     transition: opacity 0.4s;
+    margin: 24px 0 16px;
   }
 
   .footer-figure img:hover { opacity: 1; }
@@ -615,23 +562,24 @@
     opacity: 0.4;
   }
 
-  /* Thalyn mark fixed */
   .thalyn-mark {
     position: fixed;
     bottom: 24px;
     left: 24px;
     z-index: 100;
     opacity: 0.45;
-    transition: opacity 0.4s ease;
+    transition: opacity 0.4s;
   }
 
   .thalyn-mark:hover { opacity: 0.9; }
   .thalyn-mark img { height: 68px; filter: drop-shadow(0 0 10px rgba(225,182,74,0.25)); }
 
   @media (max-width: 768px) {
-    .steps { grid-template-columns: 1fr; }
-    .price-card { padding: 40px 32px; }
+    .steps-grid { grid-template-columns: 1fr; }
+    .research-inner { grid-template-columns: 1fr; gap: 40px; }
+    .audience-grid { grid-template-columns: 1fr; }
     nav { padding: 14px 20px; }
+    .nav-links { display: none; }
   }
 </style>
 </head>
@@ -639,132 +587,125 @@
 
 <nav>
   <a href="../" class="nav-home">THALYN<sup style="font-size:0.45em;vertical-align:super;color:var(--gold-dim);">™</sup></a>
-  <span class="nav-badge">Roblox Adapter</span>
+  <ul class="nav-links">
+    <li><a href="#for">Who It's For</a></li>
+    <li><a href="#how">How It Works</a></li>
+    <li><a href="#why">Why</a></li>
+    <li><a href="#research">Research</a></li>
+  </ul>
 </nav>
 
 <!-- HERO -->
 <section class="hero">
-  <div class="hero-inner">
-    <p class="hero-adapter">Thalyn for Roblox</p>
-    <h1 class="hero-title">Your world.<br>Built before<br>you've named it.</h1>
-    <p class="hero-sub">Unique Roblox environments that look like nobody else's. Drops straight into Studio. No code. No manual building. No generic asset packs.</p>
+  <div class="hero-bg"></div>
+  <div class="hero-beam"></div>
+  <div class="hero-content">
+    <p class="hero-eyebrow">Thalyn Core — The Full Platform</p>
+    <img class="hero-wordmark" src="../library_logo_650x360_transparent.png" alt="Thalyn">
+    <p class="hero-tagline">Worlds that don't just look right — they feel right.</p>
+    <p class="hero-sub">You place what matters. Thalyn resolves everything else.</p>
+    <div class="hero-emotions">
+      <span class="emotion-pill">Serene</span>
+      <span class="emotion-pill">Eerie</span>
+      <span class="emotion-pill">Joyful</span>
+      <span class="emotion-pill">Desolate</span>
+      <span class="emotion-pill">Oppressive</span>
+      <span class="emotion-pill">Chaotic</span>
+    </div>
     <div class="hero-ctas">
-      <a href="#access" class="btn-primary">♦ Request Early Access</a>
-      <a href="https://store.steampowered.com" class="btn-secondary">View on Steam</a>
+      <a href="https://store.steampowered.com" class="btn-primary">♦ Wishlist on Steam</a>
+      <a href="https://discord.gg/22jxAwwgX" class="btn-secondary" target="_blank">Join Discord</a>
     </div>
   </div>
 </section>
 
 <div class="divider"></div>
 
-<!-- PAIN -->
-<section class="pain">
+<!-- FOR WHO -->
+<section class="forwhom" id="for">
   <div class="container">
-    <p class="section-label">The Problem</p>
-    <h2 class="section-title">Building a world in Studio takes time you don't have.</h2>
-    <div class="pain-grid">
-      <div class="pain-card">
-        <span class="icon">⏱</span>
-        <h3>It Takes Days</h3>
-        <p>A genuinely good-looking environment in Roblox Studio takes days of manual work — terrain sculpting, asset placement, lighting, atmosphere. Days you could be building the actual game.</p>
+    <p class="section-label">Who It's For</p>
+    <h2 class="section-title">Built for anyone who has ever wanted<br>to create a place that feels real.</h2>
+    <div class="audience-grid">
+
+      <div class="audience-card">
+        <span class="audience-icon">⚙</span>
+        <h3>Developers</h3>
+        <p class="audience-subtitle">Indie, AA, or professional — the scene comes first.</p>
+        <p>Stop spending weeks on world-building before you've written a line of game logic. Thalyn hands you a game-ready, emotionally coherent 3D scene — fully exportable, fully yours.</p>
+        <ul class="audience-points">
+          <li>Fast iterative prototyping — generate, export, test, repeat</li>
+          <li>AA-comparable environments without an art team</li>
+          <li>Roblox and Unity export at launch</li>
+          <li>Every asset you own, forever</li>
+        </ul>
       </div>
-      <div class="pain-card">
-        <span class="icon">📦</span>
-        <h3>Free Packs Look Generic</h3>
-        <p>Everyone recognises the free asset packs. Players have seen those trees, those rocks, those terrain textures a hundred times. Your world looks like everyone else's world.</p>
+
+      <div class="audience-card">
+        <span class="audience-icon">✦</span>
+        <h3>Creators & Builders</h3>
+        <p class="audience-subtitle">Your world. Your way. No code required.</p>
+        <p>You don't need to know what a vertex is. You need an idea of how you want your world to feel — and Thalyn handles everything else. Build something beautiful. Invite people in.</p>
+        <ul class="audience-points">
+          <li>Roblox worlds ready to share with your community</li>
+          <li>Worlds that scale from a cosy glade to a vast landscape</li>
+          <li>No technical barrier between imagination and result</li>
+          <li>Showcase your creative vision, not your technical skills</li>
+        </ul>
       </div>
-      <div class="pain-card">
-        <span class="icon">💷</span>
-        <h3>Hiring a Builder Costs</h3>
-        <p>A freelance Roblox world builder charges real money — often more than your entire game's first month of revenue. And you still don't own the process, just the output.</p>
+
+      <div class="audience-card">
+        <span class="audience-icon">◈</span>
+        <h3>Gamers & Explorers</h3>
+        <p class="audience-subtitle">The more you play, the more you can build.</p>
+        <p>Thalyn has secrets. Hidden within each generated world are relics of Thalyn's lore — artefacts that unlock deeper creation abilities the further you explore.</p>
+        <ul class="audience-points">
+          <li>Seven Relics of Thalyn's Sovereignty to discover</li>
+          <li>20 fairy types to encounter across your worlds</li>
+          <li>ThalynQuest — progression that rewards curiosity</li>
+          <li>Worlds sized from an intimate clearing to a vast city</li>
+        </ul>
       </div>
-      <div class="pain-card">
-        <span class="icon">🎯</span>
-        <h3>Terrain Feels Flat</h3>
-        <p>Roblox terrain tools are capable — but producing something that feels designed, not just generated, requires skill most developers spend years developing.</p>
+
+      <div class="audience-card">
+        <span class="audience-icon">❧</span>
+        <h3>Wellness Professionals</h3>
+        <p class="audience-subtitle">Environments built on the same science you practise.</p>
+        <p>Thalyn's generation logic is grounded in environmental psychology — the same principles that inform therapeutic space design inform every world it builds.</p>
+        <ul class="audience-points">
+          <li>Generate controlled restorative environments</li>
+          <li>Demonstrate spatial psychology principles interactively</li>
+          <li>Research applications — worlds from emotional parameters</li>
+          <li><a href="../research/" style="color:var(--gold-dim);">Read the research foundation →</a></li>
+        </ul>
       </div>
+
     </div>
   </div>
 </section>
 
 <div class="divider"></div>
 
-<!-- SOLUTION -->
-<section class="solution">
-  <div class="container">
-    <p class="section-label">The Solution</p>
-    <h2 class="section-title">Thalyn resolves everything you haven't placed yet.</h2>
-    <p class="solution-intro">You tell Thalyn what matters to you — your hero builds, your towers, your shrines, your landmarks. You choose how you want the world to <em>feel</em>. Thalyn places everything else: terrain, trees, rocks, paths, water, atmosphere, lighting. The entire world resolves around your intent.</p>
-
-    <div class="benefit-list">
-      <div class="benefit">
-        <div class="benefit-num">01</div>
-        <div class="benefit-content">
-          <h3>Unique Every Time</h3>
-          <p>Every world Thalyn generates is yours alone. The same seed always produces the same world — share it, regenerate it, hand it off identically. But no two creators get the same world by accident.</p>
-        </div>
-      </div>
-      <div class="benefit">
-        <div class="benefit-num">02</div>
-        <div class="benefit-content">
-          <h3>Drops Straight Into Studio</h3>
-          <p>Thalyn exports complete .rbxl and .rbxm files ready to open in Roblox Studio. No conversion, no reformatting, no technical pipeline. Open, place, done.</p>
-        </div>
-      </div>
-      <div class="benefit">
-        <div class="benefit-num">03</div>
-        <div class="benefit-content">
-          <h3>Six Emotional Archetypes</h3>
-          <p>Choose how your world feels — Serene, Joyful, Oppressive, Desolate, Eerie, or Chaotic. Every placement decision — every tree, ridge, and shadow — is driven by that emotional intent. Not random. Intentional.</p>
-        </div>
-      </div>
-      <div class="benefit">
-        <div class="benefit-num">04</div>
-        <div class="benefit-content">
-          <h3>Hero Zones — Your Builds Stay</h3>
-          <p>Place what matters to you first. Thalyn's Hero Zone system guarantees the terrain flattens and resolves around your assets. Your tower stays. Your ruin stays. The world builds around them.</p>
-        </div>
-      </div>
-      <div class="benefit">
-        <div class="benefit-num">05</div>
-        <div class="benefit-content">
-          <h3>Roblox Export Costs No Awen</h3>
-          <p>Awen is Thalyn's generation credit. Generating a world uses Awen. Exporting that world to Roblox costs nothing extra. Generate once, export as many times as you need.</p>
-        </div>
-      </div>
-      <div class="benefit">
-        <div class="benefit-num">06</div>
-        <div class="benefit-content">
-          <h3>You Own It. Permanently.</h3>
-          <p>Everything Thalyn generates belongs to you. No recurring licence fee on your worlds. No subscription to keep your exports alive. Buy Thalyn once. Build forever.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<div class="divider"></div>
-
-<!-- HOW EASY -->
-<section class="howEasy">
+<!-- HOW IT WORKS -->
+<section class="howitworks" id="how">
   <div class="container">
     <p class="section-label">How It Works</p>
-    <h2 class="section-title">Three decisions. One world.</h2>
-    <div class="steps">
+    <h2 class="section-title">Choose how it feels.<br>Watch it come to life.</h2>
+    <div class="steps-grid">
       <div class="step">
         <div class="step-num">01</div>
-        <h3>Choose Your Feeling</h3>
-        <p>Pick an emotional archetype. Serene. Eerie. Joyful. Desolate. Oppressive. Chaotic. This is the soul of your world — everything else follows from it.</p>
+        <h3>Choose an Emotion</h3>
+        <p>Select from six emotional archetypes — Serene, Eerie, Joyful, Desolate, Oppressive, Chaotic. This is the soul of your Chapter. Every decision that follows serves it.</p>
       </div>
       <div class="step">
         <div class="step-num">02</div>
-        <h3>Place What Matters</h3>
-        <p>Drop in your hero assets — the builds, landmarks, or structures that matter to you. Or start from a clean world. Thalyn resolves the rest.</p>
+        <h3>The World Resolves</h3>
+        <p>Thalyn's generation engine builds your terrain, places every asset, carves paths, shapes water bodies, and reasons about how each decision serves the emotional intent you chose.</p>
       </div>
       <div class="step">
         <div class="step-num">03</div>
-        <h3>Export to Studio</h3>
-        <p>Download your .rbxl or .rbxm file. Open it in Roblox Studio. Your world is ready — terrain, assets, atmosphere, lighting. Everything included.</p>
+        <h3>Export or Explore</h3>
+        <p>Export to Roblox or Unity — or remain inside Thalyn and walk your world. Save your Chapter. Build a Realm from multiple Chapters. Every generation becomes a Chronicle.</p>
       </div>
     </div>
   </div>
@@ -772,51 +713,47 @@
 
 <div class="divider"></div>
 
-<!-- FEATURES -->
-<section class="features">
+<!-- CAPABILITIES -->
+<section class="capabilities">
   <div class="container">
-    <p class="section-label">What's Included</p>
-    <h2 class="section-title">Everything a Roblox world needs.</h2>
-    <div class="feat-grid">
-      <div class="feat-card">
-        <h3>500+ Assets</h3>
-        <p>Trees, shrubs, rocks, ruins, water features, and atmospheric props — all Roblox-ready with correct polygon counts and collision meshes.</p>
-        <span class="feat-tag">Day 1</span>
+    <p class="section-label">Capabilities</p>
+    <h2 class="section-title">Everything. Without the expertise.</h2>
+    <div class="cap-grid">
+      <div class="cap-item">
+        <h3>Zero Code</h3>
+        <p>No scripting, no modelling, no technical knowledge at any stage.</p>
       </div>
-      <div class="feat-card">
-        <h3>Biome System</h3>
-        <p>Multiple biomes per world with organic, natural boundaries. No hard grid edges. Biomes shift the way real ecosystems do — gradually, with transition zones.</p>
-        <span class="feat-tag">Day 1</span>
+      <div class="cap-item">
+        <h3>Emotional Architecture</h3>
+        <p>Six archetypes shape every placement decision, not just surface appearance.</p>
       </div>
-      <div class="feat-card">
-        <h3>Path Network</h3>
-        <p>Paths and roads generated intelligently between your hero zones. They follow terrain logic — they curve, climb, and descend the way a real path would.</p>
-        <span class="feat-tag">Day 1</span>
-      </div>
-      <div class="feat-card">
-        <h3>Water System</h3>
-        <p>Rivers and lakes placed according to terrain drainage and emotional archetype. Water shapes the scene rather than just filling the low points.</p>
-        <span class="feat-tag">Day 1</span>
-      </div>
-      <div class="feat-card">
-        <h3>Atmosphere & Lighting</h3>
-        <p>Sky, fog, volumetric light, and weather resolved from your emotional archetype. Each archetype has a distinct atmospheric signature.</p>
-        <span class="feat-tag">Day 1</span>
-      </div>
-      <div class="feat-card">
-        <h3>Deterministic Builds</h3>
-        <p>Same seed + same config = same world. Always. Share your seed with friends and they get your exact world. Regenerate it a year later identically.</p>
-        <span class="feat-tag">Day 1</span>
-      </div>
-      <div class="feat-card">
-        <h3>ThalynQuest Progression</h3>
-        <p>Hidden within every generated world are relics to discover. The more you explore, the more creation tools you unlock. Play to build better.</p>
-        <span class="feat-tag">Day 1</span>
-      </div>
-      <div class="feat-card">
+      <div class="cap-item">
         <h3>Any Scale</h3>
-        <p>From an intimate clearing to a vast open landscape. World size is yours to choose — Thalyn scales the generation to match.</p>
-        <span class="feat-tag">Day 1</span>
+        <p>From an intimate woodland clearing to a landscape the scale of a city.</p>
+      </div>
+      <div class="cap-item">
+        <h3>Roblox Export</h3>
+        <p>Complete .rbxl and .rbxm files. Drops straight into Studio. Costs no Awen.</p>
+      </div>
+      <div class="cap-item">
+        <h3>Hero Zones</h3>
+        <p>Place what matters first. The terrain resolves around your assets. Guaranteed walkable.</p>
+      </div>
+      <div class="cap-item">
+        <h3>Deterministic</h3>
+        <p>Same seed + same config = same world. Every time. Share it. Regenerate it. Hand it off.</p>
+      </div>
+      <div class="cap-item">
+        <h3>ThalynQuest</h3>
+        <p>Hidden relics within every world unlock deeper creation tools. Play to build better.</p>
+      </div>
+      <div class="cap-item">
+        <h3>Yours Forever</h3>
+        <p>Everything generated belongs to you. No recurring fees on exports. Buy once.</p>
+      </div>
+      <div class="cap-item">
+        <h3>Awen Credits</h3>
+        <p>Generation uses Awen — poetic inspiration made credit. Starter pack included at purchase.</p>
       </div>
     </div>
   </div>
@@ -824,94 +761,52 @@
 
 <div class="divider"></div>
 
-<!-- PRICING -->
-<section class="pricing">
+<!-- FOUNDER -->
+<section class="founder" id="why">
   <div class="container">
-    <p class="section-label" style="justify-content:center;">Pricing</p>
-    <h2 class="section-title">One price. Everything included.</h2>
-    <div class="price-card">
-      <div class="price-amount">£19.99</div>
-      <div class="price-period">One-time purchase — no subscription</div>
-      <ul class="price-includes">
-        <li>Full Thalyn Core platform</li>
-        <li>Roblox .rbxl and .rbxm export</li>
-        <li>500+ day-one assets</li>
-        <li>Six emotional archetypes</li>
-        <li>Starter Awen generation credits included</li>
-        <li>Roblox exports cost no Awen</li>
-        <li>ThalynQuest progression system</li>
-        <li>All future core updates</li>
-        <li>You own everything you generate, forever</li>
-      </ul>
-      <a href="https://store.steampowered.com" class="btn-primary" style="width:100%;justify-content:center;">♦ Wishlist on Steam</a>
-      <p class="price-note">Additional Awen top-ups available for heavy generation workloads.</p>
+    <p class="section-label">Why It Exists</p>
+    <h2 class="section-title">I built Thalyn because<br>spaces change how we feel.</h2>
+    <div class="founder-text">
+      <p>Not metaphorically. Literally. There's a body of research in environmental psychology that shows the spaces we inhabit — the balance of open sky and enclosing shelter, the presence of water, the depth of a view — directly shape our emotional state. We've known this for decades. Architecture uses it. Therapy uses it. Nobody had built it into a world generator.</p>
+      <p>I became obsessed with the question: what would it mean to build a world that <em>reasons about how it feels</em>, not just how it looks? Every tree placed for a reason. Every ridgeline calculated not just for visual interest but for whether it creates safety, or tension, or wonder.</p>
+      <p>That's Thalyn. Not a tool that makes pretty scenes — a tool that understands the <em>emotional grammar of space</em>, and uses it to build worlds that land.</p>
+      <p>I'm one person. I work a day job. I built this because I believed in it, not because I spotted a market gap. I hope that comes through in every world it generates.</p>
+    </div>
+    <div class="founder-sig">— Mike, Founder & Director, Thalyn Ltd</div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- RESEARCH -->
+<section class="research" id="research">
+  <div class="container">
+    <p class="section-label">The Science</p>
+    <h2 class="section-title">Built on real environmental psychology.</h2>
+    <div class="research-inner">
+      <div class="research-text">
+        <p>Prospect-refuge theory, first articulated by geographer Jay Appleton in 1975, proposes that humans respond emotionally to environments based on evolutionary principles — the ability to see without being seen, to have open view balanced with safe enclosure.</p>
+        <p>This isn't abstract theory. It's measurable. Environments that correctly balance these spatial principles consistently show lower cortisol responses, higher reported feelings of safety, and greater restorative effect. Architects use it. Landscape designers use it. Therapists use it.</p>
+        <p>Thalyn uses it to decide where every tree, rock, and ridgeline goes.</p>
+        <p>The whitepaper documenting Thalyn's implementation of these principles is in preparation. Enter your email to be notified when it publishes.</p>
+        <a href="../research/" class="btn-secondary" style="margin-top:16px;display:inline-flex;">Research page →</a>
+      </div>
+      <div class="research-quote">
+        <blockquote>"The aesthetic pleasure of landscape derives from the spontaneous perception of features which, in their capacity as sign-stimuli, promise the satisfaction of a basic biological need."</blockquote>
+        <cite>— Jay Appleton, The Experience of Landscape, 1975</cite>
+        <p>Thalyn's generation engine is the first procedural world builder to implement these spatial principles as a live placement constraint — not a post-hoc aesthetic filter, but the architecture of every decision.</p>
+      </div>
     </div>
   </div>
 </section>
 
 <div class="divider"></div>
 
-<!-- EARLY ACCESS -->
-<section class="access" id="access">
+<!-- MISSION -->
+<section class="mission">
   <div class="container">
-    <p class="section-label">Early Access</p>
-    <h2 class="section-title">Be first in.</h2>
-    <div class="form-wrap">
-      <p class="form-intro">Join the early access list and we'll notify you the moment Thalyn is ready for Roblox creators. No spam. Just one email when it's live.</p>
-      <form action="https://formspree.io/f/hello@thalyn.world" method="POST">
-        <div class="field">
-          <label for="name">Your Name</label>
-          <input type="text" id="name" name="name" placeholder="What should we call you?" required>
-        </div>
-        <div class="field">
-          <label for="email">Email Address</label>
-          <input type="email" id="email" name="email" placeholder="your@email.com" required>
-        </div>
-        <div class="field">
-          <label for="use">What are you building?</label>
-          <input type="text" id="use" name="use" placeholder="Tell us about your Roblox project (optional)">
-        </div>
-        <input type="hidden" name="_subject" value="Thalyn Roblox Early Access Request">
-        <input type="hidden" name="_next" value="https://thalyn.world/roblox/">
-        <button type="submit" class="submit-btn">Request Early Access →</button>
-      </form>
-    </div>
-  </div>
-</section>
-
-<div class="divider"></div>
-
-<!-- FAQ -->
-<section class="faq">
-  <div class="container">
-    <p class="section-label">Questions</p>
-    <h2 class="section-title">Things people ask.</h2>
-    <div class="faq-list">
-      <div class="faq-item">
-        <p class="faq-q">Do I need to know Roblox Studio to use Thalyn?</p>
-        <p class="faq-a">No. You generate and configure your world inside Thalyn. The exported file opens in Studio, but you don't need Studio skills to create the world — only to add your game logic on top of it.</p>
-      </div>
-      <div class="faq-item">
-        <p class="faq-q">Will the world work inside my existing Roblox game?</p>
-        <p class="faq-a">Yes. Thalyn exports .rbxm files (Roblox model format) that you can insert directly into an existing place, as well as complete .rbxl files for a full experience. Both formats are native Roblox.</p>
-      </div>
-      <div class="faq-item">
-        <p class="faq-q">Can I customise the world after exporting?</p>
-        <p class="faq-a">Absolutely. The exported file is a standard Roblox file — every part, mesh, and property is editable in Studio. Thalyn gives you a strong starting point, not a locked output.</p>
-      </div>
-      <div class="faq-item">
-        <p class="faq-q">What's Awen?</p>
-        <p class="faq-a">Awen is Thalyn's generation credit — a Celtic word for poetic inspiration. Each world generation uses Awen. Your purchase includes a starter pack of Awen credits. Roblox exports don't cost any Awen — only the generation does.</p>
-      </div>
-      <div class="faq-item">
-        <p class="faq-q">Can I sell games built with Thalyn worlds?</p>
-        <p class="faq-a">Yes. Everything Thalyn generates belongs to you. You can use it commercially in any Roblox experience without additional licensing or fees.</p>
-      </div>
-      <div class="faq-item">
-        <p class="faq-q">What's ThalynQuest?</p>
-        <p class="faq-a">ThalynQuest is Thalyn's in-app progression system. Hidden relics exist within your generated worlds — finding them unlocks deeper creation tools, new style options, and more generation power. The more you explore, the more you can build.</p>
-      </div>
-    </div>
+    <p class="mission-statement">"Thalyn exists to give anyone the ability to create a world that feels like somewhere — without code, without 3D expertise, and without compromise on emotional intent."</p>
+    <p class="mission-gaelic">Ó Senchetel, Beirthir Cach Bith — From ancient song, all worlds are born.</p>
   </div>
 </section>
 
@@ -920,7 +815,9 @@
     <img class="footer-wordmark" src="../library_logo_650x360_transparent.png" alt="Thalyn">
     <div class="footer-links">
       <a href="../">Home</a>
-      <a href="../core/">Thalyn Core</a>
+      <a href="../roblox/">Roblox</a>
+      <a href="../developers/">Developers</a>
+      <a href="../research/">Research</a>
       <a href="https://discord.gg/22jxAwwgX" target="_blank">Discord</a>
       <a href="https://store.steampowered.com">Steam</a>
       <a href="mailto:hello@thalyn.world">Contact</a>
@@ -932,7 +829,7 @@
   </div>
 </footer>
 
-<a href="../" class="thalyn-mark" title="Return to Thalyn">
+<a href="../" class="thalyn-mark">
   <img src="../thalyn_figure_gold.png" alt="Thalyn">
 </a>
 
