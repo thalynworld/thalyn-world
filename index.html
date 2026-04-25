@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thalyn™ — Enter the Space Between Thought and Creation</title>
+<meta name="description" content="Thalyn is a procedural world generation platform that builds emotionally coherent 3D environments from intent. No code. No modelling. Just worlds that feel exactly right.">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #E1B64A;
+    --gold-light: #f0cc6e;
+    --gold-dim: #9a7a2a;
+    --gold-pale: rgba(225,182,74,0.15);
+    --forest-deep: #060e06;
+    --cream: #f2e8d5;
+    --cream-dim: #c9b99a;
+    --text-dim: #8a7a5a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow-x: hidden; }
+
+  body {
+    background: var(--forest-deep);
+    font-family: 'Crimson Pro', Georgia, serif;
+    cursor: default;
+  }
+
+  /* Full viewport hero */
+  .hero {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    min-height: 600px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .hero-bg {
+    position: absolute;
+    inset: 0;
+    background-image: url('enhanced_4k_169_thalyn_splash_5_.webp');
+    background-size: cover;
+    background-position: center 30%;
+    filter: brightness(0.55);
+    transform: scale(1.05);
+    animation: slowZoom 30s ease-in-out infinite alternate;
+  }
+
+  @keyframes slowZoom {
+    from { transform: scale(1.05); }
+    to { transform: scale(1.12); }
+  }
+
+  .hero-overlay {
+    position: absolute;
+    inset: 0;
+    background: 
+      linear-gradient(180deg, rgba(6,14,6,0.3) 0%, rgba(6,14,6,0.1) 30%, rgba(6,14,6,0.2) 60%, rgba(6,14,6,0.85) 100%);
+  }
+
+  .hero-content {
+    position: relative;
+    text-align: center;
+    padding: 20px;
+    animation: fadeIn 2s ease both;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .wordmark {
+    width: clamp(260px, 45vw, 560px);
+    filter: drop-shadow(0 0 60px rgba(225,182,74,0.35));
+    margin-bottom: 24px;
+  }
+
+  .tagline {
+    font-family: 'Crimson Pro', serif;
+    font-size: clamp(16px, 2.5vw, 24px);
+    font-style: italic;
+    font-weight: 300;
+    color: var(--cream-dim);
+    letter-spacing: 0.04em;
+    margin-bottom: 8px;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.8);
+  }
+
+  .subtagline {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(10px, 1.2vw, 13px);
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 56px;
+  }
+
+  /* Four doors */
+  .doors {
+    display: flex;
+    gap: 2px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 40px;
+  }
+
+  .door {
+    position: relative;
+    padding: 20px 32px;
+    border: 1px solid rgba(225,182,74,0.2);
+    background: rgba(6,14,6,0.6);
+    backdrop-filter: blur(8px);
+    text-decoration: none;
+    text-align: center;
+    transition: all 0.4s ease;
+    min-width: 160px;
+    overflow: hidden;
+  }
+
+  .door::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(225,182,74,0.08) 0%, transparent 100%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  .door:hover::before { opacity: 1; }
+  .door:hover { border-color: rgba(225,182,74,0.5); transform: translateY(-3px); }
+
+  .door-label {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .door-title {
+    font-family: 'Cinzel Decorative', serif;
+    font-size: clamp(13px, 1.8vw, 16px);
+    color: var(--gold-light);
+    font-weight: 700;
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .door-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-style: italic;
+    line-height: 1.5;
+  }
+
+  .door-coming {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-top: 6px;
+    display: block;
+    opacity: 0.6;
+  }
+
+  .door.primary { border-color: rgba(225,182,74,0.35); }
+
+  /* Steam CTA */
+  .steam-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 32px;
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
+    color: #0a120a;
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 30px rgba(225,182,74,0.3);
+  }
+
+  .steam-cta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 40px rgba(225,182,74,0.5);
+  }
+
+  /* Scroll indicator */
+  .scroll-hint {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 0.4em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    animation: bob 2.5s ease-in-out infinite;
+    text-align: center;
+  }
+
+  .scroll-hint::after {
+    content: '';
+    display: block;
+    width: 1px;
+    height: 32px;
+    background: linear-gradient(180deg, var(--gold-dim), transparent);
+    margin: 8px auto 0;
+  }
+
+  @keyframes bob {
+    0%,100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(5px); }
+  }
+
+  /* Thalyn figure - bottom left, every page */
+  .thalyn-mark {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    z-index: 100;
+    opacity: 0.5;
+    transition: opacity 0.4s ease;
+  }
+
+  .thalyn-mark:hover { opacity: 0.9; }
+
+  .thalyn-mark img {
+    height: 72px;
+    filter: drop-shadow(0 0 12px rgba(225,182,74,0.3));
+  }
+
+  /* Below fold — brief about */
+  .below-fold {
+    background: var(--forest-deep);
+    padding: 100px 24px;
+    text-align: center;
+  }
+
+  .below-fold p {
+    font-size: clamp(17px, 2vw, 22px);
+    font-style: italic;
+    color: var(--cream-dim);
+    max-width: 700px;
+    margin: 0 auto 48px;
+    line-height: 1.85;
+    font-weight: 300;
+  }
+
+  .below-fold p em {
+    color: var(--gold-light);
+    font-style: normal;
+  }
+
+  .platform-links {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .platform-link {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    text-decoration: none;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(225,182,74,0.2);
+    transition: all 0.3s ease;
+  }
+
+  .platform-link:hover {
+    color: var(--gold-light);
+    border-bottom-color: var(--gold);
+  }
+
+  @media (max-width: 600px) {
+    .doors { flex-direction: column; align-items: center; }
+    .door { width: 100%; max-width: 300px; }
+  }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-overlay"></div>
+
+  <div class="hero-content">
+    <img class="wordmark" src="library_logo_650x360_transparent.png" alt="Thalyn">
+    <p class="tagline">Enter the space between thought and creation.</p>
+    <p class="subtagline">You place what matters. Thalyn resolves everything else.</p>
+
+    <div class="doors">
+      <a href="roblox/" class="door primary">
+        <span class="door-label">Adapter</span>
+        <span class="door-title">Roblox</span>
+        <span class="door-desc">Build unique Roblox worlds. No Studio expertise required.</span>
+      </a>
+      <a href="core/" class="door">
+        <span class="door-label">Platform</span>
+        <span class="door-title">Thalyn Core</span>
+        <span class="door-desc">The full vision. Emotionally intelligent world generation.</span>
+      </a>
+      <a href="developers/" class="door">
+        <span class="door-label">Adapter</span>
+        <span class="door-title">Unity</span>
+        <span class="door-desc">Game-ready scenes for Unity URP.</span>
+        <span class="door-coming">Coming Soon</span>
+      </a>
+      <a href="research/" class="door">
+        <span class="door-label">Foundation</span>
+        <span class="door-title">Research</span>
+        <span class="door-desc">The environmental psychology behind every world.</span>
+        <span class="door-coming">Whitepaper Coming</span>
+      </a>
+    </div>
+
+    <a href="https://store.steampowered.com" class="steam-cta">♦ Wishlist on Steam</a>
+  </div>
+
+  <div class="scroll-hint">Explore</div>
+</section>
+
+<section class="below-fold">
+  <p>Thalyn is not a random scatter tool. It is not an AI image generator. It does not make pretty pictures of worlds — it makes <em>actual worlds</em>. Game-ready. Emotionally coherent. Yours forever.</p>
+  <p>Six emotional archetypes. Five hundred assets. One intent. The world resolves while you decide what to name it.</p>
+  <div class="platform-links">
+    <a href="roblox/" class="platform-link">Roblox Creators</a>
+    <a href="core/" class="platform-link">Full Platform</a>
+    <a href="https://discord.gg/22jxAwwgX" class="platform-link" target="_blank">Discord</a>
+    <a href="mailto:hello@thalyn.world" class="platform-link">Contact</a>
+  </div>
+</section>
+
+<a href="#" class="thalyn-mark" title="Thalyn">
+  <img src="thalyn_figure_gold.png" alt="Thalyn">
+</a>
+
+</body>
+</html>
