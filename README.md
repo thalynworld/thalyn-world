@@ -1,2 +1,2 @@
 # thalyn-world
-Thalyn™ official website
+Thalyn® official website
