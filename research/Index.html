@@ -3,337 +3,62 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Thalyn Research — The Environmental Psychology of World Generation</title>
+<title>Thalyn® Research — The Environmental Psychology of Space</title>
+<meta name="description" content="Why certain spaces feel the way they do. The environmental psychology behind Thalyn® — from prospect-refuge theory to attention restoration, biophilia, and the measurable effects of designed space on human wellbeing.">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --gold: #E1B64A;
-    --gold-light: #f0cc6e;
-    --gold-dim: #9a7a2a;
-    --forest-deep: #060e06;
-    --forest: #0d1a0d;
-    --cream: #f2e8d5;
-    --cream-dim: #c9b99a;
-    --text-dim: #8a7a5a;
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-
-  body {
-    background: var(--forest-deep);
-    color: var(--cream-dim);
-    font-family: 'Crimson Pro', Georgia, serif;
-    font-size: 19px;
-    line-height: 1.75;
-  }
-
-  nav {
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    z-index: 100;
-    padding: 18px 40px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: rgba(6,14,6,0.92);
-    backdrop-filter: blur(8px);
-    border-bottom: 1px solid rgba(225,182,74,0.08);
-  }
-
-  .nav-home {
-    font-family: 'Cinzel Decorative', serif;
-    font-size: 16px;
-    color: var(--gold-light);
-    text-decoration: none;
-    letter-spacing: 0.1em;
-  }
-
-  .nav-badge {
-    font-family: 'Cinzel', serif;
-    font-size: 10px;
-    letter-spacing: 0.3em;
-    color: var(--gold-dim);
-    text-transform: uppercase;
-  }
-
-  .hero {
-    min-height: 60vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 140px 24px 80px;
-    text-align: center;
-    background: linear-gradient(180deg, #060e06 0%, #0a160a 100%);
-  }
-
-  .hero-inner { max-width: 760px; }
-
-  .hero-label {
-    font-family: 'Cinzel', serif;
-    font-size: 10px;
-    letter-spacing: 0.5em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
-    margin-bottom: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-  }
-
-  .hero-label::before, .hero-label::after {
-    content: '';
-    width: 32px;
-    height: 1px;
-    background: var(--gold-dim);
-  }
-
-  h1 {
-    font-family: 'Cinzel Decorative', serif;
-    font-size: clamp(28px, 5vw, 52px);
-    font-weight: 900;
-    color: var(--gold-light);
-    line-height: 1.15;
-    margin-bottom: 24px;
-  }
-
-  .hero-intro {
-    font-size: clamp(17px, 2.2vw, 22px);
-    font-style: italic;
-    font-weight: 300;
-    color: var(--cream-dim);
-    line-height: 1.8;
-    margin-bottom: 48px;
-  }
-
-  .coming-tag {
-    display: inline-block;
-    padding: 8px 24px;
-    border: 1px solid rgba(225,182,74,0.25);
-    font-family: 'Cinzel', serif;
-    font-size: 10px;
-    letter-spacing: 0.4em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
-    margin-bottom: 40px;
-  }
-
-  section { padding: 80px 24px; }
-  .container { max-width: 860px; margin: 0 auto; }
-
-  .divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(225,182,74,0.15), transparent);
-  }
-
-  .section-label {
-    font-family: 'Cinzel', serif;
-    font-size: 10px;
-    letter-spacing: 0.5em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-  }
-
-  .section-label::before {
-    content: '';
-    width: 32px;
-    height: 1px;
-    background: var(--gold-dim);
-  }
-
-  .section-title {
-    font-family: 'Cinzel Decorative', serif;
-    font-size: clamp(22px, 3vw, 34px);
-    font-weight: 700;
-    color: var(--cream);
-    line-height: 1.2;
-    margin-bottom: 32px;
-  }
-
-  .body-text p {
-    font-size: clamp(17px, 2vw, 20px);
-    color: var(--text-dim);
-    line-height: 1.85;
-    margin-bottom: 24px;
-  }
-
-  .body-text em { color: var(--cream-dim); font-style: italic; }
-  .body-text strong { color: var(--gold-dim); font-weight: 600; font-style: normal; }
-
-  .quote-block {
-    margin: 48px 0;
-    padding: 40px;
-    border-left: 2px solid var(--gold-dim);
-    background: rgba(225,182,74,0.03);
-  }
-
-  .quote-block blockquote {
-    font-size: clamp(18px, 2vw, 23px);
-    font-style: italic;
-    font-weight: 300;
-    color: var(--cream-dim);
-    line-height: 1.8;
-    margin-bottom: 16px;
-  }
-
-  .quote-block cite {
-    font-family: 'Cinzel', serif;
-    font-size: 10px;
-    letter-spacing: 0.25em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
-    font-style: normal;
-  }
-
-  .principles-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 2px;
-    margin-top: 40px;
-  }
-
-  .principle {
-    padding: 32px 28px;
-    background: rgba(225,182,74,0.03);
-    border: 1px solid rgba(225,182,74,0.08);
-  }
-
-  .principle h3 {
-    font-family: 'Cinzel', serif;
-    font-size: 12px;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--gold);
-    margin-bottom: 12px;
-  }
-
-  .principle p {
-    font-size: 15px;
-    color: var(--text-dim);
-    line-height: 1.7;
-  }
-
-  /* Notify form */
-  .notify { background: linear-gradient(180deg, var(--forest-deep) 0%, var(--forest) 100%); text-align: center; }
-
-  .notify h2 {
-    font-family: 'Cinzel Decorative', serif;
-    font-size: clamp(22px, 3vw, 34px);
-    color: var(--gold-light);
-    margin-bottom: 16px;
-  }
-
-  .notify p {
-    font-size: 17px;
-    font-style: italic;
-    color: var(--text-dim);
-    margin-bottom: 36px;
-  }
-
-  .form-row {
-    display: flex;
-    gap: 0;
-    max-width: 440px;
-    margin: 0 auto;
-  }
-
-  .form-row input {
-    flex: 1;
-    padding: 15px 18px;
-    background: rgba(225,182,74,0.04);
-    border: 1px solid rgba(225,182,74,0.15);
-    border-right: none;
-    color: var(--cream-dim);
-    font-family: 'Crimson Pro', serif;
-    font-size: 17px;
-    outline: none;
-  }
-
-  .form-row input::placeholder { color: var(--text-dim); }
-
-  .form-row button {
-    padding: 15px 24px;
-    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
-    color: #060e06;
-    font-family: 'Cinzel', serif;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    border: none;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-
-  footer {
-    padding: 48px 24px 90px;
-    text-align: center;
-    border-top: 1px solid rgba(225,182,74,0.08);
-  }
-
-  .footer-links {
-    display: flex;
-    gap: 24px;
-    justify-content: center;
-    flex-wrap: wrap;
-    margin-bottom: 32px;
-  }
-
-  .footer-links a {
-    font-family: 'Cinzel', serif;
-    font-size: 10px;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    text-decoration: none;
-    transition: color 0.3s;
-  }
-
-  .footer-links a:hover { color: var(--gold-light); }
-
-  .footer-figure img {
-    height: 80px;
-    opacity: 0.55;
-    filter: drop-shadow(0 0 14px rgba(225,182,74,0.2));
-    transition: opacity 0.4s;
-    margin-bottom: 16px;
-  }
-
-  .footer-figure img:hover { opacity: 0.9; }
-
-  .footer-legal {
-    font-family: 'Cinzel', serif;
-    font-size: 10px;
-    letter-spacing: 0.15em;
-    color: var(--text-dim);
-    opacity: 0.35;
-  }
-
-  .thalyn-mark {
-    position: fixed;
-    bottom: 24px;
-    left: 24px;
-    z-index: 100;
-    opacity: 0.4;
-    transition: opacity 0.4s;
-  }
-
-  .thalyn-mark:hover { opacity: 0.85; }
-  .thalyn-mark img { height: 64px; filter: drop-shadow(0 0 10px rgba(225,182,74,0.2)); }
-
-  @media (max-width: 600px) {
-    .form-row { flex-direction: column; }
-    .form-row input { border-right: 1px solid rgba(225,182,74,0.15); border-bottom: none; }
-  }
+  :root{--gold:#E1B64A;--gold-light:#f0cc6e;--gold-dim:#9a7a2a;--forest-deep:#060e06;--forest:#0d1a0d;--cream:#f2e8d5;--cream-dim:#c9b99a;--text-dim:#8a7a5a;}
+  *{margin:0;padding:0;box-sizing:border-box;}html{scroll-behavior:smooth;}
+  body{background:var(--forest-deep);color:var(--cream-dim);font-family:'Crimson Pro',Georgia,serif;font-size:20px;line-height:1.8;overflow-x:hidden;}
+  nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:18px 40px;display:flex;justify-content:space-between;align-items:center;background:rgba(6,14,6,0.92);backdrop-filter:blur(8px);border-bottom:1px solid rgba(225,182,74,0.08);}
+  .nav-home{font-family:'Cinzel Decorative',serif;font-size:16px;color:var(--gold-light);text-decoration:none;letter-spacing:0.1em;}
+  .nav-badge{font-family:'Cinzel',serif;font-size:10px;letter-spacing:0.3em;color:var(--gold-dim);text-transform:uppercase;}
+  .hero{min-height:55vh;display:flex;align-items:center;justify-content:center;padding:140px 24px 80px;text-align:center;background:linear-gradient(180deg,#060e06 0%,#0a160a 100%);}
+  .hero-inner{max-width:760px;}
+  .hero-label{font-family:'Cinzel',serif;font-size:10px;letter-spacing:0.5em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:24px;display:flex;align-items:center;justify-content:center;gap:12px;}
+  .hero-label::before,.hero-label::after{content:'';width:32px;height:1px;background:var(--gold-dim);}
+  h1{font-family:'Cinzel Decorative',serif;font-size:clamp(28px,5vw,52px);font-weight:900;color:var(--gold-light);line-height:1.15;margin-bottom:24px;}
+  .hero-intro{font-size:clamp(17px,2.2vw,22px);font-style:italic;font-weight:300;color:var(--cream-dim);line-height:1.8;margin-bottom:32px;}
+  .read-time{font-family:'Cinzel',serif;font-size:10px;letter-spacing:0.3em;color:var(--text-dim);text-transform:uppercase;}
+  .essay{max-width:720px;margin:0 auto;}
+  section{padding:80px 24px;}
+  .divider{height:1px;background:linear-gradient(90deg,transparent,rgba(225,182,74,0.15),transparent);}
+  h2{font-family:'Cinzel Decorative',serif;font-size:clamp(22px,3vw,34px);font-weight:700;color:var(--cream);line-height:1.2;margin-bottom:32px;}
+  h3{font-family:'Cinzel',serif;font-size:16px;letter-spacing:0.12em;text-transform:uppercase;color:var(--gold);margin-bottom:20px;margin-top:40px;}
+  p{font-size:clamp(18px,2vw,20px);color:var(--text-dim);line-height:1.88;margin-bottom:24px;}
+  p em{color:var(--cream-dim);font-style:italic;}
+  p strong{color:var(--gold-dim);font-weight:600;font-style:normal;}
+  .pull-quote{margin:56px 0;padding:40px;border-left:2px solid var(--gold-dim);background:rgba(225,182,74,0.03);}
+  .pull-quote blockquote{font-size:clamp(19px,2.2vw,24px);font-style:italic;font-weight:300;color:var(--cream-dim);line-height:1.8;margin-bottom:16px;}
+  .pull-quote cite{font-family:'Cinzel',serif;font-size:10px;letter-spacing:0.25em;text-transform:uppercase;color:var(--gold-dim);font-style:normal;}
+  .section-label{font-family:'Cinzel',serif;font-size:10px;letter-spacing:0.5em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:20px;display:flex;align-items:center;gap:14px;}
+  .section-label::before{content:'';width:32px;height:1px;background:var(--gold-dim);}
+  .researchers-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:2px;margin:48px 0;}
+  .researcher{padding:32px 28px;background:rgba(225,182,74,0.03);border:1px solid rgba(225,182,74,0.08);}
+  .researcher-name{font-family:'Cinzel',serif;font-size:14px;letter-spacing:0.1em;color:var(--gold);margin-bottom:4px;}
+  .researcher-field{font-size:13px;color:var(--gold-dim);font-style:italic;margin-bottom:14px;}
+  .researcher p{font-size:15px;color:var(--text-dim);line-height:1.7;margin-bottom:0;}
+  .notify{text-align:center;padding:80px 24px;background:linear-gradient(180deg,var(--forest-deep) 0%,var(--forest) 100%);}
+  .notify h2{font-family:'Cinzel Decorative',serif;font-size:clamp(22px,3vw,34px);color:var(--gold-light);margin-bottom:16px;}
+  .notify p{font-size:17px;font-style:italic;color:var(--text-dim);margin-bottom:36px;max-width:500px;margin-left:auto;margin-right:auto;}
+  .form-row{display:flex;gap:0;max-width:440px;margin:0 auto;}
+  .form-row input{flex:1;padding:15px 18px;background:rgba(225,182,74,0.04);border:1px solid rgba(225,182,74,0.15);border-right:none;color:var(--cream-dim);font-family:'Crimson Pro',serif;font-size:17px;outline:none;}
+  .form-row input::placeholder{color:var(--text-dim);}
+  .form-row button{padding:15px 24px;background:linear-gradient(135deg,var(--gold) 0%,var(--gold-light) 100%);color:#060e06;font-family:'Cinzel',serif;font-size:11px;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;border:none;cursor:pointer;white-space:nowrap;}
+  footer{padding:48px 24px 90px;text-align:center;border-top:1px solid rgba(225,182,74,0.08);}
+  .footer-links{display:flex;gap:24px;justify-content:center;flex-wrap:wrap;margin-bottom:32px;}
+  .footer-links a{font-family:'Cinzel',serif;font-size:10px;letter-spacing:0.3em;text-transform:uppercase;color:var(--text-dim);text-decoration:none;transition:color 0.3s;}
+  .footer-links a:hover{color:var(--gold-light);}
+  .footer-figure img{height:80px;opacity:0.55;filter:drop-shadow(0 0 14px rgba(225,182,74,0.2));transition:opacity 0.4s;margin-bottom:16px;}
+  .footer-figure img:hover{opacity:0.9;}
+  .footer-legal{font-family:'Cinzel',serif;font-size:10px;letter-spacing:0.15em;color:var(--text-dim);opacity:0.35;}
+  .thalyn-mark{position:fixed;bottom:24px;left:24px;z-index:100;opacity:0.4;transition:opacity 0.4s;}
+  .thalyn-mark:hover{opacity:0.85;}
+  .thalyn-mark img{height:64px;filter:drop-shadow(0 0 10px rgba(225,182,74,0.2));}
+  @media(max-width:600px){.form-row{flex-direction:column;}.form-row input{border-right:1px solid rgba(225,182,74,0.15);border-bottom:none;}nav{padding:14px 20px;}}
 </style>
 </head>
 <body>
-
 <nav>
   <a href="../" class="nav-home">THALYN<sup style="font-size:0.45em;vertical-align:super;color:var(--gold-dim);">®</sup></a>
   <span class="nav-badge">Research Foundation</span>
@@ -342,114 +67,138 @@
 <section class="hero">
   <div class="hero-inner">
     <p class="hero-label">Environmental Psychology</p>
-    <h1>The science behind<br>every world.</h1>
-    <p class="hero-intro">Thalyn's generation engine is grounded in prospect-refuge theory — the branch of environmental psychology that explains why certain spaces make us feel safe, open, threatened, or at peace. The whitepaper is coming.</p>
-    <div class="coming-tag">Whitepaper In Preparation</div>
+    <h1>Why certain places feel<br>the way they do.</h1>
+    <p class="hero-intro">Some spaces restore us. Others exhaust us. Some feel safe without explanation. Others produce unease before we've had time to think. The reasons are older than architecture — and more interesting than taste.</p>
+    <p class="read-time">A 10-minute read</p>
   </div>
 </section>
 
 <div class="divider"></div>
 
-<!-- THE THEORY -->
 <section>
-  <div class="container">
-    <p class="section-label">The Foundation</p>
-    <h2 class="section-title">Why certain places feel the way they do.</h2>
-    <div class="body-text">
-      <p>In 1975, geographer <em>Jay Appleton</em> published <strong>The Experience of Landscape</strong> — a foundational text in environmental aesthetics. His central argument was that human aesthetic responses to landscape are not culturally constructed but biologically grounded: we respond to the spaces we inhabit according to evolutionary priorities that predate civilisation by hundreds of thousands of years.</p>
-      <p>Appleton's core thesis — <em>prospect-refuge theory</em> — proposes that humans derive pleasure and a sense of safety from environments that offer two things simultaneously: <strong>prospect</strong> (the ability to see, to survey, to have a commanding view) and <strong>refuge</strong> (the ability to hide, to be sheltered, to feel protected from behind).</p>
-      <p>A clearing in a forest edge. A hillside overlooking a valley. A cave mouth facing open water. These configurations appear again and again in human settlement patterns, in the gardens of every culture, in the most admired paintings of landscape across centuries. The pattern is not coincidence — it is biology.</p>
-    </div>
+  <div class="essay">
+    <p class="section-label">Part One</p>
+    <h2>The question Appleton asked in 1975.</h2>
 
-    <div class="quote-block">
-      <blockquote>"The aesthetic pleasure of landscape... derives from the spontaneous perception of landscape features which, in their capacity as sign-stimuli, promise the satisfaction of a basic biological need."</blockquote>
+    <p>In 1975, a British geographer named Jay Appleton published a book called <em>The Experience of Landscape</em>. It wasn't widely read outside academic geography at the time. But the central question it asked has turned out to be one of the more useful questions anyone has applied to the study of space: <strong>why do we find certain landscapes beautiful?</strong></p>
+
+    <p>Not in the sense of cultural taste — why Monet painted water lilies or why the English have an obsession with rolling countryside. Appleton was asking something more fundamental. He wanted to know whether there was a biological explanation for the landscapes humans consistently find pleasing, across cultures and across centuries. Whether our aesthetic responses to space might be rooted not in what we've been taught to appreciate, but in what our species evolved to need.</p>
+
+    <p>His answer was prospect-refuge theory. The argument, put simply: we respond most positively to environments that give us two things simultaneously. <em>Prospect</em> — the ability to see, to survey, to have a commanding view of what's around us. And <em>refuge</em> — the ability to shelter, to feel protected, to have something solid behind us. The ideal environment, evolutionarily speaking, was one where you could watch the plain without being seen from it.</p>
+
+    <div class="pull-quote">
+      <blockquote>"The aesthetic pleasure of landscape derives from the spontaneous perception of landscape features which, in their capacity as sign-stimuli, promise the satisfaction of a basic biological need."</blockquote>
       <cite>— Jay Appleton, The Experience of Landscape, 1975</cite>
     </div>
 
-    <div class="body-text">
-      <p>Subsequent research has built substantially on Appleton's foundation. Studies in environmental psychology consistently demonstrate that <em>correctly balanced prospect-refuge environments</em> produce measurable physiological effects: reduced cortisol levels, lower heart rate variability, higher self-reported feelings of safety and wellbeing. The response is not cognitive — it is pre-conscious.</p>
-      <p>Architects have applied these principles for decades. Landscape designers use them. Therapeutic garden design is built upon them. The question Thalyn asks is: <strong>what happens when you encode these principles into the generation logic of a world?</strong></p>
+    <p>Think about the landscapes humans have consistently chosen to paint, to build beside, to holiday near, to settle. A hillside overlooking a valley. A clearing at the edge of a forest. A cave mouth facing open water. A house on a ridge with a view. These configurations appear again and again — not because humans arbitrarily decided they were pretty, but because they deliver exactly what Appleton was describing: the ability to see and the ability to hide.</p>
+
+    <p>The observation wasn't entirely new — designers and landscape architects had been working with versions of this intuition for decades. What Appleton did was name it, ground it in evolutionary theory, and give researchers a framework they could actually test.</p>
+
+    <h3>What the research found.</h3>
+
+    <p>The fifty years since Appleton's book have produced a substantial body of evidence. Environmental psychology became a serious discipline. And the findings consistently point in the same direction.</p>
+
+    <p>Environments that correctly balance prospect and refuge reliably produce measurable physiological effects. Roger Ulrich's landmark 1984 study — which has since been replicated many times — found that hospital patients who could see trees through their windows recovered faster, required less pain medication, and had shorter stays than patients facing a brick wall. The difference wasn't subjective or self-reported. It showed up in medical records.</p>
+
+    <p>Ulrich went on to develop his Stress Recovery Theory: the idea that natural environments — particularly those with the prospect-refuge balance Appleton described — trigger a specific physiological response. Heart rate drops. Cortisol levels decrease. Muscle tension reduces. The body does these things automatically, before conscious thought has engaged, in response to spatial cues that our nervous systems have been reading for a very long time.</p>
+
+    <div class="pull-quote">
+      <blockquote>"Within three to five minutes of viewing nature settings, there were significant positive changes in physiological stress indicators — changes that did not occur with urban environments."</blockquote>
+      <cite>— Roger Ulrich, Stress Recovery Theory, 1991</cite>
     </div>
+
+    <p>Meanwhile, Rachel and Stephen Kaplan were developing their own framework at the University of Michigan — <em>Attention Restoration Theory</em>. Their argument was slightly different in emphasis but complementary in conclusion. They proposed that natural environments restore what they called <em>directed attention</em> — the cognitive resource we deplete through sustained focus. Natural environments, because they capture our attention involuntarily without demanding directed effort, give that depleted resource time to recover.</p>
+
+    <p>Their research found that even brief exposure to natural environments — a view through a window, a short walk in a park — produced measurable improvements in concentration, problem-solving, and mood. The environments that worked best shared certain qualities: they were coherent but complex, they offered a sense of extent (the feeling of being in a larger world), and they were legible — you could see where you were going. Again, the pattern Appleton had described.</p>
   </div>
 </section>
 
 <div class="divider"></div>
 
-<!-- THALYN'S IMPLEMENTATION -->
+<section style="background:var(--forest);">
+  <div class="essay">
+    <p class="section-label">Part Two</p>
+    <h2>Biophilia and the deeper argument.</h2>
+
+    <p>In 1984, the biologist E.O. Wilson introduced a concept he called <em>biophilia</em> — the innate human tendency to seek connections with other living systems and nature. Wilson's argument was evolutionary: humans spent 99% of their history in natural environments, and our nervous systems were shaped by that history. The responses Appleton and Ulrich and the Kaplans were documenting weren't quirks or preferences. They were the biological baseline.</p>
+
+    <p>Wilson's biophilia hypothesis is now one of the more robust frameworks in environmental psychology. It helps explain why the effects of natural environments on human wellbeing are so consistent across cultures, why they show up in children before any cultural conditioning has had time to work, and why they persist even when the "nature" is relatively artificial — a pot plant, a view of a tree, a nature documentary.</p>
+
+    <p>The implication is significant: we didn't learn to find certain landscapes beautiful. We were built to respond to them. And the built environment — including digital environments — can either work with that biology or against it.</p>
+
+    <h3>What this means for designed space.</h3>
+
+    <p>The practical applications of this research have been building for decades. Therapeutic garden design is an established discipline. Evidence-based healthcare design — which takes spatial psychology seriously — consistently shows that environments designed around these principles produce better patient outcomes. Urban park design, school playground layout, workplace design: the research has filtered into all of them.</p>
+
+    <p>The therapeutic use of nature-based environments — whether real or simulated — is growing as a formal practice. Ecotherapy, green care, nature-based therapeutic interventions: these approaches are backed by the same body of evidence. The consistent finding is that environments designed with deliberate attention to spatial psychology produce measurable improvements in anxiety, depression, attention, and subjective wellbeing.</p>
+
+    <p>What hasn't existed, until now, is a tool that encodes this knowledge into the generation logic of a digital world — not as decoration, but as the foundation of every placement decision.</p>
+  </div>
+</section>
+
+<div class="divider"></div>
+
 <section>
-  <div class="container">
-    <p class="section-label">Thalyn's Implementation</p>
-    <h2 class="section-title">From theory to every placement decision.</h2>
-    <div class="body-text">
-      <p>Thalyn's generation engine does not apply prospect-refuge theory as a post-hoc aesthetic filter. It is <em>the architecture of every placement decision</em>. When Thalyn decides where a tree goes, where a ridge rises, where a clearing opens, where water sits — these decisions are evaluated against spatial principles that encode the emotional intent you chose at the start.</p>
-      <p>A <strong>Serene</strong> world builds environments with high refuge and moderate prospect — enclosed enough to feel sheltered, open enough to feel expansive. An <strong>Oppressive</strong> world inverts this balance: prospect is constrained, refuge becomes claustrophobic, the terrain presses in. An <strong>Eerie</strong> world introduces ambiguity — prospect that cannot be trusted, refuge that offers no real safety.</p>
-    </div>
-
-    <div class="principles-grid">
-      <div class="principle">
-        <h3>Spatial Composition</h3>
-        <p>Every world is composed with designed sightlines — views that draw the eye, enclosures that create safety, transitions that build tension or release it.</p>
+  <div class="essay">
+    <p class="section-label">Part Three</p>
+    <h2>The researchers whose work<br>this builds on.</h2>
+  </div>
+  <div style="max-width:960px;margin:0 auto;">
+    <div class="researchers-grid">
+      <div class="researcher">
+        <p class="researcher-name">Jay Appleton</p>
+        <p class="researcher-field">Geographer — University of Hull</p>
+        <p>Prospect-refuge theory (1975). The foundational argument that human aesthetic responses to landscape are rooted in evolutionary biology — specifically the survival value of environments that offer both survey and shelter.</p>
       </div>
-      <div class="principle">
-        <h3>Terrain Logic</h3>
-        <p>Ridgelines, valleys, and clearings are placed according to the emotional archetype. Terrain is not random — it is purposeful spatial composition.</p>
+      <div class="researcher">
+        <p class="researcher-name">Roger Ulrich</p>
+        <p class="researcher-field">Environmental psychologist — Texas A&M University</p>
+        <p>Stress Recovery Theory and the landmark 1984 hospital study. Demonstrated measurable physiological recovery effects from nature exposure. Established the evidence base for evidence-based healthcare design.</p>
       </div>
-      <div class="principle">
-        <h3>Water as Signal</h3>
-        <p>Water bodies are placed according to prospect-refuge logic and emotional intent. Water at the horizon signals openness. Water in an enclosed hollow signals refuge.</p>
+      <div class="researcher">
+        <p class="researcher-name">Rachel & Stephen Kaplan</p>
+        <p class="researcher-field">Environmental psychologists — University of Michigan</p>
+        <p>Attention Restoration Theory. Identified the cognitive restoration effects of natural environments and the specific spatial qualities — coherence, complexity, extent, legibility — that produce them.</p>
       </div>
-      <div class="principle">
-        <h3>Asset Placement</h3>
-        <p>Trees, rocks, and structures are placed not for visual variety but for spatial role — each one either extending a sightline, creating enclosure, or marking a threshold.</p>
-      </div>
-      <div class="principle">
-        <h3>Path Psychology</h3>
-        <p>Paths are generated to encourage or discourage exploration based on archetype. Serene paths are clear and inviting. Eerie paths vanish around corners. Oppressive paths feel unavoidable.</p>
-      </div>
-      <div class="principle">
-        <h3>Deterministic Outcomes</h3>
-        <p>The same seed and archetype always produce the same world — meaning emotional outcomes are reproducible, researchable, and verifiable. This is not a black box.</p>
+      <div class="researcher">
+        <p class="researcher-name">E.O. Wilson</p>
+        <p class="researcher-field">Biologist — Harvard University</p>
+        <p>Biophilia hypothesis (1984). The evolutionary argument that human affinity for natural environments is innate rather than learned — a product of the biological history our nervous systems were shaped by.</p>
       </div>
     </div>
+  </div>
+  <div class="essay">
+    <p>The whitepaper documenting Thalyn's approach — including the emotional scoring system, how the six archetypes map to spatial configurations, and the validation methodology — is in preparation. Enter your email below to be notified when it publishes.</p>
   </div>
 </section>
 
 <div class="divider"></div>
 
-<!-- NOTIFY -->
 <section class="notify">
-  <div class="container">
-    <h2>The whitepaper is coming.</h2>
-    <p>Enter your email and we'll notify you when it publishes. No spam — one email, when it's ready.</p>
-    <form action="https://formspree.io/f/hello@thalyn.world" method="POST">
-      <div class="form-row">
-        <input type="email" name="email" placeholder="your@email.com" required>
-        <input type="hidden" name="_subject" value="Thalyn Research Whitepaper Notification Request">
-        <button type="submit">Notify Me</button>
-      </div>
-    </form>
-  </div>
+  <h2>The whitepaper is coming.</h2>
+  <p>One email when it's ready. No spam, no newsletter.</p>
+  <form action="https://formspree.io/f/xpwzgkqj" method="POST">
+    <div class="form-row">
+      <input type="email" name="email" placeholder="your@email.com" required>
+      <input type="hidden" name="_subject" value="Thalyn Research Whitepaper Notification">
+      <button type="submit">Notify Me</button>
+    </div>
+  </form>
 </section>
 
 <footer>
-  <div class="container">
+  <div style="max-width:960px;margin:0 auto;">
     <div class="footer-links">
-      <a href="../">Home</a>
-      <a href="../core/">Thalyn Core</a>
+      <a href="../">Home</a><a href="../core/">Thalyn Core</a>
       <a href="../roblox/">Roblox</a>
       <a href="https://discord.gg/22jxAwwgX" target="_blank">Discord</a>
       <a href="mailto:hello@thalyn.world">Contact</a>
     </div>
-    <div class="footer-figure">
-      <img src="../thalyn_figure_gold.png" alt="Thalyn">
-    </div>
-    <p class="footer-legal">© 2026 Thalyn Ltd. All rights reserved. Thalyn® is a trademark of Thalyn Ltd, registered in the United Kingdom.</p>
+    <div class="footer-figure"><img src="../thalyn_figure_gold.png" alt="Thalyn"></div>
+    <p class="footer-legal">© 2026 Thalyn Ltd. All rights reserved. Thalyn® is a registered trademark of Thalyn Ltd, registered in the United Kingdom.</p>
   </div>
 </footer>
-
-<a href="../" class="thalyn-mark">
-  <img src="../thalyn_figure_gold.png" alt="Thalyn">
-</a>
-
+<a href="../" class="thalyn-mark"><img src="../thalyn_figure_gold.png" alt="Thalyn"></a>
 </body>
 </html>
