@@ -4,353 +4,221 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Thalyn® — Enter the Space Between Thought and Creation</title>
-<meta name="description" content="Thalyn is a procedural world generation platform that builds emotionally coherent 3D environments from intent. No code. No modelling. Just worlds that feel exactly right.">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600&family=Crimson+Pro:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<meta name="description" content="Thalyn® builds emotionally coherent 3D worlds from intent. Pick a feeling. Get a complete, walkable world you own. Reskin it in one pick. Export to Roblox.">
+<meta property="og:title" content="Thalyn® — Enter the Space Between Thought and Creation">
+<meta property="og:description" content="Pick a feeling. Get a complete, walkable world you own. Reskin it in one pick. Export to Roblox.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://thalyn.world">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --gold: #E1B64A;
-    --gold-light: #f0cc6e;
-    --gold-dim: #9a7a2a;
-    --gold-pale: rgba(225,182,74,0.15);
-    --forest-deep: #060e06;
-    --cream: #f2e8d5;
-    --cream-dim: #c9b99a;
-    --text-dim: #8a7a5a;
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{
+    --root-bg:#0B1515;--panel:#0E2E2A;--panel-light:#183830;
+    --border:rgba(212,136,10,0.18);--border-subtle:rgba(0,168,160,0.12);
+    --gold:#D4880A;--gold-dim:rgba(212,136,10,0.7);
+    --teal:#00A8A0;--teal-dim:rgba(0,168,160,0.5);
+    --parchment:#D9CBA8;--parchment-dim:rgba(217,203,168,0.65);
+    --text-bright:#EDE5D0;
+    --font-display:'Cinzel',Georgia,serif;--font-body:'Crimson Pro',Georgia,serif;
   }
+  html{scroll-behavior:smooth;}
+  body{background:var(--root-bg);color:var(--parchment);font-family:var(--font-body);font-size:1.05rem;line-height:1.7;min-height:100vh;}
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { height: 100%; overflow-x: hidden; }
+  nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:1rem 2.5rem;background:rgba(11,21,21,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border-subtle);}
+  .nav-logo{font-family:var(--font-display);font-size:1.15rem;font-weight:700;color:var(--gold);text-decoration:none;letter-spacing:0.08em;}
+  .nav-logo sup{font-size:0.5em;vertical-align:super;color:var(--teal);}
+  .nav-links{display:flex;gap:2rem;list-style:none;}
+  .nav-links a{font-family:var(--font-display);font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--parchment-dim);text-decoration:none;transition:color 0.2s;}
+  .nav-links a:hover{color:var(--gold);}
 
-  body {
-    background: var(--forest-deep);
-    font-family: 'Crimson Pro', Georgia, serif;
-    cursor: default;
-  }
+  .hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8rem 2rem 5rem;position:relative;overflow:hidden;}
+  .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 50% at 50% 40%,rgba(0,168,160,0.07) 0%,transparent 70%),radial-gradient(ellipse 40% 30% at 50% 60%,rgba(212,136,10,0.04) 0%,transparent 60%);pointer-events:none;}
+  .hero-eyebrow{font-family:var(--font-display);font-size:0.68rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--teal);margin-bottom:1.5rem;opacity:0.85;}
+  .hero-title{font-family:var(--font-display);font-size:clamp(2.4rem,6vw,5rem);font-weight:700;line-height:1.12;color:var(--text-bright);margin-bottom:1.5rem;letter-spacing:0.01em;}
+  .hero-title em{font-style:normal;color:var(--gold);}
+  .hero-sub{font-size:clamp(1.05rem,2.2vw,1.3rem);font-weight:300;font-style:italic;color:var(--parchment-dim);max-width:640px;margin:0 auto 0.6rem;}
+  .hero-sub2{font-family:var(--font-display);font-size:0.8rem;letter-spacing:0.1em;color:var(--teal-dim);margin-bottom:3rem;}
+  .hero-ctas{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;}
 
-  /* Full viewport hero */
-  .hero {
-    position: relative;
-    width: 100%;
-    height: 100vh;
-    min-height: 600px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-  }
+  .btn-primary{font-family:var(--font-display);font-size:0.75rem;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:#0B1515;background:var(--gold);border:none;padding:0.9rem 2.2rem;cursor:pointer;text-decoration:none;transition:background 0.2s,box-shadow 0.2s;display:inline-block;}
+  .btn-primary:hover{background:#E8990E;box-shadow:0 0 24px rgba(212,136,10,0.35);}
+  .btn-secondary{font-family:var(--font-display);font-size:0.75rem;font-weight:400;letter-spacing:0.15em;text-transform:uppercase;color:var(--parchment-dim);background:transparent;border:1px solid var(--border);padding:0.9rem 2.2rem;cursor:pointer;text-decoration:none;transition:border-color 0.2s,color 0.2s;display:inline-block;}
+  .btn-secondary:hover{border-color:var(--gold-dim);color:var(--parchment);}
 
-  .hero-bg {
-    position: absolute;
-    inset: 0;
-    background-image: url('enhanced_4k_169_thalyn_splash_5_.webp');
-    background-size: cover;
-    background-position: center 30%;
-    filter: brightness(0.55);
-    transform: scale(1.05);
-    animation: slowZoom 30s ease-in-out infinite alternate;
-  }
+  .divider{width:100%;height:1px;background:linear-gradient(to right,transparent,var(--border),transparent);}
 
-  @keyframes slowZoom {
-    from { transform: scale(1.05); }
-    to { transform: scale(1.12); }
-  }
+  .category-strip{background:var(--panel);padding:2.2rem 2rem;text-align:center;border-top:1px solid var(--border-subtle);border-bottom:1px solid var(--border-subtle);}
+  .category-strip p{font-family:var(--font-display);font-size:0.8rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--teal);opacity:0.85;}
+  .category-strip strong{color:var(--text-bright);font-weight:600;}
 
-  .hero-overlay {
-    position: absolute;
-    inset: 0;
-    background: 
-      linear-gradient(180deg, rgba(6,14,6,0.3) 0%, rgba(6,14,6,0.1) 30%, rgba(6,14,6,0.2) 60%, rgba(6,14,6,0.85) 100%);
-  }
+  .doors-section{padding:6rem 2rem;max-width:1100px;margin:0 auto;}
+  .section-heading{font-family:var(--font-display);font-size:0.7rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--teal-dim);margin-bottom:3.5rem;text-align:center;}
+  .doors-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.5px;background:var(--border-subtle);border:1px solid var(--border-subtle);}
+  .door{background:var(--panel);padding:2.5rem 2rem;text-decoration:none;display:flex;flex-direction:column;gap:0.75rem;transition:background 0.2s;position:relative;overflow:hidden;}
+  .door::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--gold);transform:scaleX(0);transform-origin:left;transition:transform 0.3s ease;}
+  .door:hover{background:var(--panel-light);}
+  .door:hover::after{transform:scaleX(1);}
+  .door-label{font-family:var(--font-display);font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--teal);}
+  .door-title{font-family:var(--font-display);font-size:1.15rem;font-weight:600;color:var(--text-bright);line-height:1.3;}
+  .door-desc{font-size:0.95rem;font-weight:300;color:var(--parchment-dim);line-height:1.6;}
+  .door-cta{font-family:var(--font-display);font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--gold);margin-top:auto;padding-top:1rem;}
 
-  .hero-content {
-    position: relative;
-    text-align: center;
-    padding: 20px;
-    animation: fadeIn 2s ease both;
-  }
+  .what-section{background:var(--panel);padding:6rem 2rem;}
+  .what-inner{max-width:800px;margin:0 auto;}
+  .what-inner h2{font-family:var(--font-display);font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:600;color:var(--text-bright);margin-bottom:2rem;line-height:1.25;}
+  .what-inner p{font-size:1.1rem;font-weight:300;color:var(--parchment);margin-bottom:1.4rem;line-height:1.75;}
+  .what-inner p strong{color:var(--text-bright);font-weight:600;}
 
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+  .who-section{padding:6rem 2rem;max-width:1100px;margin:0 auto;}
+  .who-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:2rem;margin-top:3rem;}
+  .who-card{border-left:2px solid var(--border);padding:0 0 0 1.5rem;transition:border-left-color 0.2s;}
+  .who-card:hover{border-left-color:var(--gold);}
+  .who-label{font-family:var(--font-display);font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--teal);margin-bottom:0.6rem;}
+  .who-card h3{font-family:var(--font-display);font-size:1rem;font-weight:600;color:var(--text-bright);margin-bottom:0.75rem;line-height:1.3;}
+  .who-card p{font-size:0.95rem;font-weight:300;color:var(--parchment-dim);line-height:1.65;}
 
-  .wordmark {
-    width: clamp(260px, 45vw, 560px);
-    filter: drop-shadow(0 0 60px rgba(225,182,74,0.35));
-    margin-bottom: 24px;
-  }
+  .mission{padding:5rem 2rem;text-align:center;background:linear-gradient(180deg,var(--panel) 0%,var(--root-bg) 100%);}
+  .mission-statement{font-family:var(--font-body);font-size:clamp(1.15rem,2.8vw,1.65rem);font-weight:300;font-style:italic;color:var(--text-bright);max-width:750px;margin:0 auto 1.4rem;line-height:1.55;}
+  .mission-gaelic{font-family:var(--font-display);font-size:0.72rem;letter-spacing:0.14em;color:var(--teal-dim);}
 
-  .tagline {
-    font-family: 'Crimson Pro', serif;
-    font-size: clamp(16px, 2.5vw, 24px);
-    font-style: italic;
-    font-weight: 300;
-    color: var(--cream-dim);
-    letter-spacing: 0.04em;
-    margin-bottom: 8px;
-    text-shadow: 0 2px 20px rgba(0,0,0,0.8);
-  }
+  footer{background:var(--root-bg);border-top:1px solid var(--border-subtle);padding:3rem 2rem 2rem;text-align:center;}
+  .footer-links{display:flex;flex-wrap:wrap;gap:0.5rem 2rem;justify-content:center;margin-bottom:1.5rem;}
+  .footer-links a{font-family:var(--font-display);font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--parchment-dim);text-decoration:none;transition:color 0.2s;}
+  .footer-links a:hover{color:var(--gold);}
+  .footer-legal{font-size:0.78rem;color:rgba(217,203,168,0.3);line-height:1.5;}
 
-  .subtagline {
-    font-family: 'Cinzel', serif;
-    font-size: clamp(10px, 1.2vw, 13px);
-    letter-spacing: 0.35em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
-    margin-bottom: 56px;
-  }
+  .thalyn-mark{position:fixed;bottom:24px;left:24px;z-index:100;opacity:0.45;transition:opacity 0.4s;}
+  .thalyn-mark:hover{opacity:0.9;}
+  .thalyn-mark img{height:68px;filter:drop-shadow(0 0 10px rgba(212,136,10,0.25));}
 
-  /* Four doors */
-  .doors {
-    display: flex;
-    gap: 2px;
-    justify-content: center;
-    flex-wrap: wrap;
-    margin-bottom: 40px;
-  }
-
-  .door {
-    position: relative;
-    padding: 20px 32px;
-    border: 1px solid rgba(225,182,74,0.2);
-    background: rgba(6,14,6,0.6);
-    backdrop-filter: blur(8px);
-    text-decoration: none;
-    text-align: center;
-    transition: all 0.4s ease;
-    min-width: 160px;
-    overflow: hidden;
-  }
-
-  .door::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, rgba(225,182,74,0.08) 0%, transparent 100%);
-    opacity: 0;
-    transition: opacity 0.4s ease;
-  }
-
-  .door:hover::before { opacity: 1; }
-  .door:hover { border-color: rgba(225,182,74,0.5); transform: translateY(-3px); }
-
-  .door-label {
-    font-family: 'Cinzel', serif;
-    font-size: 10px;
-    letter-spacing: 0.4em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
-    margin-bottom: 6px;
-    display: block;
-  }
-
-  .door-title {
-    font-family: 'Cinzel Decorative', serif;
-    font-size: clamp(13px, 1.8vw, 16px);
-    color: var(--gold-light);
-    font-weight: 700;
-    display: block;
-    margin-bottom: 8px;
-  }
-
-  .door-desc {
-    font-size: 12px;
-    color: var(--text-dim);
-    font-style: italic;
-    line-height: 1.5;
-  }
-
-  .door-coming {
-    font-family: 'Cinzel', serif;
-    font-size: 9px;
-    letter-spacing: 0.3em;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    margin-top: 6px;
-    display: block;
-    opacity: 0.6;
-  }
-
-  .door.primary { border-color: rgba(225,182,74,0.35); }
-
-  /* Steam CTA */
-  .steam-cta {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    padding: 14px 32px;
-    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
-    color: #0a120a;
-    font-family: 'Cinzel', serif;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    text-decoration: none;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 30px rgba(225,182,74,0.3);
-  }
-
-  .steam-cta:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 40px rgba(225,182,74,0.5);
-  }
-
-  /* Scroll indicator */
-  .scroll-hint {
-    position: absolute;
-    bottom: 30px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-family: 'Cinzel', serif;
-    font-size: 9px;
-    letter-spacing: 0.4em;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    animation: bob 2.5s ease-in-out infinite;
-    text-align: center;
-  }
-
-  .scroll-hint::after {
-    content: '';
-    display: block;
-    width: 1px;
-    height: 32px;
-    background: linear-gradient(180deg, var(--gold-dim), transparent);
-    margin: 8px auto 0;
-  }
-
-  @keyframes bob {
-    0%,100% { transform: translateX(-50%) translateY(0); }
-    50% { transform: translateX(-50%) translateY(5px); }
-  }
-
-  /* Thalyn figure - bottom left, every page */
-  .thalyn-mark {
-    position: fixed;
-    bottom: 24px;
-    left: 24px;
-    z-index: 100;
-    opacity: 0.5;
-    transition: opacity 0.4s ease;
-  }
-
-  .thalyn-mark:hover { opacity: 0.9; }
-
-  .thalyn-mark img {
-    height: 72px;
-    filter: drop-shadow(0 0 12px rgba(225,182,74,0.3));
-  }
-
-  /* Below fold — brief about */
-  .below-fold {
-    background: var(--forest-deep);
-    padding: 100px 24px;
-    text-align: center;
-  }
-
-  .below-fold p {
-    font-size: clamp(17px, 2vw, 22px);
-    font-style: italic;
-    color: var(--cream-dim);
-    max-width: 700px;
-    margin: 0 auto 48px;
-    line-height: 1.85;
-    font-weight: 300;
-  }
-
-  .below-fold p em {
-    color: var(--gold-light);
-    font-style: normal;
-  }
-
-  .platform-links {
-    display: flex;
-    gap: 24px;
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-
-  .platform-link {
-    font-family: 'Cinzel', serif;
-    font-size: 11px;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-    color: var(--gold-dim);
-    text-decoration: none;
-    padding-bottom: 4px;
-    border-bottom: 1px solid rgba(225,182,74,0.2);
-    transition: all 0.3s ease;
-  }
-
-  .platform-link:hover {
-    color: var(--gold-light);
-    border-bottom-color: var(--gold);
-  }
-
-  @media (max-width: 600px) {
-    .doors { flex-direction: column; align-items: center; }
-    .door { width: 100%; max-width: 300px; }
-  }
+  @media(max-width:600px){nav{padding:1rem 1.2rem;}.nav-links{gap:1rem;}.nav-links a{font-size:0.65rem;}.hero{padding:7rem 1.2rem 4rem;}.doors-section,.who-section{padding:4rem 1.2rem;}.what-section{padding:4rem 1.2rem;}.thalyn-mark{bottom:16px;left:16px;}.thalyn-mark img{height:50px;}}
 </style>
 </head>
 <body>
 
+<nav>
+  <a href="/" class="nav-logo">Thalyn<sup>®</sup></a>
+  <ul class="nav-links">
+    <li><a href="/core/">The Tool</a></li>
+    <li><a href="/roblox/">World Export</a></li>
+    <li><a href="/research/">Research</a></li>
+    <li><a href="/developers/">Developers</a></li>
+    <li><a href="https://discord.gg/22jxAwwgX" target="_blank" rel="noopener">Discord</a></li>
+  </ul>
+</nav>
+
 <section class="hero">
-  <div class="hero-bg"></div>
-  <div class="hero-overlay"></div>
+  <p class="hero-eyebrow">Thalyn® — World Generation Platform</p>
+  <h1 class="hero-title">Enter the space between<br><em>thought and creation.</em></h1>
+  <p class="hero-sub">Every generative tool produces appearance. Thalyn produces meaning.</p>
+  <p class="hero-sub2">You place what matters. Thalyn resolves everything else.</p>
+  <div class="hero-ctas">
+    <a href="https://store.steampowered.com" target="_blank" rel="noopener" class="btn-primary">Wishlist on Steam</a>
+    <a href="https://discord.gg/22jxAwwgX" target="_blank" rel="noopener" class="btn-secondary">Join Discord</a>
+  </div>
+</section>
 
-  <div class="hero-content">
-    <img class="wordmark" src="library_logo_650x360_transparent.png" alt="Thalyn">
-    <p class="tagline">Enter the space between thought and creation.</p>
-    <p class="subtagline">You place what matters. Thalyn resolves everything else.</p>
+<div class="divider"></div>
 
-    <div class="doors">
-      <a href="roblox/" class="door primary">
-        <span class="door-label">Adapter</span>
-        <span class="door-title">Roblox</span>
-        <span class="door-desc">Build unique Roblox worlds. No Studio expertise required.</span>
-      </a>
-      <a href="core/" class="door">
-        <span class="door-label">Platform</span>
-        <span class="door-title">Thalyn Core</span>
-        <span class="door-desc">The full vision. Emotionally intelligent world generation.</span>
-      </a>
-      <a href="developers/" class="door">
-        <span class="door-label">Adapter</span>
-        <span class="door-title">Unity</span>
-        <span class="door-desc">Game-ready scenes for Unity URP.</span>
-        <span class="door-coming">Coming Soon</span>
-      </a>
-      <a href="research/" class="door">
-        <span class="door-label">Foundation</span>
-        <span class="door-title">Research</span>
-        <span class="door-desc">The environmental psychology behind every world.</span>
-        <span class="door-coming">Whitepaper Coming</span>
-      </a>
+<div class="category-strip">
+  <p>A <strong>procedural world generation platform</strong> — no code, no 3D modelling, no manual world-building.<br>PC · Steam · £19.99 · One-time purchase</p>
+</div>
+
+<section class="doors-section">
+  <p class="section-heading">Explore Thalyn</p>
+  <div class="doors-grid">
+    <a href="/core/" class="door">
+      <span class="door-label">The Tool</span>
+      <h2 class="door-title">Thalyn Core</h2>
+      <p class="door-desc">What you get for £19.99. Every capability unlocked from day one. Pick a feeling. Place what matters. Walk the world Thalyn builds around it — then change its entire look in a single pick.</p>
+      <span class="door-cta">Explore the tool →</span>
+    </a>
+    <a href="/roblox/" class="door">
+      <span class="door-label">Export</span>
+      <h2 class="door-title">World Export</h2>
+      <p class="door-desc">Take your generated world into Roblox as a complete, playable scene — terrain, assets, lighting, atmosphere. Your world. Their platform.</p>
+      <span class="door-cta">See the pipeline →</span>
+    </a>
+    <a href="/research/" class="door">
+      <span class="door-label">The Science</span>
+      <h2 class="door-title">Why Spaces Feel the Way They Do</h2>
+      <p class="door-desc">The environmental psychology that underlies every system in Thalyn — from prospect-refuge theory to attention restoration and biophilia.</p>
+      <span class="door-cta">Read the research →</span>
+    </a>
+    <a href="/developers/" class="door">
+      <span class="door-label">For Builders</span>
+      <h2 class="door-title">Developers</h2>
+      <p class="door-desc">Game-ready meshes, coherent topology, and Roblox export — built around your intent. Fast iteration for indie developers and small studios.</p>
+      <span class="door-cta">Developer details →</span>
+    </a>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<section class="what-section">
+  <div class="what-inner">
+    <h2>A world that feels like somewhere.</h2>
+    <p>Thalyn was built because the tools that exist produce worlds that look like something — but rarely feel like anything. The terrain is technically correct. The assets are high quality. But walk through it and the space says nothing. There is no sense of shelter, no sightline that draws the eye, no clearing that invites you to stay.</p>
+    <p>Every system in Thalyn is built around a single question: <strong>does this feel the way it should?</strong> Terrain resolves around the emotion you choose. Assets are placed where spatial psychology says they belong. Light, atmosphere, and path behave as designed elements. The result is a world with intent — one that communicates before you've understood why.</p>
+    <p>This is not a faster way to make a generic world. It is a different understanding of what a world is for.</p>
+    <p>One purchase. No subscription. No code. No 3D experience required.</p>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<section class="who-section">
+  <p class="section-heading">Who Thalyn is for</p>
+  <div class="who-grid">
+    <div class="who-card">
+      <p class="who-label">Indie Developers</p>
+      <h3>Game-ready scenes built around your intent.</h3>
+      <p>Bring your own assets; Thalyn places them in real, coherent topology. Fast-iterate on world designs without building the world yourself. Export complete, walkable scenes to Roblox. AA-comparable visual quality without the pipeline cost.</p>
     </div>
-
-    <a href="https://store.steampowered.com" class="steam-cta">♦ Wishlist on Steam</a>
+    <div class="who-card">
+      <p class="who-label">Hangout Creators</p>
+      <h3>Build your world. Make it yours. Share it.</h3>
+      <p>No prior experience required. Pick the feeling — serene, joyful, eerie, chaotic — and Thalyn builds it. Walk through your creation. Change its entire visual character with a single pick. Export to Roblox for your community to explore.</p>
+    </div>
+    <div class="who-card">
+      <p class="who-label">Gamers</p>
+      <h3>A treasure hunt woven into creation.</h3>
+      <p>ThalynQuest is a free, optional discovery layer. Follow the riddles. Shape the worlds they describe. Claim the seven relics. Earn things money cannot buy — rare visual looks and world-building powers nobody else has access to.</p>
+    </div>
+    <div class="who-card">
+      <p class="who-label">Wellness Professionals</p>
+      <h3>Designed spaces for designed purposes.</h3>
+      <p>The emotional coherence at Thalyn's core is grounded in environmental psychology — the same research that informs therapeutic spatial design. Thalyn makes those principles generatable without specialist technical knowledge.</p>
+    </div>
   </div>
-
-  <div class="scroll-hint">Explore</div>
 </section>
 
-<section class="below-fold">
-  <p>Thalyn is not a random scatter tool. It is not an AI image generator. It does not make pretty pictures of worlds — it makes <em>actual worlds</em>. Game-ready. Emotionally coherent. Yours forever.</p>
-  <p>Six emotional archetypes. Five hundred assets. One intent. The world resolves while you decide what to name it.</p>
-  <div class="platform-links">
-    <a href="roblox/" class="platform-link">Roblox Creators</a>
-    <a href="core/" class="platform-link">Full Platform</a>
-    <a href="https://discord.gg/22jxAwwgX" class="platform-link" target="_blank">Discord</a>
-    <a href="mailto:hello@thalyn.world" class="platform-link">Contact</a>
-  </div>
+<div class="divider"></div>
+
+<section class="mission">
+  <p class="mission-statement">"Thalyn exists to give anyone the ability to create a world that feels like somewhere — without code, without 3D expertise, and without compromising on emotional intent."</p>
+  <p class="mission-gaelic">Ó Senchetel, Beirthir Cach Bith — From ancient song, all worlds are born.</p>
 </section>
 
-<a href="#" class="thalyn-mark" title="Thalyn">
-  <img src="thalyn_figure_gold.png" alt="Thalyn">
-</a>
+<footer>
+  <div class="footer-links">
+    <a href="/core/">The Tool</a>
+    <a href="/roblox/">World Export</a>
+    <a href="/research/">Research</a>
+    <a href="/developers/">Developers</a>
+    <a href="/legal/">Legal</a>
+    <a href="https://discord.gg/22jxAwwgX" target="_blank" rel="noopener">Discord</a>
+    <a href="https://store.steampowered.com" target="_blank" rel="noopener">Steam</a>
+    <a href="mailto:hello@thalyn.world">Contact</a>
+  </div>
+  <p class="footer-legal">© 2026 Thalyn Ltd. All rights reserved. Thalyn® is a registered trademark of Thalyn Ltd, registered in the United Kingdom.<br>
+  Thalyn is not affiliated with or endorsed by Roblox Corporation, Valve Corporation, or Unity Technologies.</p>
+</footer>
+
+<a href="/" class="thalyn-mark"><img src="thalyn_figure_gold.png" alt="Thalyn"></a>
 
 </body>
 </html>
