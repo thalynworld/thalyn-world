@@ -63,6 +63,11 @@
   .thalyn-mark:hover{opacity:0.9;}
   .thalyn-mark img{height:68px;filter:drop-shadow(0 0 10px rgba(212,136,10,0.25));}
   @media(max-width:600px){nav{padding:1rem 1.2rem;}.nav-links{gap:1rem;}.nav-links a{font-size:0.65rem;}.thalyn-mark img{height:50px;}}
+  /* ── CANVAS ── */
+  #ember-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;}
+  nav,section,footer,header,article,.reskin-callout,.category-strip,.legal-body,.essay-body,.references{position:relative;z-index:1;}
+  .tw-target::after{content:'|';animation:tw-blink 0.9s step-end infinite;color:var(--gold);margin-left:1px;}
+  @keyframes tw-blink{0%,100%{opacity:1}50%{opacity:0}}
 </style>
 </head>
 <body>
@@ -79,7 +84,7 @@
 
 <section class="page-hero">
   <p class="page-eyebrow">Thalyn® — World Export</p>
-  <h1 class="page-title">Your world.<br><em>Built for any platform.</em></h1>
+  <h1 class="page-title">Your world.<br><em class="tw-target" data-phrases='["Built for any platform.","Playable on Roblox.","Your world, everywhere.","Your work, ready to share."]'>Built for any platform.</em></h1>
   <p class="page-sub">Generate a complete, emotionally coherent world in Thalyn. Export it as a playable Roblox scene. Your world, their platform.</p>
   <div class="cta-row">
     <a href="https://store.steampowered.com" target="_blank" rel="noopener" class="btn-primary">Wishlist on Steam</a>
@@ -92,7 +97,7 @@
 <section class="prose-section">
   <span class="label">The export</span>
   <h2>Same world. Different platform.</h2>
-  <p>Thalyn generates worlds that are inherently platform-agnostic. The generation brain produces a complete world manifest — terrain, biome data, asset placements, atmosphere, lighting — that a platform adapter translates into the target format. <strong>Exporting to Roblox costs no Awen.</strong> It is a pipeline operation, not a creative generation.</p>
+  <p>Thalyn generates worlds that are inherently platform-agnostic. The generation brain produces a complete world manifest — terrain, biome data, asset placements, atmosphere, lighting — that a platform adapter translates into the target format. <strong>Exporting to Roblox has no additional cost.</strong> It is a pipeline operation, not a creative generation.</p>
   <p>The result is a fully playable Roblox experience: walkable terrain, placed assets with correct physics, and complete lighting and atmosphere. Your world arrives as a scene ready to open in Roblox, with your visual character intact.</p>
   <p>Thalyn is not a Roblox tool. It is the layer above platforms. Roblox is the first adapter. Others follow.</p>
 </section>
@@ -103,28 +108,28 @@
   <div class="pipeline-inner">
     <span class="section-label">How it works</span>
     <div class="steps">
-      <div class="step">
+      <div class="step reveal">
         <span class="step-num">01</span>
         <div class="step-content">
           <h3>Generate your world in Thalyn</h3>
-          <p>Choose your emotional archetype and world shape. Place any Hero Zones — your own landmarks or assets the world should resolve around. Thalyn builds the complete scene on its servers and delivers it to your client.</p>
+          <p>Choose your emotional archetype and world shape. Place any focal points — your own landmarks or assets the world should resolve around. Thalyn builds the complete scene on its servers and delivers it to your client.</p>
         </div>
       </div>
-      <div class="step">
+      <div class="step reveal">
         <span class="step-num">02</span>
         <div class="step-content">
           <h3>Walk it. Reskin it.</h3>
           <p>Explore your world in Thalyn's first-person viewer. Pick a visual look to transform the material character of the entire scene in one selection. Walk it again. Change it again. When it feels right, export.</p>
         </div>
       </div>
-      <div class="step">
+      <div class="step reveal">
         <span class="step-num">03</span>
         <div class="step-content">
-          <h3>Export — no Awen required</h3>
-          <p>Thalyn's export pipeline translates your world manifest into a complete Roblox file. Terrain, asset placements, collision, lighting, atmosphere — all resolved. This step costs no Awen.</p>
+          <h3>Export — no extra cost</h3>
+          <p>Thalyn's export pipeline translates your world manifest into a complete Roblox file. Terrain, asset placements, collision, lighting, atmosphere — all resolved. There is no additional cost for this step.</p>
         </div>
       </div>
-      <div class="step">
+      <div class="step reveal">
         <span class="step-num">04</span>
         <div class="step-content">
           <h3>Publish on Roblox</h3>
@@ -140,12 +145,12 @@
 <section class="what-ships">
   <span class="section-label">What exports with your world</span>
   <div class="ships-grid">
-    <div class="ships-item"><h4>Terrain</h4><p>Full heightmap, biome-resolved surface materials, natural slopes and water bodies.</p></div>
-    <div class="ships-item"><h4>Placed Assets</h4><p>Trees, rocks, structures, and foliage — placed with emotional and spatial intent, correct scale and orientation.</p></div>
-    <div class="ships-item"><h4>Lighting</h4><p>Time of day, ambient character, and atmospheric density resolved for your emotional archetype.</p></div>
-    <div class="ships-item"><h4>Atmosphere</h4><p>Sky, fog, and weather behaviour carried through. The world feels the same on Roblox as it did in Thalyn.</p></div>
-    <div class="ships-item"><h4>Collision</h4><p>Terrain and major assets include correct collision for player traversal.</p></div>
-    <div class="ships-item"><h4>Your Visual Look</h4><p>The material character of the look you applied exports with the scene.</p></div>
+    <div class="ships-item reveal"><h4>Terrain</h4><p>Full heightmap, biome-resolved surface materials, natural slopes and water bodies.</p></div>
+    <div class="ships-item reveal"><h4>Placed Assets</h4><p>Trees, rocks, structures, and foliage — placed with emotional and spatial intent, correct scale and orientation.</p></div>
+    <div class="ships-item reveal"><h4>Lighting</h4><p>Time of day, ambient character, and atmospheric density resolved for your emotional archetype.</p></div>
+    <div class="ships-item reveal"><h4>Atmosphere</h4><p>Sky, fog, and weather behaviour carried through. The world feels the same on Roblox as it did in Thalyn.</p></div>
+    <div class="ships-item reveal"><h4>Collision</h4><p>Terrain and major assets include correct collision for player traversal.</p></div>
+    <div class="ships-item reveal"><h4>Your Visual Look</h4><p>The material character of the look you applied exports with the scene.</p></div>
   </div>
 </section>
 
@@ -177,5 +182,91 @@
 </footer>
 
 <a href="/" class="thalyn-mark"><img src="../thalyn_figure_gold.png" alt="Thalyn"></a>
+
+<canvas id="ember-canvas" aria-hidden="true"></canvas>
+<script>
+(function(){
+  const canvas=document.getElementById('ember-canvas');
+  const ctx=canvas.getContext('2d');
+  const GOLD='#E1B64A',GREEN='#78b45a';
+  let W,H,embers=[],RAF;
+  const COUNT=42;
+  const reduced=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+  window.addEventListener('resize',resize);resize();
+  function mkEmber(){
+    const g=Math.random()>0.38;
+    return{x:Math.random()*W,y:H+Math.random()*60,r:0.8+Math.random()*2.2,
+      vy:-(0.22+Math.random()*0.55),vx:(Math.random()-0.5)*0.38,
+      a:0.55+Math.random()*0.45,da:-(0.0008+Math.random()*0.0012),
+      col:g?GOLD:GREEN,halo:g?'rgba(225,182,74,':'rgba(120,180,90,'};
+  }
+  for(let i=0;i<COUNT;i++){const e=mkEmber();e.y=Math.random()*H;embers.push(e);}
+  function drawEmber(e){
+    ctx.save();
+    const gr=ctx.createRadialGradient(e.x,e.y,0,e.x,e.y,e.r*5);
+    gr.addColorStop(0,e.halo+(e.a*0.45).toFixed(3)+')');
+    gr.addColorStop(1,e.halo+'0)');
+    ctx.fillStyle=gr;ctx.beginPath();ctx.arc(e.x,e.y,e.r*5,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=e.a;ctx.fillStyle=e.col;
+    ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+  function tick(){
+    ctx.clearRect(0,0,W,H);
+    embers.forEach(function(e,i){
+      e.y+=e.vy;e.x+=e.vx;e.a+=e.da;drawEmber(e);
+      if(e.a<=0||e.y<-20){embers[i]=mkEmber();}
+    });
+    RAF=requestAnimationFrame(tick);
+  }
+  if(!reduced){tick();}
+
+  /* TYPEWRITER */
+  document.querySelectorAll('.tw-target').forEach(function(el){
+    let phrases;
+    try{phrases=JSON.parse(el.dataset.phrases||'[]');}catch(ex){return;}
+    if(!phrases.length)return;
+    let pi=0,ci=0,del=false,paused=false;
+    function step(){
+      if(reduced){el.textContent=phrases[0];return;}
+      const word=phrases[pi];
+      if(paused){paused=false;del=true;setTimeout(step,28);return;}
+      if(!del){
+        el.textContent=word.slice(0,ci+1);ci++;
+        if(ci===word.length){paused=true;setTimeout(step,2200);return;}
+        setTimeout(step,55);
+      }else{
+        el.textContent=word.slice(0,ci-1);ci--;
+        if(ci===0){del=false;pi=(pi+1)%phrases.length;setTimeout(step,320);return;}
+        setTimeout(step,28);
+      }
+    }
+    el.textContent=phrases[0];
+    setTimeout(step,400+Math.random()*600);
+  });
+
+  /* SCROLL REVEAL */
+  if(!reduced){
+    const revEls=document.querySelectorAll('.reveal');
+    revEls.forEach(function(el){
+      el.style.opacity='0';el.style.transform='translateY(18px)';
+      el.style.transition='opacity 0.6s ease,transform 0.6s ease';
+    });
+    const obs=new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(!entry.isIntersecting)return;
+        const el=entry.target;
+        const sibs=Array.from(el.parentElement.querySelectorAll('.reveal'));
+        const si=sibs.indexOf(el);
+        setTimeout(function(){el.style.opacity='1';el.style.transform='translateY(0)';},si*150);
+        obs.unobserve(el);
+      });
+    },{threshold:0.12});
+    revEls.forEach(function(el){obs.observe(el);});
+  }
+})();
+</script>
+
 </body>
 </html>
