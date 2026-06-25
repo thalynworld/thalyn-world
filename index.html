@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Thalyn® — Enter the Space Between Thought and Creation</title>
-<meta name="description" content="Thalyn® builds emotionally coherent 3D worlds from intent. Pick a feeling. Get a complete, walkable world you own. Reskin it in one pick. Export to Roblox.">
-<meta property="og:title" content="Thalyn® — Enter the Space Between Thought and Creation">
-<meta property="og:description" content="Pick a feeling. Get a complete, walkable world you own. Reskin it in one pick. Export to Roblox.">
+<title>Thalyn® — From Ancient Song, All Worlds Are Born.</title>
+<meta name="description" content="Thalyn® turns a feeling into a world you can walk through, reshape, and carry anywhere. No code, no 3D modelling. Pick an emotion. Walk the world it builds.">
+<meta property="og:title" content="Thalyn® — From Ancient Song, All Worlds Are Born.">
+<meta property="og:description" content="Every generative tool produces appearance. Thalyn produces meaning. Pick a feeling. Walk the world it builds. Change its entire look in one pick.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://thalyn.world">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,6 +26,7 @@
   html{scroll-behavior:smooth;}
   body{background:var(--root-bg);color:var(--parchment);font-family:var(--font-body);font-size:1.05rem;line-height:1.7;min-height:100vh;}
 
+  /* ── NAV ── */
   nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:1rem 2.5rem;background:rgba(11,21,21,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border-subtle);}
   .nav-logo{font-family:var(--font-display);font-size:1.15rem;font-weight:700;color:var(--gold);text-decoration:none;letter-spacing:0.08em;}
   .nav-logo sup{font-size:0.5em;vertical-align:super;color:var(--teal);}
@@ -33,67 +34,121 @@
   .nav-links a{font-family:var(--font-display);font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--parchment-dim);text-decoration:none;transition:color 0.2s;}
   .nav-links a:hover{color:var(--gold);}
 
+  /* ── HERO ── */
   .hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8rem 2rem 5rem;position:relative;overflow:hidden;}
-  .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 50% at 50% 40%,rgba(0,168,160,0.07) 0%,transparent 70%),radial-gradient(ellipse 40% 30% at 50% 60%,rgba(212,136,10,0.04) 0%,transparent 60%);pointer-events:none;}
-  .hero-eyebrow{font-family:var(--font-display);font-size:0.68rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--teal);margin-bottom:1.5rem;opacity:0.85;}
-  .hero-title{font-family:var(--font-display);font-size:clamp(2.4rem,6vw,5rem);font-weight:700;line-height:1.12;color:var(--text-bright);margin-bottom:1.5rem;letter-spacing:0.01em;}
-  .hero-title em{font-style:normal;color:var(--gold);}
-  .hero-sub{font-size:clamp(1.05rem,2.2vw,1.3rem);font-weight:300;font-style:italic;color:var(--parchment-dim);max-width:640px;margin:0 auto 0.6rem;}
-  .hero-sub2{font-family:var(--font-display);font-size:0.8rem;letter-spacing:0.1em;color:var(--teal-dim);margin-bottom:3rem;}
+  .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 65% 55% at 50% 42%,rgba(0,168,160,0.07) 0%,transparent 70%),radial-gradient(ellipse 40% 30% at 50% 65%,rgba(212,136,10,0.04) 0%,transparent 60%);pointer-events:none;}
+
+  /* Gaelic provenance mark */
+  .hero-gaelic{font-family:var(--font-display);font-size:0.62rem;letter-spacing:0.28em;text-transform:uppercase;color:rgba(0,168,160,0.35);margin-bottom:2rem;display:block;}
+
+  /* Primary myth line */
+  .hero-myth{font-family:var(--font-display);font-size:clamp(2rem,5.5vw,4.4rem);font-weight:700;line-height:1.1;color:var(--text-bright);margin-bottom:0;letter-spacing:0.01em;}
+  .hero-myth-next{font-family:var(--font-display);font-size:clamp(2rem,5.5vw,4.4rem);font-weight:700;line-height:1.1;color:var(--gold);margin-bottom:2.2rem;letter-spacing:0.01em;display:block;}
+
+  /* Threshold line — brand line now lives here */
+  .hero-threshold{font-family:var(--font-body);font-size:clamp(1rem,2.2vw,1.25rem);font-weight:300;font-style:italic;color:var(--parchment-dim);max-width:560px;margin:0 auto 0.5rem;line-height:1.5;}
+
+  /* Typewriter */
+  .hero-tw-wrap{min-height:2rem;margin-bottom:2.8rem;}
+  .tw-target{font-family:var(--font-display);font-size:0.8rem;letter-spacing:0.12em;color:var(--teal);text-transform:none;}
+  .tw-target::after{content:'|';animation:tw-blink 0.9s step-end infinite;color:var(--gold);margin-left:1px;}
+  @keyframes tw-blink{0%,100%{opacity:1}50%{opacity:0}}
+
   .hero-ctas{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;}
 
-  .btn-primary{font-family:var(--font-display);font-size:0.75rem;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:#0B1515;background:var(--gold);border:none;padding:0.9rem 2.2rem;cursor:pointer;text-decoration:none;transition:background 0.2s,box-shadow 0.2s;display:inline-block;}
-  .btn-primary:hover{background:#E8990E;box-shadow:0 0 24px rgba(212,136,10,0.35);}
-  .btn-secondary{font-family:var(--font-display);font-size:0.75rem;font-weight:400;letter-spacing:0.15em;text-transform:uppercase;color:var(--parchment-dim);background:transparent;border:1px solid var(--border);padding:0.9rem 2.2rem;cursor:pointer;text-decoration:none;transition:border-color 0.2s,color 0.2s;display:inline-block;}
+  .btn-primary{font-family:var(--font-display);font-size:0.75rem;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:#0B1515;background:var(--gold);border:none;padding:0.9rem 2.4rem;cursor:pointer;text-decoration:none;transition:background 0.2s,box-shadow 0.2s;display:inline-block;}
+  .btn-primary:hover{background:#E8990E;box-shadow:0 0 28px rgba(212,136,10,0.4);}
+  .btn-secondary{font-family:var(--font-display);font-size:0.75rem;font-weight:400;letter-spacing:0.15em;text-transform:uppercase;color:var(--parchment-dim);background:transparent;border:1px solid var(--border);padding:0.9rem 2.4rem;cursor:pointer;text-decoration:none;transition:border-color 0.2s,color 0.2s;display:inline-block;}
   .btn-secondary:hover{border-color:var(--gold-dim);color:var(--parchment);}
 
   .divider{width:100%;height:1px;background:linear-gradient(to right,transparent,var(--border),transparent);}
 
-  .category-strip{background:var(--panel);padding:2.2rem 2rem;text-align:center;border-top:1px solid var(--border-subtle);border-bottom:1px solid var(--border-subtle);}
-  .category-strip p{font-family:var(--font-display);font-size:0.8rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--teal);opacity:0.85;}
+  /* ── CATEGORY STRIP ── */
+  .category-strip{background:var(--panel);padding:2rem 2rem;text-align:center;border-top:1px solid var(--border-subtle);border-bottom:1px solid var(--border-subtle);}
+  .category-strip p{font-family:var(--font-display);font-size:0.75rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--teal);opacity:0.85;}
   .category-strip strong{color:var(--text-bright);font-weight:600;}
 
-  .doors-section{padding:6rem 2rem;max-width:1100px;margin:0 auto;}
-  .section-heading{font-family:var(--font-display);font-size:0.7rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--teal-dim);margin-bottom:3.5rem;text-align:center;}
+  /* ── PROBLEM STRIP ── */
+  .problem-section{padding:5rem 2rem;max-width:1060px;margin:0 auto;}
+  .problem-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5px;background:var(--border-subtle);margin-top:3rem;}
+  .problem-card{background:var(--panel);padding:2.2rem 1.8rem;}
+  .problem-quote{font-family:var(--font-body);font-size:1rem;font-style:italic;font-weight:300;color:var(--text-bright);line-height:1.55;margin-bottom:1.2rem;padding-bottom:1.2rem;border-bottom:1px solid var(--border-subtle);}
+  .problem-answer{font-size:0.9rem;font-weight:300;color:var(--parchment-dim);line-height:1.6;}
+  .section-eyebrow{font-family:var(--font-display);font-size:0.68rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--teal-dim);display:block;}
+
+  /* ── AUDIENCE SELECTOR ── */
+  .selector-section{padding:4rem 2rem 2rem;text-align:center;}
+  .selector-pills{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;margin-top:1.5rem;}
+  .pill{font-family:var(--font-display);font-size:0.7rem;letter-spacing:0.14em;text-transform:uppercase;padding:0.65rem 1.6rem;border:1px solid var(--border);color:var(--parchment-dim);text-decoration:none;transition:all 0.2s;cursor:pointer;background:transparent;}
+  .pill:hover{border-color:var(--gold-dim);color:var(--gold);background:rgba(212,136,10,0.04);}
+
+  /* ── DOORS ── */
+  .doors-section{padding:4rem 2rem 6rem;max-width:1100px;margin:0 auto;}
   .doors-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.5px;background:var(--border-subtle);border:1px solid var(--border-subtle);}
   .door{background:var(--panel);padding:2.5rem 2rem;text-decoration:none;display:flex;flex-direction:column;gap:0.75rem;transition:background 0.2s;position:relative;overflow:hidden;}
   .door::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--gold);transform:scaleX(0);transform-origin:left;transition:transform 0.3s ease;}
   .door:hover{background:var(--panel-light);}
   .door:hover::after{transform:scaleX(1);}
   .door-label{font-family:var(--font-display);font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--teal);}
-  .door-title{font-family:var(--font-display);font-size:1.15rem;font-weight:600;color:var(--text-bright);line-height:1.3;}
+  .door-title{font-family:var(--font-display);font-size:1.1rem;font-weight:600;color:var(--text-bright);line-height:1.3;}
   .door-desc{font-size:0.95rem;font-weight:300;color:var(--parchment-dim);line-height:1.6;}
   .door-cta{font-family:var(--font-display);font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--gold);margin-top:auto;padding-top:1rem;}
 
-  .what-section{background:var(--panel);padding:6rem 2rem;}
-  .what-inner{max-width:800px;margin:0 auto;}
-  .what-inner h2{font-family:var(--font-display);font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:600;color:var(--text-bright);margin-bottom:2rem;line-height:1.25;}
-  .what-inner p{font-size:1.1rem;font-weight:300;color:var(--parchment);margin-bottom:1.4rem;line-height:1.75;}
-  .what-inner p strong{color:var(--text-bright);font-weight:600;}
+  /* ── MEANING SECTION ── */
+  .meaning-section{background:var(--panel);padding:6rem 2rem;}
+  .meaning-inner{max-width:800px;margin:0 auto;}
+  .meaning-inner h2{font-family:var(--font-display);font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:600;color:var(--text-bright);margin-bottom:2rem;line-height:1.25;}
+  .meaning-inner p{font-size:1.1rem;font-weight:300;color:var(--parchment);margin-bottom:1.4rem;line-height:1.75;}
+  .meaning-inner p strong{color:var(--text-bright);font-weight:600;}
 
+  /* ── CONFIDENCE STRIP ── */
+  .confidence-section{padding:4rem 2rem;border-top:1px solid var(--border-subtle);border-bottom:1px solid var(--border-subtle);}
+  .confidence-inner{max-width:960px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:2rem;text-align:center;}
+  .conf-item{}
+  .conf-label{font-family:var(--font-display);font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--teal-dim);margin-bottom:0.5rem;display:block;}
+  .conf-value{font-family:var(--font-display);font-size:0.95rem;font-weight:600;color:var(--text-bright);line-height:1.35;}
+
+  /* ── WHO ── */
   .who-section{padding:6rem 2rem;max-width:1100px;margin:0 auto;}
   .who-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:2rem;margin-top:3rem;}
   .who-card{border-left:2px solid var(--border);padding:0 0 0 1.5rem;transition:border-left-color 0.2s;}
   .who-card:hover{border-left-color:var(--gold);}
-  .who-label{font-family:var(--font-display);font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--teal);margin-bottom:0.6rem;}
+  .who-label{font-family:var(--font-display);font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--teal);margin-bottom:0.6rem;display:block;}
   .who-card h3{font-family:var(--font-display);font-size:1rem;font-weight:600;color:var(--text-bright);margin-bottom:0.75rem;line-height:1.3;}
   .who-card p{font-size:0.95rem;font-weight:300;color:var(--parchment-dim);line-height:1.65;}
 
+  /* ── MISSION CLOSE ── */
   .mission{padding:5rem 2rem;text-align:center;background:linear-gradient(180deg,var(--panel) 0%,var(--root-bg) 100%);}
-  .mission-statement{font-family:var(--font-body);font-size:clamp(1.15rem,2.8vw,1.65rem);font-weight:300;font-style:italic;color:var(--text-bright);max-width:750px;margin:0 auto 1.4rem;line-height:1.55;}
-  .mission-gaelic{font-family:var(--font-display);font-size:0.72rem;letter-spacing:0.14em;color:var(--teal-dim);}
+  .mission-statement{font-family:var(--font-body);font-size:clamp(1.1rem,2.5vw,1.55rem);font-weight:300;font-style:italic;color:var(--text-bright);max-width:700px;margin:0 auto 1rem;line-height:1.55;}
+  .mission-connected{font-size:0.95rem;font-weight:300;color:var(--parchment-dim);max-width:540px;margin:0 auto 1.8rem;line-height:1.6;}
+  .mission-gaelic{font-family:var(--font-display);font-size:0.68rem;letter-spacing:0.18em;color:var(--teal-dim);}
 
+  /* ── FOOTER ── */
   footer{background:var(--root-bg);border-top:1px solid var(--border-subtle);padding:3rem 2rem 2rem;text-align:center;}
   .footer-links{display:flex;flex-wrap:wrap;gap:0.5rem 2rem;justify-content:center;margin-bottom:1.5rem;}
   .footer-links a{font-family:var(--font-display);font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--parchment-dim);text-decoration:none;transition:color 0.2s;}
   .footer-links a:hover{color:var(--gold);}
-  .footer-legal{font-size:0.78rem;color:rgba(217,203,168,0.3);line-height:1.5;}
+  .footer-legal{font-size:0.78rem;color:rgba(217,203,168,0.3);line-height:1.6;}
+  .footer-gaelic{font-family:var(--font-display);font-size:0.65rem;letter-spacing:0.16em;color:rgba(0,168,160,0.25);margin-bottom:1rem;display:block;}
 
+  /* ── THALYN MARK ── */
   .thalyn-mark{position:fixed;bottom:24px;left:24px;z-index:100;opacity:0.45;transition:opacity 0.4s;}
   .thalyn-mark:hover{opacity:0.9;}
   .thalyn-mark img{height:68px;filter:drop-shadow(0 0 10px rgba(212,136,10,0.25));}
 
-  @media(max-width:600px){nav{padding:1rem 1.2rem;}.nav-links{gap:1rem;}.nav-links a{font-size:0.65rem;}.hero{padding:7rem 1.2rem 4rem;}.doors-section,.who-section{padding:4rem 1.2rem;}.what-section{padding:4rem 1.2rem;}.thalyn-mark{bottom:16px;left:16px;}.thalyn-mark img{height:50px;}}
+  /* ── ANIMATIONS ── */
+  #ember-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;}
+  nav,section,footer,header,article,.category-strip,.problem-section,.selector-section,.doors-section,.meaning-section,.confidence-section,.who-section,.mission{position:relative;z-index:1;}
+
+  @media(max-width:768px){
+    .problem-grid{grid-template-columns:1fr;}
+    .hero-myth,.hero-myth-next{font-size:clamp(1.8rem,8vw,3rem);}
+  }
+  @media(max-width:600px){
+    nav{padding:1rem 1.2rem;}.nav-links{gap:1rem;}.nav-links a{font-size:0.65rem;}
+    .thalyn-mark img{height:50px;}
+    .hero{padding:7rem 1.4rem 4rem;}
+  }
 </style>
 </head>
 <body>
@@ -109,11 +164,21 @@
   </ul>
 </nav>
 
+<!-- ═══════════════════════════════════════════
+     HERO — The myth line. Then the threshold.
+════════════════════════════════════════════ -->
 <section class="hero">
-  <p class="hero-eyebrow">Thalyn® — World Generation Platform</p>
-  <h1 class="hero-title">Enter the space between<br><em>thought and creation.</em></h1>
-  <p class="hero-sub">Every generative tool produces appearance. Thalyn produces meaning.</p>
-  <p class="hero-sub2">You place what matters. Thalyn resolves everything else.</p>
+  <span class="hero-gaelic">Ó Senchetel, Beirthir Cach Bith</span>
+
+  <h1 class="hero-myth">From ancient song, all worlds are born.</h1>
+  <span class="hero-myth-next">Yours is next.</span>
+
+  <p class="hero-threshold">Enter the space between thought and creation.</p>
+
+  <div class="hero-tw-wrap">
+    <span class="tw-target" data-phrases='["A world that feels the way you chose.","Walked in first person. Owned completely.","Changed in a single pick.","Waiting inside you right now."]'>A world that feels the way you chose.</span>
+  </div>
+
   <div class="hero-ctas">
     <a href="https://store.steampowered.com" target="_blank" rel="noopener" class="btn-primary">Wishlist on Steam</a>
     <a href="https://discord.gg/22jxAwwgX" target="_blank" rel="noopener" class="btn-secondary">Join Discord</a>
@@ -122,35 +187,74 @@
 
 <div class="divider"></div>
 
+<!-- CATEGORY -->
 <div class="category-strip">
   <p>A <strong>procedural world generation platform</strong> — no code, no 3D modelling, no manual world-building.<br>PC · Steam · £19.99 · One-time purchase</p>
 </div>
 
+<!-- ═══════════════════════════════════════════
+     PROBLEM STRIP — Three pains, three answers
+════════════════════════════════════════════ -->
+<section class="problem-section">
+  <span class="section-eyebrow">Every generative tool produces appearance. Thalyn produces meaning.</span>
+  <div class="problem-grid">
+    <div class="problem-card reveal">
+      <p class="problem-quote">"I placed assets for hours. The world still felt like nothing."</p>
+      <p class="problem-answer">Thalyn's placement brain puts everything where it belongs — not where the algorithm scatters it. Every tree, every path, every sightline is resolved around the feeling you chose.</p>
+    </div>
+    <div class="problem-card reveal">
+      <p class="problem-quote">"I can imagine exactly how it should feel. I have no way to build it."</p>
+      <p class="problem-answer">Six emotional archetypes. Every terrain, asset, atmosphere, and light resolves around the one you choose. The emotional outcome is designed in — not left to chance.</p>
+    </div>
+    <div class="problem-card reveal">
+      <p class="problem-quote">"Every world I make looks like everyone else's."</p>
+      <p class="problem-answer">Change the entire visual character of your world in a single pick. Every surface, every texture, every object transforms at once. No other tool does this.</p>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ═══════════════════════════════════════════
+     AUDIENCE SELECTOR — Self-identify, then scroll
+════════════════════════════════════════════ -->
+<section class="selector-section">
+  <span class="section-eyebrow">Which of these is you?</span>
+  <div class="selector-pills">
+    <a href="#creators" class="pill">I create worlds</a>
+    <a href="#developers" class="pill">I build games</a>
+    <a href="#explorers" class="pill">I want to explore</a>
+    <a href="#wellness" class="pill">I design spaces</a>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     DOORS — Page hub
+════════════════════════════════════════════ -->
 <section class="doors-section">
-  <p class="section-heading">Explore Thalyn</p>
   <div class="doors-grid">
-    <a href="/core/" class="door">
+    <a href="/core/" class="door reveal">
       <span class="door-label">The Tool</span>
       <h2 class="door-title">Thalyn Core</h2>
-      <p class="door-desc">What you get for £19.99. Every capability unlocked from day one. Pick a feeling. Place what matters. Walk the world Thalyn builds around it — then change its entire look in a single pick.</p>
+      <p class="door-desc">What £19.99 buys. Every capability unlocked from day one. Pick a feeling. Walk the world it builds. Change its entire look in a single pick.</p>
       <span class="door-cta">Explore the tool →</span>
     </a>
-    <a href="/roblox/" class="door">
+    <a href="/roblox/" class="door reveal">
       <span class="door-label">Export</span>
       <h2 class="door-title">World Export</h2>
       <p class="door-desc">Take your generated world into Roblox as a complete, playable scene — terrain, assets, lighting, atmosphere. Your world. Their platform.</p>
       <span class="door-cta">See the pipeline →</span>
     </a>
-    <a href="/research/" class="door">
+    <a href="/research/" class="door reveal">
       <span class="door-label">The Science</span>
       <h2 class="door-title">Why Spaces Feel the Way They Do</h2>
-      <p class="door-desc">The environmental psychology that underlies every system in Thalyn — from prospect-refuge theory to attention restoration and biophilia.</p>
+      <p class="door-desc">The environmental psychology that underlies every system in Thalyn — the research that explains why some spaces feel like somewhere, and most don't.</p>
       <span class="door-cta">Read the research →</span>
     </a>
-    <a href="/developers/" class="door">
+    <a href="/developers/" class="door reveal">
       <span class="door-label">For Builders</span>
       <h2 class="door-title">Developers</h2>
-      <p class="door-desc">Game-ready meshes, coherent topology, and Roblox export — built around your intent. Fast iteration for indie developers and small studios.</p>
+      <p class="door-desc">Game-ready worlds built around your intent. Your assets in real, coherent topology. Professional-grade visual quality without the pipeline cost.</p>
       <span class="door-cta">Developer details →</span>
     </a>
   </div>
@@ -158,67 +262,197 @@
 
 <div class="divider"></div>
 
-<section class="what-section">
-  <div class="what-inner">
+<!-- ═══════════════════════════════════════════
+     MEANING — What makes Thalyn different
+════════════════════════════════════════════ -->
+<section class="meaning-section">
+  <div class="meaning-inner">
     <h2>A world that feels like somewhere.</h2>
-    <p>Thalyn was built because the tools that exist produce worlds that look like something — but rarely feel like anything. The terrain is technically correct. The assets are high quality. But walk through it and the space says nothing. There is no sense of shelter, no sightline that draws the eye, no clearing that invites you to stay.</p>
-    <p>Every system in Thalyn is built around a single question: <strong>does this feel the way it should?</strong> Terrain resolves around the emotion you choose. Assets are placed where spatial psychology says they belong. Light, atmosphere, and path behave as designed elements. The result is a world with intent — one that communicates before you've understood why.</p>
+    <p>The tools that exist produce worlds that look like something — but rarely feel like anything. The terrain is technically correct. The assets are high quality. But walk through it and the space says nothing. There is no sense of shelter, no sightline that draws the eye, no clearing that invites you to stay.</p>
+    <p>Every system in Thalyn is built around a single question: <strong>does this feel the way it should?</strong> Terrain resolves around the emotion you choose. Assets land where spatial psychology says they belong. Light, atmosphere, and path behave as designed elements — not defaults. The result is a world with intent.</p>
     <p>This is not a faster way to make a generic world. It is a different understanding of what a world is for.</p>
-    <p>One purchase. No subscription. No code. No 3D experience required.</p>
   </div>
 </section>
 
 <div class="divider"></div>
 
+<!-- ═══════════════════════════════════════════
+     CONFIDENCE — Trust signals
+════════════════════════════════════════════ -->
+<section class="confidence-section">
+  <div class="confidence-inner">
+    <div class="conf-item">
+      <span class="conf-label">Foundation</span>
+      <span class="conf-value">Built on environmental psychology — prospect-refuge theory, attention restoration, biophilia</span>
+    </div>
+    <div class="conf-item">
+      <span class="conf-label">Generation</span>
+      <span class="conf-value">Deterministic — every seed reproducible, every world ownable</span>
+    </div>
+    <div class="conf-item">
+      <span class="conf-label">Prior Art</span>
+      <span class="conf-value">Defensive publication filed June 2026 — <a href="/prior-art/" style="color:var(--teal-dim);text-decoration:none;">thalyn.world/prior-art</a></span>
+    </div>
+    <div class="conf-item">
+      <span class="conf-label">Purchase</span>
+      <span class="conf-value">£19.99 one-time · No subscription · You own the output</span>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ═══════════════════════════════════════════
+     WHO — Four audiences
+════════════════════════════════════════════ -->
 <section class="who-section">
-  <p class="section-heading">Who Thalyn is for</p>
+  <span class="section-eyebrow">Who Thalyn is for</span>
   <div class="who-grid">
-    <div class="who-card">
-      <p class="who-label">Indie Developers</p>
-      <h3>Game-ready scenes built around your intent.</h3>
-      <p>Bring your own assets; Thalyn places them in real, coherent topology. Fast-iterate on world designs without building the world yourself. Export complete, walkable scenes to Roblox. AA-comparable visual quality without the pipeline cost.</p>
-    </div>
-    <div class="who-card">
-      <p class="who-label">Hangout Creators</p>
+    <div class="who-card reveal" id="creators">
+      <span class="who-label">Creators &amp; Hangout Builders</span>
       <h3>Build your world. Make it yours. Share it.</h3>
-      <p>No prior experience required. Pick the feeling — serene, joyful, eerie, chaotic — and Thalyn builds it. Walk through your creation. Change its entire visual character with a single pick. Export to Roblox for your community to explore.</p>
+      <p>No experience required. Pick the feeling — serene, joyful, eerie, chaotic. Walk through your creation. Change its entire look in one pick. Export to Roblox for your community to explore.</p>
     </div>
-    <div class="who-card">
-      <p class="who-label">Gamers</p>
+    <div class="who-card reveal" id="developers">
+      <span class="who-label">Indie Developers</span>
+      <h3>Game-ready scenes built around your intent.</h3>
+      <p>Your assets in real, coherent topology. Fast-iterate on world designs without building the world yourself. Professional-grade visual quality without the pipeline cost.</p>
+    </div>
+    <div class="who-card reveal" id="explorers">
+      <span class="who-label">Gamers &amp; Explorers</span>
       <h3>A treasure hunt woven into creation.</h3>
-      <p>ThalynQuest is a free, optional discovery layer. Follow the riddles. Shape the worlds they describe. Claim the seven relics. Earn things money cannot buy — rare visual looks and world-building powers nobody else has access to.</p>
+      <p>ThalynQuest is a free, optional discovery layer. Seven relics. Seven songs. Earn things money cannot buy — rare visual looks and world-building powers nobody else has access to.</p>
     </div>
-    <div class="who-card">
-      <p class="who-label">Wellness Professionals</p>
+    <div class="who-card reveal" id="wellness">
+      <span class="who-label">Wellness Professionals</span>
       <h3>Designed spaces for designed purposes.</h3>
-      <p>The emotional coherence at Thalyn's core is grounded in environmental psychology — the same research that informs therapeutic spatial design. Thalyn makes those principles generatable without specialist technical knowledge.</p>
+      <p>Emotional coherence grounded in the same research that informs therapeutic spatial design. Thalyn makes those principles generatable without specialist technical knowledge.</p>
     </div>
   </div>
 </section>
 
 <div class="divider"></div>
 
+<!-- ═══════════════════════════════════════════
+     MISSION CLOSE
+════════════════════════════════════════════ -->
 <section class="mission">
-  <p class="mission-statement">"Thalyn exists to give anyone the ability to create a world that feels like somewhere — without code, without 3D expertise, and without compromising on emotional intent."</p>
-  <p class="mission-gaelic">Ó Senchetel, Beirthir Cach Bith — From ancient song, all worlds are born.</p>
+  <p class="mission-statement">"Thalyn exists to give anyone the ability to create a world that feels like somewhere — without code, without 3D expertise, and without compromise on emotional intent."</p>
+  <p class="mission-connected">Your world is yours alone. And part of something far larger.</p>
+  <p class="mission-gaelic">From ancient song, all worlds are born. &nbsp;·&nbsp; Ó Senchetel, Beirthir Cach Bith.</p>
 </section>
 
+<!-- ═══════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════════ -->
 <footer>
   <div class="footer-links">
     <a href="/core/">The Tool</a>
     <a href="/roblox/">World Export</a>
     <a href="/research/">Research</a>
     <a href="/developers/">Developers</a>
+    <a href="/prior-art/">Prior Art</a>
     <a href="/legal/">Legal</a>
     <a href="https://discord.gg/22jxAwwgX" target="_blank" rel="noopener">Discord</a>
     <a href="https://store.steampowered.com" target="_blank" rel="noopener">Steam</a>
     <a href="mailto:hello@thalyn.world">Contact</a>
   </div>
+  <span class="footer-gaelic">From ancient song, all worlds are born. &nbsp;·&nbsp; Ó Senchetel, Beirthir Cach Bith.</span>
   <p class="footer-legal">© 2026 Thalyn Ltd. All rights reserved. Thalyn® is a registered trademark of Thalyn Ltd, registered in the United Kingdom.<br>
   Thalyn is not affiliated with or endorsed by Roblox Corporation, Valve Corporation, or Unity Technologies.</p>
 </footer>
 
 <a href="/" class="thalyn-mark"><img src="thalyn_figure_gold.png" alt="Thalyn"></a>
 
+<!-- ═══════════════════════════════════════════
+     ANIMATIONS — Embers · Typewriter · Reveal
+════════════════════════════════════════════ -->
+<canvas id="ember-canvas" aria-hidden="true"></canvas>
+<script>
+(function(){
+  /* ── EMBERS ── */
+  const canvas=document.getElementById('ember-canvas');
+  const ctx=canvas.getContext('2d');
+  const GOLD='#E1B64A',GREEN='#78b45a';
+  let W,H,embers=[];
+  const COUNT=42;
+  const reduced=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+  window.addEventListener('resize',resize);resize();
+  function mkEmber(){
+    const g=Math.random()>0.38;
+    return{x:Math.random()*W,y:H+Math.random()*60,r:0.8+Math.random()*2.2,
+      vy:-(0.22+Math.random()*0.55),vx:(Math.random()-0.5)*0.38,
+      a:0.55+Math.random()*0.45,da:-(0.0008+Math.random()*0.0012),
+      col:g?GOLD:GREEN,halo:g?'rgba(225,182,74,':'rgba(120,180,90,'};
+  }
+  for(let i=0;i<COUNT;i++){const e=mkEmber();e.y=Math.random()*H;embers.push(e);}
+  function tick(){
+    ctx.clearRect(0,0,W,H);
+    embers.forEach(function(e,i){
+      e.y+=e.vy;e.x+=e.vx;e.a+=e.da;
+      ctx.save();
+      const gr=ctx.createRadialGradient(e.x,e.y,0,e.x,e.y,e.r*5);
+      gr.addColorStop(0,e.halo+(e.a*0.45).toFixed(3)+')');
+      gr.addColorStop(1,e.halo+'0)');
+      ctx.fillStyle=gr;ctx.beginPath();ctx.arc(e.x,e.y,e.r*5,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=e.a;ctx.fillStyle=e.col;
+      ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,Math.PI*2);ctx.fill();
+      ctx.restore();
+      if(e.a<=0||e.y<-20){embers[i]=mkEmber();}
+    });
+    requestAnimationFrame(tick);
+  }
+  if(!reduced){tick();}
+
+  /* ── TYPEWRITER ── */
+  document.querySelectorAll('.tw-target').forEach(function(el){
+    let phrases;
+    try{phrases=JSON.parse(el.dataset.phrases||'[]');}catch(ex){return;}
+    if(!phrases.length)return;
+    let pi=0,ci=0,del=false,paused=false;
+    function step(){
+      if(reduced){el.textContent=phrases[0];return;}
+      const word=phrases[pi];
+      if(paused){paused=false;del=true;setTimeout(step,28);return;}
+      if(!del){
+        el.textContent=word.slice(0,ci+1);ci++;
+        if(ci===word.length){paused=true;setTimeout(step,2200);return;}
+        setTimeout(step,55);
+      }else{
+        el.textContent=word.slice(0,ci-1);ci--;
+        if(ci===0){del=false;pi=(pi+1)%phrases.length;setTimeout(step,320);return;}
+        setTimeout(step,28);
+      }
+    }
+    el.textContent=phrases[0];
+    setTimeout(step,600);
+  });
+
+  /* ── SCROLL REVEAL ── */
+  if(!reduced){
+    const revEls=document.querySelectorAll('.reveal');
+    revEls.forEach(function(el){
+      el.style.opacity='0';
+      el.style.transform='translateY(18px)';
+      el.style.transition='opacity 0.6s ease,transform 0.6s ease';
+    });
+    const obs=new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(!entry.isIntersecting)return;
+        const el=entry.target;
+        const sibs=Array.from(el.parentElement.querySelectorAll('.reveal'));
+        const si=sibs.indexOf(el);
+        setTimeout(function(){
+          el.style.opacity='1';
+          el.style.transform='translateY(0)';
+        },si*150);
+        obs.unobserve(el);
+      });
+    },{threshold:0.1});
+    revEls.forEach(function(el){obs.observe(el);});
+  }
+})();
+</script>
 </body>
 </html>
