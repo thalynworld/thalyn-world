@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Thalyn® for Developers — Game-Ready Worlds, Built Around Your Intent</title>
-<meta name="description" content="Indie or professional, solo or team. Game-ready meshes you own. Built around your intent. Coherent topology, AA-comparable visual quality, Roblox export. Thalyn for developers.">
+<meta name="description" content="Indie or professional, solo or team. Game-ready meshes you own. Built around your intent. Game-ready worlds. Professional-grade quality, built around your intent. Thalyn for developers.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
@@ -75,6 +75,11 @@
   .thalyn-mark{position:fixed;bottom:24px;left:24px;z-index:100;opacity:0.45;transition:opacity 0.4s;}
   .thalyn-mark:hover{opacity:0.9;}
   .thalyn-mark img{height:68px;filter:drop-shadow(0 0 10px rgba(212,136,10,0.25));}
+  /* ── CANVAS ── */
+  #ember-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;}
+  nav,section,footer,header,article,.reskin-callout,.category-strip,.legal-body,.essay-body,.references{position:relative;z-index:1;}
+  .tw-target::after{content:'|';animation:tw-blink 0.9s step-end infinite;color:var(--gold);margin-left:1px;}
+  @keyframes tw-blink{0%,100%{opacity:1}50%{opacity:0}}
 </style>
 </head>
 <body>
@@ -92,7 +97,7 @@
 
 <section class="page-hero">
   <p class="page-eyebrow">Thalyn® — For Developers</p>
-  <h1 class="page-title">Game-ready worlds.<br><em>Built around your intent.</em></h1>
+  <h1 class="page-title">Game-ready worlds.<br><em class="tw-target" data-phrases='["Built around your intent.","Your assets, real topology.","Fast-iterate. Ship the game.","Professional quality, solo budget."]'>Built around your intent.</em></h1>
   <p class="page-sub">Bring your own assets. Thalyn places them in coherent topology, with full atmosphere and export. Fast iteration. Game-ready output. Meshes you own.</p>
   <div class="cta-row">
     <a href="https://store.steampowered.com" target="_blank" rel="noopener" class="btn-primary">Wishlist on Steam</a>
@@ -106,8 +111,8 @@
   <p class="label">The developer case</p>
   <h2>The part of game development that doesn't have to be hard.</h2>
   <p>World design is one of the heaviest creative and technical lifts in game development. Terrain takes time. Asset placement takes longer. Getting the two to feel like a coherent environment — not a collection of placed things — takes experience that most solo developers and small teams don't have time to develop.</p>
-  <p>Thalyn takes that lift away. <strong>You describe intent — emotional archetype, world shape, what matters in the scene.</strong> Thalyn resolves terrain, biome placement, path logic, water, erosion, atmosphere, lighting, and asset distribution into a coherent world. The output is a scene you own, ready to receive your game mechanics.</p>
-  <p>For rapid prototyping: a new world configuration in the time it takes to describe it. For final production: AA-comparable visual quality with full control over the assets that go into it. For Roblox distribution: complete export, no Awen cost, your experience on their platform.</p>
+  <p>Thalyn takes that lift away. <strong>You choose the emotional character, the world shape, and what matters in the scene.</strong> Thalyn resolves terrain, biome placement, path logic, water, erosion, atmosphere, lighting, and asset distribution into a coherent world. The output is a scene you own, ready to receive your game mechanics.</p>
+  <p>For rapid prototyping: a new world configuration in a single session. For final production: professional-grade visual quality with full control over the assets that go into it. For Roblox distribution: complete export, no additional cost, your experience on their platform.</p>
 </section>
 
 <div class="divider"></div>
@@ -116,29 +121,29 @@
   <div class="cards-inner">
     <p class="label">What developers get</p>
     <div class="cards-grid">
-      <div class="card">
+      <div class="card reveal">
         <h3>Bring Your Own Assets</h3>
-        <p>Place your own models as Hero Zones — the focal points the world resolves around. Thalyn's asset catalogue fills the scene; your assets anchor it. The output contains what you put in.</p>
+        <p>Place your own models as focal points — the world resolves around them spatially. Thalyn's asset catalogue fills the scene; your assets anchor it. The output contains what you put in.</p>
       </div>
-      <div class="card">
+      <div class="card reveal">
         <h3>You Own the Output</h3>
         <p>Generated worlds and their assets are yours. No licensing encumbrance on the generated terrain or placement. Export to Roblox and publish as your own experience.</p>
       </div>
-      <div class="card">
+      <div class="card reveal">
         <h3>Fast Iteration</h3>
-        <p>Same configuration, different seed. Reseed to explore variations on your world without reconfiguring from scratch. Chronicle every generation; return to any previous world.</p>
+        <p>Same configuration, different seed. Reseed to explore variations on your world without reconfiguring from scratch. Every generation is saved — return to any world you've made.</p>
       </div>
-      <div class="card">
+      <div class="card reveal">
         <h3>Coherent, Not Assembled</h3>
         <p>Thalyn's placement is emotionally and spatially resolved — not randomly scattered. Assets land where spatial psychology says they belong. Sightlines are designed. The scene has intent.</p>
       </div>
-      <div class="card">
+      <div class="card reveal">
         <h3>Deterministic Builds</h3>
         <p>Same seed, same world. Share a seed with your team; everyone can reproduce the exact configuration. Version-control your world intent, not just your code.</p>
       </div>
-      <div class="card">
+      <div class="card reveal">
         <h3>Platform Export</h3>
-        <p>Export to Roblox as a complete playable scene — terrain, assets, lighting, atmosphere. No Awen cost to export. More platform adapters on the roadmap.</p>
+        <p>Export to Roblox as a complete playable scene — terrain, assets, lighting, atmosphere. No additional cost to export. More platform adapters on the roadmap.</p>
       </div>
     </div>
   </div>
@@ -149,22 +154,22 @@
 <section class="use-cases">
   <p class="label">Use cases</p>
   <div class="use-grid">
-    <div class="use-item">
+    <div class="use-item reveal">
       <p class="use-label">Indie Solo Dev</p>
       <h3>Skip the world-build. Ship the game.</h3>
       <p>Rapid-iterate on world configurations without building the world yourself. Thalyn produces a complete, coherent scene you can drop your mechanics into. Prototype ten layouts in a day; ship the one that works.</p>
     </div>
-    <div class="use-item">
+    <div class="use-item reveal">
       <p class="use-label">Small Studio</p>
       <h3>AA visual quality without the pipeline cost.</h3>
       <p>Thalyn's visual quality competes with environments that take much longer to build by hand. Give your artists the time for what only they can do — character, bespoke structures, hero assets — while Thalyn handles coherent world fill.</p>
     </div>
-    <div class="use-item">
+    <div class="use-item reveal">
       <p class="use-label">Game Jam</p>
       <h3>A complete environment in your first session.</h3>
       <p>Configure your world intent, pick your emotion, generate. Walk the scene. Export to Roblox. The environment problem is solved before your jam is an hour old.</p>
     </div>
-    <div class="use-item">
+    <div class="use-item reveal">
       <p class="use-label">Roblox Developer</p>
       <h3>Unique experiences that look like nobody else's.</h3>
       <p>Stop building from Roblox terrain tools and generic asset packs. Thalyn produces scenes with coherent identity — emotional character, designed sightlines, full atmosphere — and exports them as ready-to-publish Roblox places.</p>
@@ -197,5 +202,91 @@
 </footer>
 
 <a href="/" class="thalyn-mark"><img src="../thalyn_figure_gold.png" alt="Thalyn"></a>
+
+<canvas id="ember-canvas" aria-hidden="true"></canvas>
+<script>
+(function(){
+  const canvas=document.getElementById('ember-canvas');
+  const ctx=canvas.getContext('2d');
+  const GOLD='#E1B64A',GREEN='#78b45a';
+  let W,H,embers=[],RAF;
+  const COUNT=42;
+  const reduced=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+  window.addEventListener('resize',resize);resize();
+  function mkEmber(){
+    const g=Math.random()>0.38;
+    return{x:Math.random()*W,y:H+Math.random()*60,r:0.8+Math.random()*2.2,
+      vy:-(0.22+Math.random()*0.55),vx:(Math.random()-0.5)*0.38,
+      a:0.55+Math.random()*0.45,da:-(0.0008+Math.random()*0.0012),
+      col:g?GOLD:GREEN,halo:g?'rgba(225,182,74,':'rgba(120,180,90,'};
+  }
+  for(let i=0;i<COUNT;i++){const e=mkEmber();e.y=Math.random()*H;embers.push(e);}
+  function drawEmber(e){
+    ctx.save();
+    const gr=ctx.createRadialGradient(e.x,e.y,0,e.x,e.y,e.r*5);
+    gr.addColorStop(0,e.halo+(e.a*0.45).toFixed(3)+')');
+    gr.addColorStop(1,e.halo+'0)');
+    ctx.fillStyle=gr;ctx.beginPath();ctx.arc(e.x,e.y,e.r*5,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=e.a;ctx.fillStyle=e.col;
+    ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+  function tick(){
+    ctx.clearRect(0,0,W,H);
+    embers.forEach(function(e,i){
+      e.y+=e.vy;e.x+=e.vx;e.a+=e.da;drawEmber(e);
+      if(e.a<=0||e.y<-20){embers[i]=mkEmber();}
+    });
+    RAF=requestAnimationFrame(tick);
+  }
+  if(!reduced){tick();}
+
+  /* TYPEWRITER */
+  document.querySelectorAll('.tw-target').forEach(function(el){
+    let phrases;
+    try{phrases=JSON.parse(el.dataset.phrases||'[]');}catch(ex){return;}
+    if(!phrases.length)return;
+    let pi=0,ci=0,del=false,paused=false;
+    function step(){
+      if(reduced){el.textContent=phrases[0];return;}
+      const word=phrases[pi];
+      if(paused){paused=false;del=true;setTimeout(step,28);return;}
+      if(!del){
+        el.textContent=word.slice(0,ci+1);ci++;
+        if(ci===word.length){paused=true;setTimeout(step,2200);return;}
+        setTimeout(step,55);
+      }else{
+        el.textContent=word.slice(0,ci-1);ci--;
+        if(ci===0){del=false;pi=(pi+1)%phrases.length;setTimeout(step,320);return;}
+        setTimeout(step,28);
+      }
+    }
+    el.textContent=phrases[0];
+    setTimeout(step,400+Math.random()*600);
+  });
+
+  /* SCROLL REVEAL */
+  if(!reduced){
+    const revEls=document.querySelectorAll('.reveal');
+    revEls.forEach(function(el){
+      el.style.opacity='0';el.style.transform='translateY(18px)';
+      el.style.transition='opacity 0.6s ease,transform 0.6s ease';
+    });
+    const obs=new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(!entry.isIntersecting)return;
+        const el=entry.target;
+        const sibs=Array.from(el.parentElement.querySelectorAll('.reveal'));
+        const si=sibs.indexOf(el);
+        setTimeout(function(){el.style.opacity='1';el.style.transform='translateY(0)';},si*150);
+        obs.unobserve(el);
+      });
+    },{threshold:0.12});
+    revEls.forEach(function(el){obs.observe(el);});
+  }
+})();
+</script>
+
 </body>
 </html>
