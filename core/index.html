@@ -97,6 +97,11 @@
 
   @media(max-width:600px){.emotions-grid{grid-template-columns:1fr 1fr;}nav{padding:1rem 1.2rem;}.nav-links{gap:1rem;}.nav-links a{font-size:0.65rem;}.thalyn-mark img{height:50px;}}
   @media(max-width:420px){.emotions-grid{grid-template-columns:1fr;}}
+  /* ── CANVAS ── */
+  #ember-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;}
+  nav,section,footer,header,article,.reskin-callout,.category-strip,.legal-body,.essay-body,.references{position:relative;z-index:1;}
+  .tw-target::after{content:'|';animation:tw-blink 0.9s step-end infinite;color:var(--gold);margin-left:1px;}
+  @keyframes tw-blink{0%,100%{opacity:1}50%{opacity:0}}
 </style>
 </head>
 <body>
@@ -114,7 +119,7 @@
 
 <section class="page-hero">
   <p class="page-eyebrow">Thalyn Core — What £19.99 buys</p>
-  <h1 class="page-title">Every capability.<br><em>Unlocked from day one.</em></h1>
+  <h1 class="page-title">Every capability.<br><em class="tw-target" data-phrases='["Unlocked from day one.","No code. No 3D experience.","One purchase, yours to keep.","Complete, walkable, yours."]'>Unlocked from day one.</em></h1>
   <p class="page-sub">One purchase. No subscription. No code. No 3D experience required.</p>
   <div class="cta-row">
     <a href="https://store.steampowered.com" target="_blank" rel="noopener" class="btn-primary">Wishlist on Steam</a>
@@ -145,41 +150,41 @@
   <div class="features-inner">
     <span class="section-eyebrow">What's included — day one, every copy</span>
     <div class="features-grid">
-      <div class="feature-card">
+      <div class="feature-card reveal">
         <h3>Six Emotional Archetypes</h3>
         <p>Serene, Joyful, Oppressive, Desolate, Eerie, Chaotic. Every terrain, biome, asset placement, and atmosphere parameter resolves around the emotion you choose.</p>
       </div>
-      <div class="feature-card">
+      <div class="feature-card reveal">
         <h3>Complete Terrain Generation</h3>
         <p>Heightmaps, biome propagation, natural boundaries, erosion, water bodies, paths, and designed sightlines — generated as a coherent whole, not assembled from parts.</p>
       </div>
-      <div class="feature-card">
-        <h3>Hero Zones</h3>
-        <p>Place your own asset — a tree, a structure, a landmark — and the world resolves around it. Your focal point is guaranteed walkable and compositionally anchored.</p>
+      <div class="feature-card reveal">
+        <h3>Focal Points (Hero Zones)</h3>
+        <p>Mark a specific spot — your own asset, a landmark, an area of importance — and the world resolves around it. Terrain, paths, and sightlines arrange themselves so that your chosen point is central and always reachable.</p>
       </div>
-      <div class="feature-card">
+      <div class="feature-card reveal">
         <h3>Full Atmosphere System</h3>
         <p>Sky, fog, time of day, and ambient character — driven by your chosen emotion, not picked from a list of unrelated presets.</p>
       </div>
-      <div class="feature-card">
+      <div class="feature-card reveal">
         <h3>One-Pick World Reskin</h3>
         <p>Walk your world and change its entire visual character in a single selection. Every surface transforms at once. No other tool does this.</p>
       </div>
-      <div class="feature-card">
-        <h3>Chronicles</h3>
-        <p>Every generation is logged as an immutable Chronicle — a record of your seed, configuration, and output. Return to any world you've made. Reseed to generate a fresh world from the same intent.</p>
+      <div class="feature-card reveal">
+        <h3>Generation History</h3>
+        <p>Every world you generate is automatically saved — its seed, emotional archetype, and configuration. Return to any world you've ever made. Generate a fresh variation from the same starting intent.</p>
       </div>
-      <div class="feature-card">
+      <div class="feature-card reveal">
         <h3>Deterministic Builds</h3>
         <p>Same seed, same world. Share a seed and anyone can reproduce your world exactly.</p>
       </div>
-      <div class="feature-card">
+      <div class="feature-card reveal">
         <h3>Roblox Export</h3>
-        <p>Export any generated world as a complete, playable Roblox scene. Terrain, assets, lighting, and atmosphere included. Export costs no Awen — it is a pipeline operation, not a generation.</p>
+        <p>Export any generated world as a complete, playable Roblox scene. Terrain, assets, lighting, and atmosphere included. Export is a pipeline step, not a generation — no credit is spent.</p>
       </div>
-      <div class="feature-card">
+      <div class="feature-card reveal">
         <h3>Visual Looks Library</h3>
-        <p>A curated set of visual looks included with every copy, spanning a range of aesthetic characters. A growing collection is available to discover with Awen credit. Ten exclusive looks are earned through ThalynQuest — they cannot be collected any other way.</p>
+        <p>A curated set of visual looks included with every copy, spanning a range of aesthetic characters. A growing collection is available to discover as you use the app. Ten exclusive looks are earned through ThalynQuest — they cannot be collected any other way.</p>
       </div>
     </div>
   </div>
@@ -190,12 +195,12 @@
 <section class="emotions-section">
   <span class="section-eyebrow">Six emotional archetypes</span>
   <div class="emotions-grid">
-    <div class="emotion-tile"><p class="emotion-name">Serene</p><p class="emotion-desc">Open, gentle, unhurried. Spaces that invite you to rest.</p></div>
-    <div class="emotion-tile"><p class="emotion-name">Joyful</p><p class="emotion-desc">Bright, abundant, generous. Worlds that feel alive and welcoming.</p></div>
-    <div class="emotion-tile"><p class="emotion-name">Oppressive</p><p class="emotion-desc">Weight and enclosure. A world that closes around the viewer.</p></div>
-    <div class="emotion-tile"><p class="emotion-name">Desolate</p><p class="emotion-desc">Emptied. The feeling of something that was, and is no longer.</p></div>
-    <div class="emotion-tile"><p class="emotion-name">Eerie</p><p class="emotion-desc">Wrongness at the edge of perception. The unseen that shouldn't be there.</p></div>
-    <div class="emotion-tile"><p class="emotion-name">Chaotic</p><p class="emotion-desc">Overwhelm as terrain. A world that refuses to resolve.</p></div>
+    <div class="emotion-tile reveal"><p class="emotion-name">Serene</p><p class="emotion-desc">Open, gentle, unhurried. Spaces that invite you to rest.</p></div>
+    <div class="emotion-tile reveal"><p class="emotion-name">Joyful</p><p class="emotion-desc">Bright, abundant, generous. Worlds that feel alive and welcoming.</p></div>
+    <div class="emotion-tile reveal"><p class="emotion-name">Oppressive</p><p class="emotion-desc">Weight and enclosure. A world that closes around the viewer.</p></div>
+    <div class="emotion-tile reveal"><p class="emotion-name">Desolate</p><p class="emotion-desc">Emptied. The feeling of something that was, and is no longer.</p></div>
+    <div class="emotion-tile reveal"><p class="emotion-name">Eerie</p><p class="emotion-desc">Wrongness at the edge of perception. The unseen that shouldn't be there.</p></div>
+    <div class="emotion-tile reveal"><p class="emotion-name">Chaotic</p><p class="emotion-desc">Overwhelm as terrain. A world that refuses to resolve.</p></div>
   </div>
 </section>
 
@@ -244,6 +249,92 @@
 </footer>
 
 <a href="/" class="thalyn-mark"><img src="../thalyn_figure_gold.png" alt="Thalyn"></a>
+
+
+<canvas id="ember-canvas" aria-hidden="true"></canvas>
+<script>
+(function(){
+  const canvas=document.getElementById('ember-canvas');
+  const ctx=canvas.getContext('2d');
+  const GOLD='#E1B64A',GREEN='#78b45a';
+  let W,H,embers=[],RAF;
+  const COUNT=42;
+  const reduced=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+  window.addEventListener('resize',resize);resize();
+  function mkEmber(){
+    const g=Math.random()>0.38;
+    return{x:Math.random()*W,y:H+Math.random()*60,r:0.8+Math.random()*2.2,
+      vy:-(0.22+Math.random()*0.55),vx:(Math.random()-0.5)*0.38,
+      a:0.55+Math.random()*0.45,da:-(0.0008+Math.random()*0.0012),
+      col:g?GOLD:GREEN,halo:g?'rgba(225,182,74,':'rgba(120,180,90,'};
+  }
+  for(let i=0;i<COUNT;i++){const e=mkEmber();e.y=Math.random()*H;embers.push(e);}
+  function drawEmber(e){
+    ctx.save();
+    const gr=ctx.createRadialGradient(e.x,e.y,0,e.x,e.y,e.r*5);
+    gr.addColorStop(0,e.halo+(e.a*0.45).toFixed(3)+')');
+    gr.addColorStop(1,e.halo+'0)');
+    ctx.fillStyle=gr;ctx.beginPath();ctx.arc(e.x,e.y,e.r*5,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=e.a;ctx.fillStyle=e.col;
+    ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+  function tick(){
+    ctx.clearRect(0,0,W,H);
+    embers.forEach(function(e,i){
+      e.y+=e.vy;e.x+=e.vx;e.a+=e.da;drawEmber(e);
+      if(e.a<=0||e.y<-20){embers[i]=mkEmber();}
+    });
+    RAF=requestAnimationFrame(tick);
+  }
+  if(!reduced){tick();}
+
+  /* TYPEWRITER */
+  document.querySelectorAll('.tw-target').forEach(function(el){
+    let phrases;
+    try{phrases=JSON.parse(el.dataset.phrases||'[]');}catch(ex){return;}
+    if(!phrases.length)return;
+    let pi=0,ci=0,del=false,paused=false;
+    function step(){
+      if(reduced){el.textContent=phrases[0];return;}
+      const word=phrases[pi];
+      if(paused){paused=false;del=true;setTimeout(step,28);return;}
+      if(!del){
+        el.textContent=word.slice(0,ci+1);ci++;
+        if(ci===word.length){paused=true;setTimeout(step,2200);return;}
+        setTimeout(step,55);
+      }else{
+        el.textContent=word.slice(0,ci-1);ci--;
+        if(ci===0){del=false;pi=(pi+1)%phrases.length;setTimeout(step,320);return;}
+        setTimeout(step,28);
+      }
+    }
+    el.textContent=phrases[0];
+    setTimeout(step,400+Math.random()*600);
+  });
+
+  /* SCROLL REVEAL */
+  if(!reduced){
+    const revEls=document.querySelectorAll('.reveal');
+    revEls.forEach(function(el){
+      el.style.opacity='0';el.style.transform='translateY(18px)';
+      el.style.transition='opacity 0.6s ease,transform 0.6s ease';
+    });
+    const obs=new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(!entry.isIntersecting)return;
+        const el=entry.target;
+        const sibs=Array.from(el.parentElement.querySelectorAll('.reveal'));
+        const si=sibs.indexOf(el);
+        setTimeout(function(){el.style.opacity='1';el.style.transform='translateY(0)';},si*150);
+        obs.unobserve(el);
+      });
+    },{threshold:0.12});
+    revEls.forEach(function(el){obs.observe(el);});
+  }
+})();
+</script>
 
 </body>
 </html>
