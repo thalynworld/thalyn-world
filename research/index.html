@@ -3,150 +3,146 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Thalyn® Research — Why Spaces Feel the Way They Do</title>
-<meta name="description" content="The environmental psychology underlying Thalyn® — prospect-refuge theory, attention restoration, biophilia, and the measurable effects of designed space on human wellbeing.">
+<script>document.documentElement.classList.add('js');</script>
+<title>Why Spaces Feel Like Somewhere — Thalyn Research</title>
+<meta name="description" content="Every generative tool produces appearance. Thalyn produces meaning — the environmental psychology of why a designed space feels like somewhere, not just something.">
+<meta property="og:title" content="Why Spaces Feel Like Somewhere — Thalyn Research">
+<meta property="og:description" content="Prospect-refuge, attention restoration, biophilia: the research behind why Thalyn's worlds feel like somewhere, laid out plainly so you can check it yourself.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://thalyn.world/research/">
+<meta property="og:image" content="https://thalyn.world/enhanced_4k_169_thalyn_splash_5_.webp">
+<link rel="icon" href="/thalyn_figure_gold.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css">
+<!--BEGIN:meta-->
+<link rel="canonical" href="https://thalyn.world/research/">
+<link rel="apple-touch-icon" href="/thalyn_figure_gold.png">
+<meta name="theme-color" content="#0B1515">
+<meta property="og:site_name" content="Thalyn">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://thalyn.world/enhanced_4k_169_thalyn_splash_5_.webp">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","name":"Thalyn Ltd","url":"https://thalyn.world","logo":"https://thalyn.world/library_logo_650x360_transparent.png","sameAs":["https://discord.gg/22jxAwwgX"]},{"@type":"WebSite","name":"Thalyn","url":"https://thalyn.world"}]}</script>
+<!--END:meta-->
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --root-bg: #0B1515; --panel: #0E2E2A; --panel-light: #183830;
-    --border: rgba(212,136,10,0.18); --border-subtle: rgba(0,168,160,0.12);
-    --gold: #D4880A; --teal: #00A8A0; --teal-dim: rgba(0,168,160,0.5);
-    --parchment: #D9CBA8; --parchment-dim: rgba(217,203,168,0.65);
-    --text-bright: #EDE5D0;
-    --font-display: 'Cinzel', Georgia, serif; --font-body: 'Crimson Pro', Georgia, serif;
-    --column: 680px;
-  }
-  html { scroll-behavior: smooth; }
-  body { background: var(--root-bg); color: var(--parchment); font-family: var(--font-body); font-size: 1.08rem; line-height: 1.78; }
-
-  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; padding: 1rem 2.5rem; background: rgba(11,21,21,0.92); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border-subtle); }
-  .nav-logo { font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; color: var(--gold); text-decoration: none; letter-spacing: 0.08em; }
-  .nav-logo sup { font-size: 0.5em; vertical-align: super; color: var(--teal); }
-  .nav-links { display: flex; gap: 2rem; list-style: none; }
-  .nav-links a { font-family: var(--font-display); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--parchment-dim); text-decoration: none; transition: color 0.2s; }
-  .nav-links a:hover, .nav-links a.active { color: var(--gold); }
-
-  /* ESSAY LAYOUT */
-  .essay-header { padding: 9rem 2rem 4rem; max-width: var(--column); margin: 0 auto; }
-  .essay-label { font-family: var(--font-display); font-size: 0.68rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--teal); margin-bottom: 1.5rem; }
-  .essay-title { font-family: var(--font-display); font-size: clamp(1.8rem, 4vw, 3rem); font-weight: 700; color: var(--text-bright); line-height: 1.18; margin-bottom: 1.5rem; }
-  .essay-deck { font-size: 1.2rem; font-weight: 300; font-style: italic; color: var(--parchment-dim); line-height: 1.6; margin-bottom: 2rem; }
-  .essay-meta { font-family: var(--font-display); font-size: 0.65rem; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(0,168,160,0.4); }
-
-  .divider { width: 100%; height: 1px; background: linear-gradient(to right, transparent, var(--border), transparent); }
-
-  .essay-body { max-width: var(--column); margin: 0 auto; padding: 4rem 2rem; }
-  .essay-body h2 { font-family: var(--font-display); font-size: 1.05rem; font-weight: 600; color: var(--text-bright); margin: 3rem 0 1rem; letter-spacing: 0.03em; }
-  .essay-body p { margin-bottom: 1.3rem; font-weight: 300; color: var(--parchment); }
-  .essay-body p strong { color: var(--text-bright); font-weight: 600; }
-  .essay-body em { font-style: italic; color: var(--parchment); }
-
-  .pull-quote { border-left: 2px solid var(--gold); padding: 0.5rem 0 0.5rem 1.8rem; margin: 2.5rem 0; }
-  .pull-quote p { font-size: 1.15rem; font-style: italic; font-weight: 300; color: var(--text-bright); margin: 0; line-height: 1.55; }
-
-  .references { background: var(--panel); padding: 4rem 2rem; }
-  .ref-inner { max-width: var(--column); margin: 0 auto; }
-  .ref-inner h3 { font-family: var(--font-display); font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--teal); margin-bottom: 2rem; }
-  .ref-list { list-style: none; display: flex; flex-direction: column; gap: 0.9rem; }
-  .ref-list li { font-size: 0.9rem; font-weight: 300; color: var(--parchment-dim); line-height: 1.5; padding-left: 1.2rem; border-left: 1px solid var(--border-subtle); }
-  .ref-list li em { color: var(--parchment); font-style: italic; }
-
-  .cta-strip { padding: 4rem 2rem; text-align: center; }
-  .btn-primary { font-family: var(--font-display); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: #0B1515; background: var(--gold); border: none; padding: 0.9rem 2.2rem; text-decoration: none; transition: background 0.2s, box-shadow 0.2s; display: inline-block; }
-  .btn-primary:hover { background: #E8990E; box-shadow: 0 0 24px rgba(212,136,10,0.35); }
-  .btn-secondary { font-family: var(--font-display); font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--parchment-dim); background: transparent; border: 1px solid var(--border); padding: 0.9rem 2.2rem; text-decoration: none; transition: border-color 0.2s, color 0.2s; display: inline-block; }
-  .btn-secondary:hover { border-color: rgba(212,136,10,0.6); color: var(--parchment); }
-  .cta-row { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
-
-  footer { background: var(--root-bg); border-top: 1px solid var(--border-subtle); padding: 3rem 2rem 2rem; text-align: center; }
-  .footer-links { display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; justify-content: center; margin-bottom: 1.5rem; }
-  .footer-links a { font-family: var(--font-display); font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--parchment-dim); text-decoration: none; transition: color 0.2s; }
-  .footer-links a:hover { color: var(--gold); }
-  .footer-legal { font-size: 0.78rem; color: rgba(217,203,168,0.3); line-height: 1.5; }
-
-  @media (max-width: 600px) { nav { padding: 1rem 1.2rem; } .nav-links { gap: 1rem; } .nav-links a { font-size: 0.65rem; } }
-  .thalyn-mark{position:fixed;bottom:24px;left:24px;z-index:100;opacity:0.45;transition:opacity 0.4s;}
-  .thalyn-mark:hover{opacity:0.9;}
-  .thalyn-mark img{height:68px;filter:drop-shadow(0 0 10px rgba(212,136,10,0.25));}
-  /* ── CANVAS ── */
-  #ember-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;}
-  nav,section,footer,header,article,.reskin-callout,.category-strip,.legal-body,.essay-body,.references{position:relative;z-index:1;}
-  .tw-target::after{content:'|';animation:tw-blink 0.9s step-end infinite;color:var(--gold);margin-left:1px;}
-  @keyframes tw-blink{0%,100%{opacity:1}50%{opacity:0}}
+.orient{max-width:720px;margin:0 auto;padding:3rem 2rem 0;text-align:center;}
+.orient p{font-family:var(--font-body);font-size:1.18rem;font-style:italic;font-weight:300;color:var(--text-bright);line-height:1.6;margin:0;}
+.orient em{font-style:normal;color:var(--gold);}
+.research-credit{font-family:var(--font-display);font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--teal-dim);text-align:center;margin-top:0.6rem;}
+.pull-quote{border-left:2px solid var(--gold);padding:0.4rem 0 0.4rem 1.8rem;margin:2.6rem 0;}
+.pull-quote p{font-size:1.18rem;font-style:italic;font-weight:300;color:var(--text-bright);line-height:1.55;margin:0;}
+.references{background:var(--panel);padding:4.5rem 2rem;border-block:1px solid var(--border-subtle);}
+.ref-inner{max-width:820px;margin-inline:auto;}
+.ref-inner h2{font-family:var(--font-display);font-size:0.78rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--teal);margin-bottom:2rem;}
+.ref-list{list-style:none;display:flex;flex-direction:column;gap:0.9rem;}
+.ref-list li{font-size:0.92rem;font-weight:300;color:var(--parchment-dim);line-height:1.55;padding-left:1.2rem;border-left:1px solid var(--border-subtle);}
+.ref-list li em{color:var(--parchment);font-style:italic;}
+.cta-band .hook{margin-bottom:2rem;}
+.cta-band .cta-row{margin-top:0.5rem;}
 </style>
 </head>
-<body>
-
-<nav>
-  <a href="/" class="nav-logo">Thalyn<sup>®</sup></a>
-  <ul class="nav-links">
+<body data-page="research">
+<a class="skip-link" href="#main">Skip to content</a>
+<!--BEGIN:nav-->
+<header class="site-nav" data-open="false">
+  <a href="/" class="nav-logo" aria-label="Thalyn home">Thalyn<sup>&reg;</sup></a>
+  <ul id="nav-menu" class="nav-links">
+    <li><a href="/what-is-thalyn/">What is Thalyn</a></li>
     <li><a href="/core/">The Tool</a></li>
-    <li><a href="/roblox/">World Export</a></li>
-    <li><a href="/research/" class="active">Research</a></li>
-    <li><a href="/developers/">Developers</a></li>
+    <li><a href="/roblox/">Make in Roblox</a></li>
+    <li><a href="/developers/">For Developers</a></li>
+    <li><a href="/research/" aria-current="page">Why Thalyn</a></li>
+    <li><a href="/licensing/">Licensing</a></li>
     <li><a href="/demo/">Demo</a></li>
-    <li><a href="https://discord.gg/22jxAwwgX" target="_blank" rel="noopener">Discord</a></li>
   </ul>
-</nav>
-
-<header class="essay-header">
-  <p class="essay-label">Environmental Psychology — The Foundation</p>
-  <h1 class="essay-title">Why spaces feel the way they do.</h1>
-  <p class="essay-deck">The accumulated evidence from environmental psychology, evolutionary biology, and spatial neuroscience points in a clear direction: the spaces around us shape our mental states in ways that are measurable, predictable, and designable. Thalyn was built on that evidence.</p>
-  <p class="essay-meta">Thalyn Ltd · Research Foundation · 2026</p>
+  <div class="nav-actions">
+    <a class="btn btn-primary btn-sm cta-steam" href="https://discord.gg/22jxAwwgX" data-label-steam="Wishlist on Steam" data-label-pending="Join the Discord">Join the Discord</a>
+    <button class="nav-toggle" aria-controls="nav-menu" aria-expanded="false" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+  </div>
 </header>
+<!--END:nav-->
+
+<main id="main">
+<section class="page-hero">
+  <p class="page-eyebrow">The Science</p>
+  <h1 class="page-title">Why spaces feel like <em>somewhere</em></h1>
+  <div class="tw-wrap"><span class="tw-target" data-phrases='["Prospect and refuge","Attention restoration","Biophilia"]'>Prospect and refuge</span></div>
+  <p class="page-sub">The accumulated evidence from environmental psychology, evolutionary biology, and spatial neuroscience points in a clear direction: the spaces around us shape our mental states in ways that are measurable, predictable, and designable. Thalyn was built on that evidence.</p>
+  <p class="research-credit">Thalyn Ltd · Research Foundation · 2026</p>
+</section>
 
 <div class="divider"></div>
 
-<article class="essay-body">
+<section class="orient reveal">
+  <p>You pick a feeling, and Thalyn grows a whole world around it. <em>This page is the why beneath that</em> — the research, laid out plainly, so you can check it for yourself.</p>
+</section>
 
-  <h2>The question that motivated everything</h2>
+<section class="prose tight">
+  <nav class="toc" aria-label="Contents">
+    <span class="label">Contents</span>
+    <ol>
+      <li><a href="#question">The question that motivated everything</a></li>
+      <li><a href="#prospect-refuge">Prospect and refuge</a></li>
+      <li><a href="#attention-restoration">Attention restoration</a></li>
+      <li><a href="#biophilia">Biophilia and the evolved preference</a></li>
+      <li><a href="#architecture">From principle to architecture</a></li>
+    </ol>
+  </nav>
+</section>
+
+<article class="prose">
+
+  <h2 id="question">The question that motivated everything</h2>
   <p>Walk into the right forest — the right clearing, the right cathedral, the right room — and something happens that you cannot fully explain. Your attention settles. Your breathing changes. The space says something, and your nervous system listens.</p>
   <p>This is not metaphor. The measurable physiological and psychological effects of spatial environments have been documented for decades. Heart rate variability shifts. Cortisol levels change. Attentional capacity — the ability to hold focus, process information, make decisions — is genuinely affected by the character of the space a person occupies.</p>
   <p>The question Thalyn was built around is: <strong>why?</strong> And having understood why, can those effects be designed into a generated space?</p>
 
-  <h2>Prospect and refuge</h2>
+  <h2 id="prospect-refuge">Prospect and refuge</h2>
   <p>In 1975, the geographer Jay Appleton published <em>The Experience of Landscape</em>, proposing what he called prospect-refuge theory. The argument was evolutionary: humans evolved in environments where survival depended on the ability to see without being seen. Environments that offered wide prospect — visibility, open view — while simultaneously providing refuge — shelter, enclosure, a position of concealment — were environments that conferred survival advantage.</p>
   <p>Appleton's insight was that this preference had not disappeared with modernity. We still respond to the same spatial characteristics. A space with good prospect — a clearing at the edge of a forest, a ridge with open view — activates a different neurological state than a space of pure enclosure. Neither is categorically better. Both serve. The power is in their combination: seeing from shelter, understanding the landscape from a position of safety.</p>
 
-  <div class="pull-quote">
+  <blockquote class="pull-quote">
     <p>"The pleasure of prospect is not simply seeing. It is seeing while being able to choose not to be seen."</p>
-  </div>
+  </blockquote>
 
-  <p>Every terrain in Thalyn is generated with designed sightlines. Hero zones — the focal points a user places — are guaranteed to be compositionally anchored: the world arranges itself so that approaches, views, and enclosure all resolve around the point of intent. This is prospect-refuge as design principle, not as decoration.</p>
+  <p>Every terrain in Thalyn is generated with designed sightlines. Hero zones — the focal points you place — are guaranteed to be compositionally anchored: the world arranges itself so that approaches, views, and enclosure all resolve around the point of intent. This is prospect-refuge as design principle, not as decoration.</p>
 
-  <h2>Attention restoration</h2>
+  <h2 id="attention-restoration">Attention restoration</h2>
   <p>In 1989, Rachel and Stephen Kaplan proposed Attention Restoration Theory (ART), arguing that directed attention — the effortful cognitive focus required for decision-making, problem-solving, and sustained concentration — is a finite resource that depletes with use. Natural environments, they proposed, replenish this resource through what they called <em>soft fascination</em>: the kind of involuntary attention drawn by moving water, shifting light, natural patterns, and wildlife.</p>
   <p>Natural environments produce what Kaplan and Kaplan called a state of <em>effortless engagement</em> — attention that holds without cost. Subsequent research has consistently supported the finding: time in natural environments, or in environments that evoke natural qualities, measurably restores attentional capacity.</p>
   <p>This is the empirical basis for Thalyn's emotional archetypes. <strong>Serene and Joyful environments are not aesthetic choices</strong> — they are environments calibrated to produce the spatial conditions that ART predicts will engage soft fascination: open water, natural path, varied canopy, movement implied by terrain. The same framework explains why Oppressive and Desolate environments have the quality they do: the spatial conditions that signal threat, enclosure without escape, absence of the restorative signals, produce a genuinely different response.</p>
 
-  <h2>Biophilia and the evolved preference</h2>
+  <h2 id="biophilia">Biophilia and the evolved preference</h2>
   <p>E.O. Wilson's biophilia hypothesis, developed from 1984 onwards, proposed that humans have an innate affiliation with other living systems — that the preference for natural environments is not learned but hardwired, a consequence of evolving in intimate relationship with the biological world.</p>
   <p>The empirical record for Wilson's hypothesis is substantial. Studies of hospital environments found that patients recovering with views of nature required less pain medication and left earlier than those facing brick walls. Urban environments with tree cover show measurably lower rates of certain stress-related conditions than equivalent environments without. Children's attentional symptoms are measurably reduced after time in green environments.</p>
   <p>These effects operate at the perceptual level — they do not require understanding or deliberate appreciation. The exposure itself, the mere presence of natural form, natural pattern, and natural light, is what produces the effect.</p>
 
-  <h2>From principle to architecture</h2>
+  <h2 id="architecture">From principle to architecture</h2>
   <p>The research establishes three things clearly:</p>
   <p>Spatial environments produce measurable, predictable effects on human psychology. Those effects are not random — they are governed by identifiable features of the environment: the ratio of prospect to refuge, the quality of light, the presence or absence of natural pattern and life, the complexity of the visual field. And those features can be designed.</p>
   <p>Thalyn does not generate appearance. It generates the spatial conditions that the research predicts will produce a specific experiential outcome. Every system — terrain resolution, asset placement, path behaviour, atmosphere, sightline design — is built around the question of whether the resulting space will feel the way it should.</p>
 
-  <div class="pull-quote">
+  <blockquote class="pull-quote">
     <p>"Every generative tool produces appearance. Thalyn produces meaning."</p>
-  </div>
+  </blockquote>
 
   <p>The emotional archetypes — Serene, Joyful, Oppressive, Desolate, Eerie, Chaotic — are not labels for aesthetic preferences. They are spatial programmes: specific configurations of prospect and refuge, of openness and enclosure, of natural complexity and its absence, that the accumulated research suggests will produce a coherent and recognisable experiential response in the person who walks through them.</p>
   <p>This is why Thalyn's worlds feel the way they do. Not because they look like something. Because they have been designed, at the system level, to feel like somewhere.</p>
 
 </article>
 
+<aside class="callout reveal">
+  <span class="label">What the research says</span>
+  <h3>In plain language</h3>
+  <p>Spaces change how you feel, and the change is not mysterious. A handful of features — how much you can see versus how sheltered you are, how much natural pattern and light is present, how open or enclosed the view — reliably shift attention, mood, and stress. Because those features are known, they can be built on purpose. That is what Thalyn does: it shapes the conditions a place needs to feel a certain way, rather than only decorating a surface.</p>
+</aside>
+
 <div class="divider"></div>
 
-<section class="references">
+<section class="references reveal">
   <div class="ref-inner">
-    <h3>Key Works</h3>
+    <h2>Key Works</h2>
     <ul class="ref-list">
       <li>Appleton, J. (1975). <em>The Experience of Landscape.</em> Wiley.</li>
       <li>Kaplan, R. &amp; Kaplan, S. (1989). <em>The Experience of Nature: A Psychological Perspective.</em> Cambridge University Press.</li>
@@ -158,115 +154,44 @@
   </div>
 </section>
 
-<div class="divider"></div>
+<aside class="callout reveal">
+  <span class="label">The public record</span>
+  <h3>Prior art, published in the open</h3>
+  <p>The methods described here are set down in a dated, public record — the systems, the claims, and the design decisions, written so anyone can read them. <a href="/prior-art/">Read the prior art →</a></p>
+</aside>
 
-<section class="cta-strip">
-  <p style="font-family: var(--font-display); font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--teal-dim); margin-bottom: 1.5rem;">The platform built on this research</p>
+<section class="cta-band reveal">
+  <span class="eyebrow">The tool built on this research</span>
+  <p class="hook">From ancient song, all worlds are born. <em>Yours is next.</em></p>
   <div class="cta-row">
-    <a href="https://store.steampowered.com" target="_blank" rel="noopener" class="btn-primary">Wishlist on Steam</a>
-    <a href="/core/" class="btn-secondary">Explore Thalyn Core →</a>
+    <a class="btn btn-primary" href="/core/">See the tool</a>
+    <a class="btn btn-secondary" href="/prior-art/">Read the prior art</a>
   </div>
+  <p class="note">Pick a feeling. Walk into somewhere.</p>
 </section>
+</main>
 
-<footer>
-  <div class="footer-links">
-    <a href="/">Home</a>
+<!--BEGIN:footer-->
+<footer class="site-footer">
+  <nav class="footer-links" aria-label="Footer">
+    <a href="/what-is-thalyn/">What is Thalyn</a>
     <a href="/core/">The Tool</a>
-    <a href="/roblox/">World Export</a>
-    <a href="/developers/">Developers</a>
+    <a href="/roblox/">Make in Roblox</a>
+    <a href="/developers/">For Developers</a>
+    <a href="/research/">Why Thalyn</a>
+    <a href="/licensing/">Licensing</a>
+    <a href="/prior-art/">Prior Art</a>
     <a href="/legal/">Legal</a>
     <a href="https://discord.gg/22jxAwwgX" target="_blank" rel="noopener">Discord</a>
     <a href="mailto:hello@thalyn.world">Contact</a>
-  </div>
-  <p class="footer-legal">© 2026 Thalyn Ltd. All rights reserved. Thalyn® is a registered trademark of Thalyn Ltd, registered in the United Kingdom.</p>
+  </nav>
+  <span class="footer-gaelic">From ancient song, all worlds are born. &nbsp;&middot;&nbsp; &Oacute; Senchetel, Beirthir Cach Bith.</span>
+  <p class="footer-legal">&copy; 2026 Thalyn Ltd. All rights reserved. Thalyn&reg; is a registered trademark of Thalyn Ltd, registered in the United Kingdom.<br>Thalyn is not affiliated with or endorsed by Roblox Corporation, Valve Corporation, or Unity Technologies.</p>
 </footer>
+<!--END:footer-->
 
-<a href="/" class="thalyn-mark"><img src="../thalyn_figure_gold.png" alt="Thalyn"></a>
-
+<a href="/" class="thalyn-mark" aria-label="Thalyn home"><img src="/thalyn_figure_gold.png" alt="" width="64"></a>
 <canvas id="ember-canvas" aria-hidden="true"></canvas>
-<script>
-(function(){
-  const canvas=document.getElementById('ember-canvas');
-  const ctx=canvas.getContext('2d');
-  const GOLD='#E1B64A',GREEN='#78b45a';
-  let W,H,embers=[],RAF;
-  const COUNT=42;
-  const reduced=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-  function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
-  window.addEventListener('resize',resize);resize();
-  function mkEmber(){
-    const g=Math.random()>0.38;
-    return{x:Math.random()*W,y:H+Math.random()*60,r:0.8+Math.random()*2.2,
-      vy:-(0.22+Math.random()*0.55),vx:(Math.random()-0.5)*0.38,
-      a:0.55+Math.random()*0.45,da:-(0.0008+Math.random()*0.0012),
-      col:g?GOLD:GREEN,halo:g?'rgba(225,182,74,':'rgba(120,180,90,'};
-  }
-  for(let i=0;i<COUNT;i++){const e=mkEmber();e.y=Math.random()*H;embers.push(e);}
-  function drawEmber(e){
-    ctx.save();
-    const gr=ctx.createRadialGradient(e.x,e.y,0,e.x,e.y,e.r*5);
-    gr.addColorStop(0,e.halo+(e.a*0.45).toFixed(3)+')');
-    gr.addColorStop(1,e.halo+'0)');
-    ctx.fillStyle=gr;ctx.beginPath();ctx.arc(e.x,e.y,e.r*5,0,Math.PI*2);ctx.fill();
-    ctx.globalAlpha=e.a;ctx.fillStyle=e.col;
-    ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,Math.PI*2);ctx.fill();
-    ctx.restore();
-  }
-  function tick(){
-    ctx.clearRect(0,0,W,H);
-    embers.forEach(function(e,i){
-      e.y+=e.vy;e.x+=e.vx;e.a+=e.da;drawEmber(e);
-      if(e.a<=0||e.y<-20){embers[i]=mkEmber();}
-    });
-    RAF=requestAnimationFrame(tick);
-  }
-  if(!reduced){tick();}
-
-  /* TYPEWRITER */
-  document.querySelectorAll('.tw-target').forEach(function(el){
-    let phrases;
-    try{phrases=JSON.parse(el.dataset.phrases||'[]');}catch(ex){return;}
-    if(!phrases.length)return;
-    let pi=0,ci=0,del=false,paused=false;
-    function step(){
-      if(reduced){el.textContent=phrases[0];return;}
-      const word=phrases[pi];
-      if(paused){paused=false;del=true;setTimeout(step,28);return;}
-      if(!del){
-        el.textContent=word.slice(0,ci+1);ci++;
-        if(ci===word.length){paused=true;setTimeout(step,2200);return;}
-        setTimeout(step,55);
-      }else{
-        el.textContent=word.slice(0,ci-1);ci--;
-        if(ci===0){del=false;pi=(pi+1)%phrases.length;setTimeout(step,320);return;}
-        setTimeout(step,28);
-      }
-    }
-    el.textContent=phrases[0];
-    setTimeout(step,400+Math.random()*600);
-  });
-
-  /* SCROLL REVEAL */
-  if(!reduced){
-    const revEls=document.querySelectorAll('.reveal');
-    revEls.forEach(function(el){
-      el.style.opacity='0';el.style.transform='translateY(18px)';
-      el.style.transition='opacity 0.6s ease,transform 0.6s ease';
-    });
-    const obs=new IntersectionObserver(function(entries){
-      entries.forEach(function(entry){
-        if(!entry.isIntersecting)return;
-        const el=entry.target;
-        const sibs=Array.from(el.parentElement.querySelectorAll('.reveal'));
-        const si=sibs.indexOf(el);
-        setTimeout(function(){el.style.opacity='1';el.style.transform='translateY(0)';},si*150);
-        obs.unobserve(el);
-      });
-    },{threshold:0.12});
-    revEls.forEach(function(el){obs.observe(el);});
-  }
-})();
-</script>
-
+<script src="/assets/app.js" defer></script>
 </body>
 </html>

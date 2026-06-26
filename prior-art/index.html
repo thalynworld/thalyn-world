@@ -3,293 +3,256 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>document.documentElement.classList.add('js');</script>
 <title>Prior Art Disclosure — Thalyn Ltd</title>
-<meta name="description" content="Defensive publication establishing prior art for emotionally coherent procedural world generation using environmental psychology. Published June 2026 by Thalyn Ltd.">
-<meta name="robots" content="index, follow">
+<meta name="description" content="Defensive publication establishing prior art for emotionally coherent procedural world generation. Published June 2026 by Thalyn Ltd. No patent sought.">
 <meta property="og:title" content="Prior Art Disclosure — Thalyn Ltd">
 <meta property="og:description" content="Defensive publication: Emotionally Coherent Procedural World Generation using Environmental Psychology as a Generative Framework.">
-<meta property="og:url" content="https://thalyn.world/prior-art">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://thalyn.world/prior-art/">
+<meta property="og:image" content="https://thalyn.world/enhanced_4k_169_thalyn_splash_5_.webp">
+<link rel="icon" href="/thalyn_figure_gold.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css">
+<!--BEGIN:meta-->
+<link rel="canonical" href="https://thalyn.world/prior-art/">
+<link rel="apple-touch-icon" href="/thalyn_figure_gold.png">
+<meta name="theme-color" content="#0B1515">
+<meta property="og:site_name" content="Thalyn">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://thalyn.world/enhanced_4k_169_thalyn_splash_5_.webp">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","name":"Thalyn Ltd","url":"https://thalyn.world","logo":"https://thalyn.world/library_logo_650x360_transparent.png","sameAs":["https://discord.gg/22jxAwwgX"]},{"@type":"WebSite","name":"Thalyn","url":"https://thalyn.world"}]}</script>
+<!--END:meta-->
 <style>
-  /* ── SITE NAV (matches main site) ── */
-  :root{
-    --root-bg:#0B1515;--panel:#0E2E2A;
-    --border:rgba(212,136,10,0.18);--border-subtle:rgba(0,168,160,0.12);
-    --gold-nav:#D4880A;--teal-nav:#00A8A0;
-    --parchment-dim:rgba(217,203,168,0.65);
-    --font-display:'Cinzel',Georgia,serif;
-  }
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-  nav.site-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:1rem 2.5rem;background:rgba(11,21,21,0.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--border-subtle);}
-  .nav-logo{font-family:var(--font-display);font-size:1.15rem;font-weight:700;color:var(--gold-nav);text-decoration:none;letter-spacing:0.08em;}
-  .nav-logo sup{font-size:0.5em;vertical-align:super;color:var(--teal-nav);}
-  .nav-links{display:flex;gap:2rem;list-style:none;}
-  .nav-links a{font-family:var(--font-display);font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--parchment-dim);text-decoration:none;transition:color 0.2s;}
-  .nav-links a:hover{color:var(--gold-nav);}
+.pa-wrap{background:var(--root-bg);padding:calc(var(--nav-h) + 3rem) 1.5rem 4.5rem;}
+.pa-orient{max-width:760px;margin:0 auto 1.5rem;font-family:var(--font-body);font-size:1.02rem;font-style:italic;color:var(--parchment-dim);text-align:center;line-height:1.6;}
+.pa-orient strong{color:var(--gold);font-style:normal;font-weight:600;}
 
-  /* ── DOCUMENT BODY ── */
-  :root {
-    --gold: #c9a84c;
-    --bg: #f5f2ec;
-    --text: #1a1a1a;
-    --mid: #4a4a4a;
-    --light: #7a7a7a;
-    --rule: #d0ccc4;
-    --max: 720px;
-  }
-  html{font-size:18px;scroll-behavior:smooth;}
-  body{font-family:Georgia,'Times New Roman',serif;background:var(--bg);color:var(--text);line-height:1.7;padding:0 1.5rem;}
-  .page{max-width:var(--max);margin:0 auto;padding:6rem 0 6rem;}
+.pa-doc{
+  --pa-gold:#c9a84c;--pa-bg:#f5f2ec;--pa-text:#1a1a1a;--pa-mid:#4a4a4a;
+  --pa-light:#7a7a7a;--pa-rule:#d0ccc4;
+  max-width:760px;margin:0 auto;background:var(--pa-bg);color:var(--pa-text);
+  font-family:Georgia,'Times New Roman',serif;font-size:18px;line-height:1.7;
+  padding:3.5rem clamp(1.4rem,5vw,3.4rem) 3.5rem;
+  border:1px solid var(--pa-rule);box-shadow:0 24px 70px rgba(0,0,0,0.45);
+}
+.pa-doc a{color:var(--pa-gold);text-decoration:none;}
+.pa-doc a:hover{text-decoration:underline;}
 
-  .stamp{border:1.5px solid var(--rule);border-radius:4px;padding:1.2rem 1.5rem;margin-bottom:3rem;background:#fff;}
-  .stamp-label{font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--light);margin-bottom:0.5rem;}
-  .stamp-row{font-size:0.85rem;color:var(--mid);line-height:1.5;}
-  .stamp-row a{color:var(--gold);text-decoration:none;}
-  .stamp-row a:hover{text-decoration:underline;}
+.pa-doc .stamp{border:1.5px solid var(--pa-rule);border-radius:4px;padding:1.2rem 1.5rem;margin-bottom:3rem;background:#fff;}
+.pa-doc .stamp-label{font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--pa-light);margin-bottom:0.5rem;}
+.pa-doc .stamp-row{font-size:0.85rem;color:var(--pa-mid);line-height:1.5;}
+.pa-doc .stamp-row strong{color:var(--pa-text);}
 
-  .title-block{margin-bottom:3rem;}
-  .title-block h1{font-size:1.9rem;font-weight:bold;line-height:1.25;margin-bottom:0.6rem;}
-  .title-block .subtitle{font-size:1.1rem;color:var(--mid);font-style:italic;}
+.pa-doc .title-block{margin-bottom:3rem;}
+.pa-doc .title-block h1{font-family:Georgia,'Times New Roman',serif;font-size:1.9rem;font-weight:bold;line-height:1.25;margin-bottom:0.6rem;color:var(--pa-text);letter-spacing:normal;text-transform:none;}
+.pa-doc .title-block .subtitle{font-size:1.1rem;color:var(--pa-mid);font-style:italic;}
 
-  .download-bar{background:#fff;border:1px solid var(--rule);border-radius:4px;padding:1rem 1.4rem;margin-bottom:3rem;display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;}
-  .download-bar p{font-size:0.9rem;color:var(--mid);flex:1;min-width:200px;}
-  .dl-btn{display:inline-block;background:var(--text);color:#fff;text-decoration:none;padding:0.55rem 1.3rem;border-radius:3px;font-size:0.85rem;font-family:Georgia,serif;white-space:nowrap;}
-  .dl-btn:hover{background:#333;}
+.pa-doc .download-bar{background:#fff;border:1px solid var(--pa-rule);border-radius:4px;padding:1rem 1.4rem;margin-bottom:3rem;display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;}
+.pa-doc .download-bar p{font-size:0.9rem;color:var(--pa-mid);flex:1;min-width:200px;margin:0;}
+.pa-doc .dl-btn{display:inline-block;background:var(--pa-text);color:#fff;text-decoration:none;padding:0.55rem 1.3rem;border-radius:3px;font-size:0.85rem;white-space:nowrap;}
+.pa-doc .dl-btn:hover{background:#333;text-decoration:none;}
 
-  hr{border:none;border-top:1px solid var(--rule);margin:2.5rem 0;}
-  h2{font-size:1.25rem;margin:2.2rem 0 0.8rem;}
-  h3{font-size:1.05rem;margin:1.8rem 0 0.6rem;color:var(--mid);}
-  p{margin-bottom:1rem;}
-  ol,ul{padding-left:1.5rem;margin-bottom:1rem;}
-  li{margin-bottom:0.5rem;font-size:0.97rem;}
-  .refs li{font-size:0.88rem;color:var(--mid);line-height:1.5;}
-  .scope-list{list-style:none;padding-left:0;}
-  .scope-list li{padding:0.5rem 0 0.5rem 1.8rem;position:relative;border-bottom:1px solid var(--rule);}
-  .scope-list li:last-child{border-bottom:none;}
-  .scope-list li::before{content:attr(data-n);position:absolute;left:0;color:var(--gold);font-weight:bold;}
-  .note{background:#fff;border-left:3px solid var(--gold);padding:0.9rem 1.2rem;margin:1.5rem 0;font-size:0.92rem;color:var(--mid);font-style:italic;}
-  .pub-table{width:100%;border-collapse:collapse;font-size:0.9rem;margin-top:1rem;}
-  .pub-table td{padding:0.45rem 0;vertical-align:top;}
-  .pub-table td:first-child{color:var(--mid);width:180px;}
-  .end{text-align:center;color:var(--light);font-style:italic;margin-top:3rem;font-size:0.9rem;}
+.pa-doc hr{border:none;border-top:1px solid var(--pa-rule);margin:2.5rem 0;}
+.pa-doc h2{font-family:Georgia,'Times New Roman',serif;font-size:1.25rem;margin:2.2rem 0 0.8rem;color:var(--pa-text);font-weight:bold;letter-spacing:normal;text-transform:none;}
+.pa-doc h3{font-family:Georgia,'Times New Roman',serif;font-size:1.05rem;margin:1.8rem 0 0.6rem;color:var(--pa-mid);font-weight:bold;letter-spacing:normal;text-transform:none;}
+.pa-doc p{margin-bottom:1rem;color:var(--pa-text);font-weight:400;}
+.pa-doc ol,.pa-doc ul{padding-left:1.5rem;margin-bottom:1rem;}
+.pa-doc li{margin-bottom:0.5rem;font-size:0.97rem;}
+.pa-doc .refs li{font-size:0.88rem;color:var(--pa-mid);line-height:1.5;}
+.pa-doc .scope-list{list-style:none;padding-left:0;}
+.pa-doc .scope-list li{padding:0.5rem 0 0.5rem 1.8rem;position:relative;border-bottom:1px solid var(--pa-rule);}
+.pa-doc .scope-list li:last-child{border-bottom:none;}
+.pa-doc .scope-list li::before{content:attr(data-n);position:absolute;left:0;color:var(--pa-gold);font-weight:bold;}
+.pa-doc .note{background:#fff;border-left:3px solid var(--pa-gold);padding:0.9rem 1.2rem;margin:1.5rem 0;font-size:0.92rem;color:var(--pa-mid);font-style:italic;}
+.pa-doc .pub-table{width:100%;border-collapse:collapse;font-size:0.9rem;margin-top:1rem;}
+.pa-doc .pub-table td{padding:0.45rem 0;vertical-align:top;}
+.pa-doc .pub-table td:first-child{color:var(--pa-mid);width:180px;}
+.pa-doc .end{text-align:center;color:var(--pa-light);font-style:italic;margin-top:3rem;font-size:0.9rem;}
 
-  /* ── SITE FOOTER ── */
-  footer.site-footer{background:var(--root-bg);border-top:1px solid var(--border-subtle);padding:3rem 2rem 2rem;text-align:center;margin-top:4rem;}
-  .footer-links{display:flex;flex-wrap:wrap;gap:0.5rem 2rem;justify-content:center;margin-bottom:1.5rem;}
-  .footer-links a{font-family:var(--font-display);font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--parchment-dim);text-decoration:none;transition:color 0.2s;}
-  .footer-links a:hover{color:var(--gold-nav);}
-  .footer-legal{font-size:0.78rem;color:rgba(217,203,168,0.3);line-height:1.5;}
+.pa-back{max-width:760px;margin:1.75rem auto 0;text-align:center;}
+.pa-back a{font-family:var(--font-display);font-size:0.68rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--parchment-dim);text-decoration:none;}
+.pa-back a:hover{color:var(--gold);}
 
-  .thalyn-mark{position:fixed;bottom:24px;left:24px;z-index:100;opacity:0.45;transition:opacity 0.4s;}
-  .thalyn-mark:hover{opacity:0.9;}
-  .thalyn-mark img{height:68px;filter:drop-shadow(0 0 10px rgba(212,136,10,0.25));}
-
-  /* Embers — muted on light bg */
-  #ember-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:0.35;}
-  nav.site-nav,.page,footer.site-footer{position:relative;z-index:1;}
-
-  @media(max-width:600px){
-    html{font-size:16px;}
-    .title-block h1{font-size:1.5rem;}
-    .pub-table td:first-child{width:120px;}
-    nav.site-nav{padding:1rem 1.2rem;}
-    .nav-links{gap:1rem;}
-    .nav-links a{font-size:0.65rem;}
-    .thalyn-mark img{height:50px;}
-  }
+@media(max-width:600px){
+  .pa-doc{font-size:16px;}
+  .pa-doc .title-block h1{font-size:1.5rem;}
+  .pa-doc .pub-table td:first-child{width:120px;}
+}
 </style>
 </head>
-<body>
-
-<nav class="site-nav">
-  <a href="/" class="nav-logo">Thalyn<sup>®</sup></a>
-  <ul class="nav-links">
+<body data-page="prior-art">
+<a class="skip-link" href="#main">Skip to content</a>
+<!--BEGIN:nav-->
+<header class="site-nav" data-open="false">
+  <a href="/" class="nav-logo" aria-label="Thalyn home">Thalyn<sup>&reg;</sup></a>
+  <ul id="nav-menu" class="nav-links">
+    <li><a href="/what-is-thalyn/">What is Thalyn</a></li>
     <li><a href="/core/">The Tool</a></li>
-    <li><a href="/roblox/">World Export</a></li>
-    <li><a href="/research/">Research</a></li>
-    <li><a href="/developers/">Developers</a></li>
+    <li><a href="/roblox/">Make in Roblox</a></li>
+    <li><a href="/developers/">For Developers</a></li>
+    <li><a href="/research/">Why Thalyn</a></li>
+    <li><a href="/licensing/">Licensing</a></li>
     <li><a href="/demo/">Demo</a></li>
-    <li><a href="https://discord.gg/22jxAwwgX" target="_blank" rel="noopener">Discord</a></li>
   </ul>
-</nav>
+  <div class="nav-actions">
+    <a class="btn btn-primary btn-sm cta-steam" href="https://discord.gg/22jxAwwgX" data-label-steam="Wishlist on Steam" data-label-pending="Join the Discord">Join the Discord</a>
+    <button class="nav-toggle" aria-controls="nav-menu" aria-expanded="false" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+  </div>
+</header>
+<!--END:nav-->
 
-<div class="page">
+<main id="main">
+<section class="pa-wrap">
 
-  <div class="stamp">
-    <div class="stamp-label">Document type</div>
-    <div class="stamp-row"><strong>Defensive Publication — Prior Art Disclosure</strong></div>
-    <div class="stamp-row">Published: June 2026 &nbsp;|&nbsp; Thalyn Ltd, United Kingdom &nbsp;|&nbsp; <a href="https://thalyn.world">thalyn.world</a></div>
-    <div class="stamp-row" style="margin-top:0.4rem;font-size:0.8rem;">
-      This document is published to establish prior art and enter the described concepts into the public domain.
-      No patent protection is sought by the publisher for any element disclosed herein.
+  <p class="pa-orient"><strong>In plain terms:</strong> we have published how this works so the ideas stay free for everyone — no one can patent them, including us.</p>
+
+  <article class="pa-doc">
+
+    <div class="stamp">
+      <div class="stamp-label">Document type</div>
+      <div class="stamp-row"><strong>Defensive Publication — Prior Art Disclosure</strong></div>
+      <div class="stamp-row">Published: June 2026 &nbsp;|&nbsp; Thalyn Ltd, United Kingdom &nbsp;|&nbsp; <a href="https://thalyn.world">thalyn.world</a></div>
+      <div class="stamp-row" style="margin-top:0.4rem;font-size:0.8rem;">
+        This document is published to establish prior art and enter the described concepts into the public domain.
+        No patent protection is sought by the publisher for any element disclosed herein.
+      </div>
     </div>
-  </div>
 
-  <div class="title-block">
-    <h1>Emotionally Coherent Procedural World Generation</h1>
-    <p class="subtitle">Environmental Psychology as a Generative Framework</p>
-  </div>
+    <div class="title-block">
+      <h1>Emotionally Coherent Procedural World Generation</h1>
+      <p class="subtitle">Environmental Psychology as a Generative Framework</p>
+    </div>
 
-  <div class="download-bar">
-    <p>Full document available as a formatted file for citation and archival purposes.</p>
-    <a class="dl-btn" href="../Thalyn_Defensive_Publication_Jun2026.docx" download>Download .docx</a>
-  </div>
+    <div class="download-bar">
+      <p>Full document available as a formatted file for citation and archival purposes.</p>
+      <a class="dl-btn" href="/prior-art/Thalyn_Defensive_Publication_Jun2026.docx" download>Download .docx</a>
+    </div>
 
-  <hr>
+    <hr>
 
-  <h2>Abstract</h2>
-  <p>This disclosure describes a method and system for procedurally generating three-dimensional virtual environments whose spatial composition, asset placement, and atmospheric properties are driven by parameters derived from empirical environmental psychology research. The core innovation is the use of multi-dimensional emotional profile vectors — parameterised from validated human perception studies including prospect-refuge theory, vastness-awe research, and spatial density psychology — as the primary control surface for an automated world generation pipeline.</p>
-  <p>Unlike prior approaches that use aesthetic heuristics, noise-based randomness, or manual artist direction, the system described here encodes psychological research findings directly as generative constraints. The result is environments in which emotional response is a designed output rather than an emergent side effect. This document constitutes a public prior art disclosure intended to prevent any third party from obtaining patent rights over the concepts and methods described herein.</p>
+    <h2>Abstract</h2>
+    <p>This disclosure describes a method and system for procedurally generating three-dimensional virtual environments whose spatial composition, asset placement, and atmospheric properties are driven by parameters derived from empirical environmental psychology research. The core innovation is the use of multi-dimensional emotional profile vectors — parameterised from validated human perception studies including prospect-refuge theory, vastness-awe research, and spatial density psychology — as the primary control surface for an automated world generation pipeline.</p>
+    <p>Unlike prior approaches that use aesthetic heuristics, noise-based randomness, or manual artist direction, the system described here encodes psychological research findings directly as generative constraints. The result is environments in which emotional response is a designed output rather than an emergent side effect. This document constitutes a public prior art disclosure intended to prevent any third party from obtaining patent rights over the concepts and methods described herein.</p>
 
-  <hr>
+    <hr>
 
-  <h2>1. Field of the Disclosure</h2>
-  <p>This disclosure relates to procedural content generation (PCG) for real-time three-dimensional environments, and specifically to the application of environmental psychology theory as a computational framework for driving generative placement, terrain topology, atmospheric rendering, and scene composition. Applications include but are not limited to: game development tooling, virtual reality environment generation, architectural visualisation, spatial design platforms, educational simulations, wellness and therapeutic virtual environments, and creative tooling for non-technical users.</p>
+    <h2>1. Field of the Disclosure</h2>
+    <p>This disclosure relates to procedural content generation (PCG) for real-time three-dimensional environments, and specifically to the application of environmental psychology theory as a computational framework for driving generative placement, terrain topology, atmospheric rendering, and scene composition. Applications include but are not limited to: game development tooling, virtual reality environment generation, architectural visualisation, spatial design platforms, educational simulations, wellness and therapeutic virtual environments, and creative tooling for non-technical users.</p>
 
-  <hr>
+    <hr>
 
-  <h2>2. Background</h2>
-  <p>Procedural content generation for virtual environments has historically relied on two broad approaches: (a) noise-based terrain and placement systems that produce geographically plausible but emotionally neutral results, and (b) manual artist-directed workflows that achieve emotional resonance through skilled labour at high cost. Neither approach systematically encodes human emotional response as a generative objective.</p>
-  <p>A substantial body of empirical research in environmental psychology has established reliable, experimentally validated relationships between spatial properties and human emotional response — including prospect-refuge theory (Appleton, 1975), Kaplan and Kaplan's Attention Restoration Theory (1989), Russell's circumplex model of affect (1980), and work on vastness and awe (Keltner and Haidt, 2003). This body of research has not previously been applied as a primary generative constraint for automated 3D environment construction.</p>
+    <h2>2. Background</h2>
+    <p>Procedural content generation for virtual environments has historically relied on two broad approaches: (a) noise-based terrain and placement systems that produce geographically plausible but emotionally neutral results, and (b) manual artist-directed workflows that achieve emotional resonance through skilled labour at high cost. Neither approach systematically encodes human emotional response as a generative objective.</p>
+    <p>A substantial body of empirical research in environmental psychology has established reliable, experimentally validated relationships between spatial properties and human emotional response — including prospect-refuge theory (Appleton, 1975), Kaplan and Kaplan's Attention Restoration Theory (1989), Russell's circumplex model of affect (1980), and work on vastness and awe (Keltner and Haidt, 2003). This body of research has not previously been applied as a primary generative constraint for automated 3D environment construction.</p>
 
-  <hr>
+    <hr>
 
-  <h2>3. Disclosure of Concepts Placed into the Public Domain</h2>
-  <p>The following concepts are hereby disclosed as prior art. Nothing in this disclosure is intended to restrict the independent development of any of these concepts by third parties. The purpose of this disclosure is exclusively to prevent exclusive patent rights from being granted to any party — including the publisher of this document.</p>
+    <h2>3. Disclosure of Concepts Placed into the Public Domain</h2>
+    <p>The following concepts are hereby disclosed as prior art. Nothing in this disclosure is intended to restrict the independent development of any of these concepts by third parties. The purpose of this disclosure is exclusively to prevent exclusive patent rights from being granted to any party — including the publisher of this document.</p>
 
-  <h3>3.1 Emotional Profile Vector as Primary Generative Control Surface</h3>
-  <p>A multi-dimensional vector encoding psychological emotional parameters — derived from empirical environmental psychology research — used as the primary input to a procedural world generation pipeline. The vector encodes properties including but not limited to: prospect-refuge ratio, spatial density, vertical exposure, canopy density, water proximity, light character, and colour temperature. All downstream generation parameters are derived from this vector rather than being specified independently.</p>
+    <h3>3.1 Emotional Profile Vector as Primary Generative Control Surface</h3>
+    <p>A multi-dimensional vector encoding psychological emotional parameters — derived from empirical environmental psychology research — used as the primary input to a procedural world generation pipeline. The vector encodes properties including but not limited to: prospect-refuge ratio, spatial density, vertical exposure, canopy density, water proximity, light character, and colour temperature. All downstream generation parameters are derived from this vector rather than being specified independently.</p>
 
-  <h3>3.2 Physics-Simulation Terrain Generation Parameterised by Emotional Profile</h3>
-  <p>Systems in which terrain topology is generated by physics-based simulation — including but not limited to spring-mass, elastic membrane, or particle settlement simulations — whose parameters (stiffness, damping, force distribution, settlement duration) are derived from a multi-dimensional emotional profile vector grounded in environmental psychology research. The emotional profile determines the macro-topology character of the resulting terrain without prescribing specific geometric forms.</p>
+    <h3>3.2 Physics-Simulation Terrain Generation Parameterised by Emotional Profile</h3>
+    <p>Systems in which terrain topology is generated by physics-based simulation — including but not limited to spring-mass, elastic membrane, or particle settlement simulations — whose parameters (stiffness, damping, force distribution, settlement duration) are derived from a multi-dimensional emotional profile vector grounded in environmental psychology research. The emotional profile determines the macro-topology character of the resulting terrain without prescribing specific geometric forms.</p>
 
-  <h3>3.3 Multi-Criteria Scored Evaluation for Procedural Asset Placement</h3>
-  <p>Multi-criteria scored evaluation systems for procedural asset placement in which prospect-refuge theory (Appleton, 1975) is used as one factor within a multi-criteria scoring framework, and in which the target prospect-refuge ratio is determined by a psychological emotional profile parameter. Positions are evaluated for their visual exposure (prospect) and enclosure (refuge) characteristics, and assets are placed in positions whose scores match the emotional profile's target ratio.</p>
+    <h3>3.3 Multi-Criteria Scored Evaluation for Procedural Asset Placement</h3>
+    <p>Multi-criteria scored evaluation systems for procedural asset placement in which prospect-refuge theory (Appleton, 1975) is used as one factor within a multi-criteria scoring framework, and in which the target prospect-refuge ratio is determined by a psychological emotional profile parameter. Positions are evaluated for their visual exposure (prospect) and enclosure (refuge) characteristics, and assets are placed in positions whose scores match the emotional profile's target ratio.</p>
 
-  <h3>3.4 Hero Spatial Anchor Points with Multi-Zone Emotional Influence Regions</h3>
-  <p>Multi-zone emotional influence regions radiating from user-specified hero spatial anchor points, in which asset placement within each zone inherits an emotionally-blended profile interpolated between the local hero intent and the global scene emotional profile. The anchor point guarantees that the generated scene resolves spatially around the user-specified focal element.</p>
+    <h3>3.4 Hero Spatial Anchor Points with Multi-Zone Emotional Influence Regions</h3>
+    <p>Multi-zone emotional influence regions radiating from user-specified hero spatial anchor points, in which asset placement within each zone inherits an emotionally-blended profile interpolated between the local hero intent and the global scene emotional profile. The anchor point guarantees that the generated scene resolves spatially around the user-specified focal element.</p>
 
-  <h3>3.5 Atmospheric Parameter Derivation from Emotional Profile Vectors</h3>
-  <p>Atmospheric and rendering parameter derivation systems in which weather, lighting, fog density, colour palette, and particle properties are mapped from psychological emotional profile parameters using research-grounded rule systems. Atmospheric character is not selected from a discrete preset list but derived continuously from the emotional profile vector.</p>
+    <h3>3.5 Atmospheric Parameter Derivation from Emotional Profile Vectors</h3>
+    <p>Atmospheric and rendering parameter derivation systems in which weather, lighting, fog density, colour palette, and particle properties are mapped from psychological emotional profile parameters using research-grounded rule systems. Atmospheric character is not selected from a discrete preset list but derived continuously from the emotional profile vector.</p>
 
-  <h3>3.6 Platform-Agnostic Manifest Architecture with Emotional Metadata</h3>
-  <p>Platform-agnostic manifest architectures for procedurally generated environments in which the same generation output — including emotional metadata — drives multiple rendering targets via adapter layers. The manifest preserves the emotional intent of the generation independently of the target platform's rendering capabilities, allowing the same world to be instantiated across different platforms with appropriate fidelity tradeoffs.</p>
+    <h3>3.6 Platform-Agnostic Manifest Architecture with Emotional Metadata</h3>
+    <p>Platform-agnostic manifest architectures for procedurally generated environments in which the same generation output — including emotional metadata — drives multiple rendering targets via adapter layers. The manifest preserves the emotional intent of the generation independently of the target platform's rendering capabilities, allowing the same world to be instantiated across different platforms with appropriate fidelity tradeoffs.</p>
 
-  <h3>3.7 Deterministic Seeded Generation with Emotional Profile as Co-Seed</h3>
-  <p>Deterministic seeded procedural world generation systems in which a world seed combined with a psychological emotional profile vector uniquely and reproducibly determines the complete spatial composition of a generated environment — including terrain topology, asset placement, atmospheric parameters, and sightline design. The same (seed, emotional profile) pair always produces an identical output.</p>
+    <h3>3.7 Deterministic Seeded Generation with Emotional Profile as Co-Seed</h3>
+    <p>Deterministic seeded procedural world generation systems in which a world seed combined with a psychological emotional profile vector uniquely and reproducibly determines the complete spatial composition of a generated environment — including terrain topology, asset placement, atmospheric parameters, and sightline design. The same (seed, emotional profile) pair always produces an identical output.</p>
 
-  <h3>3.8 Server-Side Generation Architecture Protecting Emotional Scoring Implementation</h3>
-  <p>Server-side generation architectures in which the emotional scoring and terrain generation pipeline executes remotely and client applications receive only a platform-agnostic output manifest, such that the implementation details of the emotional-to-spatial mapping — including scoring weights, parameter curves, and solver methods — are not derivable from client-side inspection of the output.</p>
+    <h3>3.8 Server-Side Generation Architecture Protecting Emotional Scoring Implementation</h3>
+    <p>Server-side generation architectures in which the emotional scoring and terrain generation pipeline executes remotely and client applications receive only a platform-agnostic output manifest, such that the implementation details of the emotional-to-spatial mapping — including scoring weights, parameter curves, and solver methods — are not derivable from client-side inspection of the output.</p>
 
-  <div class="section">
-    <p class="section-num">Section 3.9</p>
-    <h2>3.9 Walkability as a Mathematical Property of Emotionally-Parameterised Simulation</h2>
+    <h3>3.9 Walkability as a Mathematical Property of Emotionally-Parameterised Simulation</h3>
     <p>Terrain generation systems in which surface continuity and walkability are guaranteed as mathematical properties of an emotionally-parameterised physics-based simulation, rather than enforced by post-processing correction applied to independently generated geometry. The emotional profile parameters that govern the simulation's physical properties — stiffness, damping, force distribution — are constrained such that the resulting geometry is provably traversable without requiring a separate walkability pass or navigation mesh correction step.</p>
-  </div>
 
-  <hr>
+    <hr>
 
-  <h2>4. Prior Art Context</h2>
-  <p>The following prior works are acknowledged as relevant to this disclosure. None of the works below, individually or in combination, discloses or suggests the use of multi-dimensional emotional profile vectors derived from environmental psychology research as the primary control surface for a complete procedural world generation pipeline.</p>
-  <ul class="refs">
-    <li>Appleton, J. (1975). <em>The Experience of Landscape.</em> Wiley. (Prospect-refuge theory.)</li>
-    <li>Kaplan, R. &amp; Kaplan, S. (1989). <em>The Experience of Nature.</em> Cambridge University Press. (Attention Restoration Theory.)</li>
-    <li>Russell, J.A. (1980). A circumplex model of affect. <em>Journal of Personality and Social Psychology, 39</em>(6), 1161–1178.</li>
-    <li>Keltner, D. &amp; Haidt, J. (2003). Approaching awe, a moral, spiritual, and aesthetic emotion. <em>Cognition and Emotion, 17</em>(2), 297–314.</li>
-    <li>Shaker, N., Togelius, J. &amp; Nelson, M.J. (2016). <em>Procedural Content Generation in Games.</em> Springer. (General PCG survey.)</li>
-    <li>Perlin, K. (1985). An image synthesizer. <em>ACM SIGGRAPH Computer Graphics, 19</em>(3), 287–296. (Noise-based terrain generation.)</li>
-  </ul>
+    <h2>4. Prior Art Context</h2>
+    <p>The following prior works are acknowledged as relevant to this disclosure. None of the works below, individually or in combination, discloses or suggests the use of multi-dimensional emotional profile vectors derived from environmental psychology research as the primary control surface for a complete procedural world generation pipeline.</p>
+    <ul class="refs">
+      <li>Appleton, J. (1975). <em>The Experience of Landscape.</em> Wiley. (Prospect-refuge theory.)</li>
+      <li>Kaplan, R. &amp; Kaplan, S. (1989). <em>The Experience of Nature.</em> Cambridge University Press. (Attention Restoration Theory.)</li>
+      <li>Russell, J.A. (1980). A circumplex model of affect. <em>Journal of Personality and Social Psychology, 39</em>(6), 1161–1178.</li>
+      <li>Keltner, D. &amp; Haidt, J. (2003). Approaching awe, a moral, spiritual, and aesthetic emotion. <em>Cognition and Emotion, 17</em>(2), 297–314.</li>
+      <li>Shaker, N., Togelius, J. &amp; Nelson, M.J. (2016). <em>Procedural Content Generation in Games.</em> Springer. (General PCG survey.)</li>
+      <li>Perlin, K. (1985). An image synthesizer. <em>ACM SIGGRAPH Computer Graphics, 19</em>(3), 287–296. (Noise-based terrain generation.)</li>
+    </ul>
 
-  <hr>
+    <hr>
 
-  <h2>5. Scope of This Disclosure</h2>
-  <div class="note">Nothing in this disclosure is intended to restrict the independent development of any of the concepts described by third parties for their own use. The purpose is exclusively to place these concepts in the public domain as prior art.</div>
-  <p>The concepts disclosed are listed below. Each entry corresponds to one of the sections in §3 above:</p>
-  <ol class="scope-list">
-    <li data-n="(1)">Multi-dimensional emotional profile vectors derived from environmental psychology research used as the primary generative control surface for automated 3D world generation pipelines.</li>
-    <li data-n="(2)">Systems in which terrain topology is generated by physics-based simulation whose parameters are derived from multi-dimensional emotional profile vectors grounded in environmental psychology research.</li>
-    <li data-n="(3)">Multi-criteria scored evaluation systems for procedural asset placement in which prospect-refuge theory is used as one factor within a multi-criteria scoring framework, and in which the target prospect-refuge ratio is determined by a psychological emotional profile parameter.</li>
-    <li data-n="(4)">Multi-zone emotional influence regions radiating from hero spatial anchor points, in which asset placement within each zone inherits an emotionally-blended profile interpolated between the local hero intent and the global scene emotional profile.</li>
-    <li data-n="(5)">Atmospheric and rendering parameter derivation systems in which weather, lighting, fog, colour palette, and particle properties are mapped from psychological emotional profile parameters using research-grounded rule systems.</li>
-    <li data-n="(6)">Platform-agnostic manifest architectures for procedurally generated environments in which the same generation output drives multiple rendering targets via adapter layers, with emotional metadata preserved in the manifest.</li>
-    <li data-n="(7)">Deterministic seeded procedural world generation systems in which a world seed combined with a psychological emotional profile vector uniquely and reproducibly determines the complete spatial composition of a generated environment.</li>
-    <li data-n="(8)">Server-side generation architectures in which the emotional scoring and terrain generation pipeline executes remotely and client applications receive only a platform-agnostic output manifest, such that implementation details are not derivable from client-side inspection.</li>
-    <li data-n="(9)">Terrain generation systems in which surface continuity and walkability are guaranteed as mathematical properties of an emotionally-parameterised physics-based simulation, rather than enforced by post-processing correction applied to independently generated geometry.</li>
-  </ol>
+    <h2>5. Scope of This Disclosure</h2>
+    <div class="note">Nothing in this disclosure is intended to restrict the independent development of any of the concepts described by third parties for their own use. The purpose is exclusively to place these concepts in the public domain as prior art.</div>
+    <p>The concepts disclosed are listed below. Each entry corresponds to one of the sections in §3 above:</p>
+    <ol class="scope-list">
+      <li data-n="(1)">Multi-dimensional emotional profile vectors derived from environmental psychology research used as the primary generative control surface for automated 3D world generation pipelines.</li>
+      <li data-n="(2)">Systems in which terrain topology is generated by physics-based simulation whose parameters are derived from multi-dimensional emotional profile vectors grounded in environmental psychology research.</li>
+      <li data-n="(3)">Multi-criteria scored evaluation systems for procedural asset placement in which prospect-refuge theory is used as one factor within a multi-criteria scoring framework, and in which the target prospect-refuge ratio is determined by a psychological emotional profile parameter.</li>
+      <li data-n="(4)">Multi-zone emotional influence regions radiating from hero spatial anchor points, in which asset placement within each zone inherits an emotionally-blended profile interpolated between the local hero intent and the global scene emotional profile.</li>
+      <li data-n="(5)">Atmospheric and rendering parameter derivation systems in which weather, lighting, fog, colour palette, and particle properties are mapped from psychological emotional profile parameters using research-grounded rule systems.</li>
+      <li data-n="(6)">Platform-agnostic manifest architectures for procedurally generated environments in which the same generation output drives multiple rendering targets via adapter layers, with emotional metadata preserved in the manifest.</li>
+      <li data-n="(7)">Deterministic seeded procedural world generation systems in which a world seed combined with a psychological emotional profile vector uniquely and reproducibly determines the complete spatial composition of a generated environment.</li>
+      <li data-n="(8)">Server-side generation architectures in which the emotional scoring and terrain generation pipeline executes remotely and client applications receive only a platform-agnostic output manifest, such that implementation details are not derivable from client-side inspection.</li>
+      <li data-n="(9)">Terrain generation systems in which surface continuity and walkability are guaranteed as mathematical properties of an emotionally-parameterised physics-based simulation, rather than enforced by post-processing correction applied to independently generated geometry.</li>
+    </ol>
 
-  <hr>
+    <hr>
 
-  <h2>6. Publication Statement</h2>
-  <p>This document is published openly and without restriction in June 2026 by Thalyn Ltd, United Kingdom. It is submitted concurrently to the IP.com Prior Art Database for formal timestamping and indexing, and is intended to be publicly accessible and discoverable by patent examiners worldwide.</p>
-  <p>This publication does not constitute a patent application, a grant of any licence, or a waiver of any trade secret protection that Thalyn Ltd maintains in the specific implementation details of its systems. Specific algorithmic parameters, solver convergence methods, scoring weight values, data structures, manifest schemas, and all other implementation specifics remain proprietary and are not disclosed herein.</p>
+    <h2>6. Publication Statement</h2>
+    <p>This document is published openly and without restriction in June 2026 by Thalyn Ltd, United Kingdom. It is submitted concurrently to the IP.com Prior Art Database for formal timestamping and indexing, and is intended to be publicly accessible and discoverable by patent examiners worldwide.</p>
+    <p>This publication does not constitute a patent application, a grant of any licence, or a waiver of any trade secret protection that Thalyn Ltd maintains in the specific implementation details of its systems. Specific algorithmic parameters, solver convergence methods, scoring weight values, data structures, manifest schemas, and all other implementation specifics remain proprietary and are not disclosed herein.</p>
 
-  <table class="pub-table">
-    <tr><td>Publisher</td><td>Thalyn Ltd, United Kingdom</td></tr>
-    <tr><td>Permanent URL</td><td><a href="https://thalyn.world/prior-art">https://thalyn.world/prior-art</a></td></tr>
-    <tr><td>IP.com submission</td><td>Submitted concurrently — date confirmed on receipt</td></tr>
-    <tr><td>Date of publication</td><td>June 2026</td></tr>
-  </table>
+    <table class="pub-table">
+      <tr><td>Publisher</td><td>Thalyn Ltd, United Kingdom</td></tr>
+      <tr><td>Permanent URL</td><td><a href="https://thalyn.world/prior-art">https://thalyn.world/prior-art</a></td></tr>
+      <tr><td>IP.com submission</td><td>Submitted concurrently — date confirmed on receipt</td></tr>
+      <tr><td>Date of publication</td><td>June 2026</td></tr>
+    </table>
 
-  <p class="end">— End of Prior Art Disclosure —</p>
+    <p class="end">— End of Prior Art Disclosure —</p>
 
-</div>
+  </article>
 
+  <p class="pa-back"><a href="/research/">Return to the Research overview</a></p>
+
+</section>
+</main>
+
+<!--BEGIN:footer-->
 <footer class="site-footer">
-  <div class="footer-links">
-    <a href="/">Home</a>
+  <nav class="footer-links" aria-label="Footer">
+    <a href="/what-is-thalyn/">What is Thalyn</a>
     <a href="/core/">The Tool</a>
-    <a href="/roblox/">World Export</a>
-    <a href="/research/">Research</a>
+    <a href="/roblox/">Make in Roblox</a>
+    <a href="/developers/">For Developers</a>
+    <a href="/research/">Why Thalyn</a>
+    <a href="/licensing/">Licensing</a>
+    <a href="/prior-art/">Prior Art</a>
     <a href="/legal/">Legal</a>
     <a href="https://discord.gg/22jxAwwgX" target="_blank" rel="noopener">Discord</a>
     <a href="mailto:hello@thalyn.world">Contact</a>
-  </div>
-  <p class="footer-legal">© 2026 Thalyn Ltd. All rights reserved. Thalyn® is a registered trademark of Thalyn Ltd, registered in the United Kingdom.</p>
+  </nav>
+  <span class="footer-gaelic">From ancient song, all worlds are born. &nbsp;&middot;&nbsp; &Oacute; Senchetel, Beirthir Cach Bith.</span>
+  <p class="footer-legal">&copy; 2026 Thalyn Ltd. All rights reserved. Thalyn&reg; is a registered trademark of Thalyn Ltd, registered in the United Kingdom.<br>Thalyn is not affiliated with or endorsed by Roblox Corporation, Valve Corporation, or Unity Technologies.</p>
 </footer>
+<!--END:footer-->
 
-<a href="/" class="thalyn-mark"><img src="../thalyn_figure_gold.png" alt="Thalyn"></a>
-
-<!-- EMBERS — muted (0.35 opacity via CSS) on light background -->
+<a href="/" class="thalyn-mark" aria-label="Thalyn home"><img src="/thalyn_figure_gold.png" alt="" width="64"></a>
 <canvas id="ember-canvas" aria-hidden="true"></canvas>
-<script>
-(function(){
-  const canvas=document.getElementById('ember-canvas');
-  const ctx=canvas.getContext('2d');
-  const GOLD='#E1B64A',GREEN='#78b45a';
-  let W,H,embers=[];
-  const COUNT=28;
-  const reduced=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-  function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
-  window.addEventListener('resize',resize);resize();
-  function mkEmber(){
-    const g=Math.random()>0.38;
-    return{x:Math.random()*W,y:H+Math.random()*60,r:0.8+Math.random()*2.2,
-      vy:-(0.18+Math.random()*0.45),vx:(Math.random()-0.5)*0.3,
-      a:0.4+Math.random()*0.35,da:-(0.0006+Math.random()*0.001),
-      col:g?GOLD:GREEN,halo:g?'rgba(225,182,74,':'rgba(120,180,90,'};
-  }
-  for(let i=0;i<COUNT;i++){const e=mkEmber();e.y=Math.random()*H;embers.push(e);}
-  function tick(){
-    ctx.clearRect(0,0,W,H);
-    embers.forEach(function(e,i){
-      e.y+=e.vy;e.x+=e.vx;e.a+=e.da;
-      ctx.save();
-      const gr=ctx.createRadialGradient(e.x,e.y,0,e.x,e.y,e.r*4);
-      gr.addColorStop(0,e.halo+(e.a*0.35).toFixed(3)+')');
-      gr.addColorStop(1,e.halo+'0)');
-      ctx.fillStyle=gr;ctx.beginPath();ctx.arc(e.x,e.y,e.r*4,0,Math.PI*2);ctx.fill();
-      ctx.globalAlpha=e.a;ctx.fillStyle=e.col;
-      ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,Math.PI*2);ctx.fill();
-      ctx.restore();
-      if(e.a<=0||e.y<-20){embers[i]=mkEmber();}
-    });
-    requestAnimationFrame(tick);
-  }
-  if(!reduced){tick();}
-})();
-</script>
-
+<script src="/assets/app.js" defer></script>
 </body>
 </html>

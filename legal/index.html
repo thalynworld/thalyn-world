@@ -3,258 +3,177 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Thalyn® — Legal Information</title>
-<meta name="description" content="Legal information for Thalyn® — company details, third-party platform disclaimers, academic references, licence terms, privacy policy, and governing law.">
+<script>document.documentElement.classList.add('js');</script>
+<title>Thalyn® — Legal</title>
+<meta name="description" content="The formal terms for Thalyn — company details, platform disclaimers, your content licence and ownership, privacy, GDPR rights, and governing law.">
+<meta property="og:title" content="Thalyn® — Legal">
+<meta property="og:description" content="The formal terms behind Thalyn: company details, third-party platform disclaimers, your content licence and ownership, privacy and GDPR rights, and governing law.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://thalyn.world/legal/">
+<meta property="og:image" content="https://thalyn.world/enhanced_4k_169_thalyn_splash_5_.webp">
+<link rel="icon" href="/thalyn_figure_gold.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css">
+<!--BEGIN:meta-->
+<link rel="canonical" href="https://thalyn.world/legal/">
+<link rel="apple-touch-icon" href="/thalyn_figure_gold.png">
+<meta name="theme-color" content="#0B1515">
+<meta property="og:site_name" content="Thalyn">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://thalyn.world/enhanced_4k_169_thalyn_splash_5_.webp">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","name":"Thalyn Ltd","url":"https://thalyn.world","logo":"https://thalyn.world/library_logo_650x360_transparent.png","sameAs":["https://discord.gg/22jxAwwgX"]},{"@type":"WebSite","name":"Thalyn","url":"https://thalyn.world"}]}</script>
+<!--END:meta-->
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --root-bg: #0B1515; --panel: #0E2E2A;
-    --border: rgba(212,136,10,0.18); --border-subtle: rgba(0,168,160,0.12);
-    --gold: #D4880A; --teal: #00A8A0; --teal-dim: rgba(0,168,160,0.5);
-    --parchment: #D9CBA8; --parchment-dim: rgba(217,203,168,0.65);
-    --text-bright: #EDE5D0;
-    --font-display: 'Cinzel', Georgia, serif; --font-body: 'Crimson Pro', Georgia, serif;
-  }
-  html { scroll-behavior: smooth; }
-  body { background: var(--root-bg); color: var(--parchment); font-family: var(--font-body); font-size: 1rem; line-height: 1.72; }
-
-  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; padding: 1rem 2.5rem; background: rgba(11,21,21,0.92); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border-subtle); }
-  .nav-logo { font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; color: var(--gold); text-decoration: none; letter-spacing: 0.08em; }
-  .nav-logo sup { font-size: 0.5em; vertical-align: super; color: var(--teal); }
-  .nav-links { display: flex; gap: 2rem; list-style: none; }
-  .nav-links a { font-family: var(--font-display); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--parchment-dim); text-decoration: none; transition: color 0.2s; }
-  .nav-links a:hover { color: var(--gold); }
-
-  .page-header { padding: 8rem 2rem 3rem; max-width: 820px; margin: 0 auto; }
-  .page-eyebrow { font-family: var(--font-display); font-size: 0.68rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--teal); margin-bottom: 1rem; }
-  .page-title { font-family: var(--font-display); font-size: clamp(1.6rem, 3.5vw, 2.4rem); font-weight: 700; color: var(--text-bright); line-height: 1.2; margin-bottom: 0.8rem; }
-  .page-date { font-family: var(--font-display); font-size: 0.65rem; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(0,168,160,0.4); }
-
-  .divider { width: 100%; height: 1px; background: linear-gradient(to right, transparent, var(--border), transparent); }
-
-  .legal-body { max-width: 820px; margin: 0 auto; padding: 0 2rem 5rem; }
-
-  .section { padding: 3.5rem 0; border-bottom: 1px solid var(--border-subtle); }
-  .section:last-child { border-bottom: none; }
-  .section-num { font-family: var(--font-display); font-size: 0.62rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--teal-dim); margin-bottom: 0.8rem; }
-  .section h2 { font-family: var(--font-display); font-size: 1rem; font-weight: 600; color: var(--text-bright); margin-bottom: 1.2rem; line-height: 1.3; letter-spacing: 0.02em; }
-  .section p { font-size: 0.95rem; font-weight: 300; color: var(--parchment); margin-bottom: 0.9rem; line-height: 1.72; }
-  .section p:last-child { margin-bottom: 0; }
-  .section p a { color: var(--teal-dim); text-decoration: none; transition: color 0.2s; }
-  .section p a:hover { color: var(--teal); }
-  .section ul { list-style: none; margin: 0.5rem 0 0.9rem 0; display: flex; flex-direction: column; gap: 0.4rem; }
-  .section ul li { font-size: 0.95rem; font-weight: 300; color: var(--parchment-dim); padding-left: 1.2rem; border-left: 1px solid var(--border-subtle); line-height: 1.6; }
-
-  footer { background: var(--root-bg); border-top: 1px solid var(--border-subtle); padding: 3rem 2rem 2rem; text-align: center; }
-  .footer-links { display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; justify-content: center; margin-bottom: 1.5rem; }
-  .footer-links a { font-family: var(--font-display); font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--parchment-dim); text-decoration: none; transition: color 0.2s; }
-  .footer-links a:hover { color: var(--gold); }
-  .footer-legal { font-size: 0.78rem; color: rgba(217,203,168,0.3); line-height: 1.5; }
-
-  @media (max-width: 600px) { nav { padding: 1rem 1.2rem; } .nav-links { gap: 1rem; } .nav-links a { font-size: 0.65rem; } }
-  .thalyn-mark{position:fixed;bottom:24px;left:24px;z-index:100;opacity:0.45;transition:opacity 0.4s;}
-  .thalyn-mark:hover{opacity:0.9;}
-  .thalyn-mark img{height:68px;filter:drop-shadow(0 0 10px rgba(212,136,10,0.25));}
-  /* ── CANVAS ── */
-  #ember-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;}
-  nav,section,footer,header,article,.reskin-callout,.category-strip,.legal-body,.essay-body,.references{position:relative;z-index:1;}
-  .tw-target::after{content:'|';animation:tw-blink 0.9s step-end infinite;color:var(--gold);margin-left:1px;}
-  @keyframes tw-blink{0%,100%{opacity:1}50%{opacity:0}}
+.legal-meta{font-family:var(--font-display);font-size:0.66rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--teal-dim);margin-top:0.6rem;}
+.page-sub a{color:var(--teal);text-decoration:underline;text-underline-offset:2px;}
+.legal-toc{max-width:820px;margin:0 auto;padding:3.5rem 2rem 0;}
+.legal-clause{scroll-margin-top:88px;}
+.legal-clause + .legal-clause{margin-top:3rem;padding-top:3rem;border-top:1px solid var(--border-subtle);}
+.legal-clause .label{color:var(--teal-dim);margin-bottom:0.9rem;}
+.legal-clause h2{font-size:clamp(1.25rem,2.6vw,1.7rem);}
+.legal-refs{list-style:none;margin:0.4rem 0 0;display:flex;flex-direction:column;gap:0.55rem;}
+.legal-refs li{font-size:1rem;font-weight:300;color:var(--parchment-dim);line-height:1.6;padding-left:1.1rem;border-left:1px solid var(--border-subtle);}
+.legal-refs li em{color:var(--parchment);font-style:italic;}
 </style>
 </head>
-<body>
-
-<nav>
-  <a href="/" class="nav-logo">Thalyn<sup>®</sup></a>
-  <ul class="nav-links">
+<body data-page="legal">
+<a class="skip-link" href="#main">Skip to content</a>
+<!--BEGIN:nav-->
+<header class="site-nav" data-open="false">
+  <a href="/" class="nav-logo" aria-label="Thalyn home">Thalyn<sup>&reg;</sup></a>
+  <ul id="nav-menu" class="nav-links">
+    <li><a href="/what-is-thalyn/">What is Thalyn</a></li>
     <li><a href="/core/">The Tool</a></li>
-    <li><a href="/roblox/">World Export</a></li>
-    <li><a href="/research/">Research</a></li>
-    <li><a href="/developers/">Developers</a></li>
-    <li><a href="https://discord.gg/22jxAwwgX" target="_blank" rel="noopener">Discord</a></li>
+    <li><a href="/roblox/">Make in Roblox</a></li>
+    <li><a href="/developers/">For Developers</a></li>
+    <li><a href="/research/">Why Thalyn</a></li>
+    <li><a href="/licensing/">Licensing</a></li>
+    <li><a href="/demo/">Demo</a></li>
   </ul>
-</nav>
-
-<header class="page-header">
-  <p class="page-eyebrow">Legal Information</p>
-  <h1 class="page-title">Thalyn® — Legal</h1>
-  <p class="page-date">Last updated: June 2026</p>
+  <div class="nav-actions">
+    <a class="btn btn-primary btn-sm cta-steam" href="https://discord.gg/22jxAwwgX" data-label-steam="Wishlist on Steam" data-label-pending="Join the Discord">Join the Discord</a>
+    <button class="nav-toggle" aria-controls="nav-menu" aria-expanded="false" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+  </div>
 </header>
+<!--END:nav-->
+
+<main id="main">
+<section class="page-hero">
+  <p class="page-eyebrow">Legal Information</p>
+  <h1 class="page-title">Thalyn® — <em>Legal</em></h1>
+  <p class="page-sub">The formal terms. For the plain-English version, see the <a href="/licensing/">Licensing</a> page.</p>
+  <p class="legal-meta">Last updated: June 2026</p>
+</section>
 
 <div class="divider"></div>
 
-<div class="legal-body">
+<div class="legal-toc">
+  <nav class="toc reveal" aria-label="Legal clauses">
+    <span class="label">Contents</span>
+    <ol>
+      <li><a href="#clause-company">Company Information</a></li>
+      <li><a href="#clause-roblox">Third-Party Platform Disclaimer — Roblox</a></li>
+      <li><a href="#clause-unity">Third-Party Platform Disclaimer — Unity Technologies</a></li>
+      <li><a href="#clause-steam">Third-Party Platform Disclaimer — Valve Corporation / Steam</a></li>
+      <li><a href="#clause-references">Academic and Research References</a></li>
+      <li><a href="#clause-licence">Generated Content Licence and Service Terms</a></li>
+      <li><a href="#clause-privacy">Privacy Policy</a></li>
+      <li><a href="#clause-law">Governing Law</a></li>
+    </ol>
+  </nav>
+</div>
 
-  <div class="section">
-    <p class="section-num">Section 01</p>
+<div class="prose">
+
+  <section id="clause-company" class="legal-clause reveal">
+    <span class="label">Section 01</span>
     <h2>Company Information</h2>
     <p>Thalyn® is a product of Thalyn Ltd, a company registered in England and Wales. Thalyn® is a registered trademark of Thalyn Ltd, registered in the United Kingdom.</p>
     <p>For legal enquiries, contact: <a href="mailto:hello@thalyn.world">hello@thalyn.world</a></p>
-  </div>
+  </section>
 
-  <div class="section">
-    <p class="section-num">Section 02</p>
+  <section id="clause-roblox" class="legal-clause reveal">
+    <span class="label">Section 02</span>
     <h2>Third-Party Platform Disclaimer — Roblox</h2>
     <p>Thalyn® is an independent product and is not affiliated with, endorsed by, sponsored by, or officially connected to Roblox Corporation in any way. The Roblox name, logo, and related trademarks are the property of Roblox Corporation.</p>
     <p>Thalyn generates 3D content that users may choose to import and use within the Roblox platform. Users are responsible for ensuring their use of Thalyn-generated content complies with Roblox's Terms of Use, Community Standards, and Creator policies. Thalyn Ltd accepts no liability for content uploaded to Roblox or for changes to Roblox's platform policies that may affect the use of Thalyn-generated content.</p>
-  </div>
+  </section>
 
-  <div class="section">
-    <p class="section-num">Section 03</p>
+  <section id="clause-unity" class="legal-clause reveal">
+    <span class="label">Section 03</span>
     <h2>Third-Party Platform Disclaimer — Unity Technologies</h2>
     <p>Thalyn® is developed using the Unity Engine. Thalyn Ltd is not affiliated with, endorsed by, or officially connected to Unity Technologies SF or its parent company. "Unity" and the Unity logo are trademarks or registered trademarks of Unity Technologies or its affiliates.</p>
-  </div>
+  </section>
 
-  <div class="section">
-    <p class="section-num">Section 04</p>
+  <section id="clause-steam" class="legal-clause reveal">
+    <span class="label">Section 04</span>
     <h2>Third-Party Platform Disclaimer — Valve Corporation / Steam</h2>
     <p>Thalyn® is distributed through the Steam platform operated by Valve Corporation. Thalyn Ltd is not affiliated with, endorsed by, or officially connected to Valve Corporation. "Steam" and the Steam logo are trademarks and/or registered trademarks of Valve Corporation.</p>
-  </div>
+  </section>
 
-  <div class="section">
-    <p class="section-num">Section 05</p>
+  <section id="clause-references" class="legal-clause reveal">
+    <span class="label">Section 05</span>
     <h2>Academic and Research References</h2>
     <p>Thalyn's approach to procedural world generation is informed by published academic research in environmental psychology, spatial cognition, and human-computer interaction. References cited on this website and in associated materials are used for informational and educational purposes. Thalyn Ltd claims no affiliation with, endorsement from, or official connection to the authors or institutions cited.</p>
     <p>Key works referenced include:</p>
-    <ul>
+    <ul class="legal-refs">
       <li>Appleton, J. (1975). <em>The Experience of Landscape.</em> Wiley.</li>
       <li>Kaplan, R. &amp; Kaplan, S. (1989). <em>The Experience of Nature: A Psychological Perspective.</em> Cambridge University Press.</li>
       <li>Wilson, E.O. (1984). <em>Biophilia.</em> Harvard University Press.</li>
       <li>Ulrich, R.S. (1984). View through a window may influence recovery from surgery. <em>Science.</em></li>
     </ul>
-  </div>
+  </section>
 
-  <div class="section">
-    <p class="section-num">Section 06</p>
+  <section id="clause-licence" class="legal-clause reveal">
+    <span class="label">Section 06</span>
     <h2>Generated Content Licence and Service Terms</h2>
     <p>Worlds, terrain, and environments generated using Thalyn® are the creative output of the user's configuration choices. Users retain ownership of the configurations and parameters they define. Thalyn Ltd grants users a licence to use, distribute, and commercialise generated output subject to compliance with applicable third-party platform terms (including Roblox's Creator policies where content is exported to Roblox).</p>
     <p>Thalyn is provided as an online service. World generation and export require an active internet connection and a free Thalyn account. Thalyn Ltd reserves the right to modify, suspend, or discontinue the service with reasonable notice. Thalyn Ltd accepts no liability for content uploaded by users to third-party platforms.</p>
     <p>Platform compatibility — including Roblox, Unity, and any future adapters — is provided on a best-efforts basis. Platform policies and technical requirements change independently of Thalyn, and Thalyn Ltd cannot guarantee ongoing compatibility with any third-party platform.</p>
-  </div>
+  </section>
 
-  <div class="section">
-    <p class="section-num">Section 07</p>
+  <section id="clause-privacy" class="legal-clause reveal">
+    <span class="label">Section 07</span>
     <h2>Privacy Policy</h2>
     <p>Thalyn collects the minimum personal data necessary to operate the service. This includes account information (email address provided at registration), generation records (world seeds, configuration parameters, and saved world history associated with your account), and standard server access logs.</p>
     <p>Thalyn does not sell personal data to third parties. Generation data may be used in aggregate, anonymised form to improve the Thalyn generation system. Thalyn Ltd is the data controller for personal data processed in connection with the Thalyn service. Data is processed on the legal basis of contract performance (operating the service you have purchased) and legitimate interests (improving the service).</p>
     <p>Users have the right to access, correct, or request deletion of their personal data. To exercise these rights, contact <a href="mailto:hello@thalyn.world">hello@thalyn.world</a>. Thalyn Ltd complies with the UK General Data Protection Regulation (UK GDPR) and the Data Protection Act 2018.</p>
     <p>Thalyn's service is intended for users aged 13 and over. A date-of-birth check is presented at first run; users confirmed to be under 13 are blocked from creating an account.</p>
-  </div>
+  </section>
 
-  <div class="section">
-    <p class="section-num">Section 08</p>
+  <section id="clause-law" class="legal-clause reveal">
+    <span class="label">Section 08</span>
     <h2>Governing Law</h2>
     <p>These terms are governed by the laws of England and Wales. Any disputes arising from use of Thalyn® or this website shall be subject to the exclusive jurisdiction of the courts of England and Wales.</p>
     <p>These terms may be updated from time to time. The date at the top of this page reflects the most recent revision. Continued use of Thalyn® following any update constitutes acceptance of the revised terms.</p>
-  </div>
+  </section>
 
 </div>
+</main>
 
-<footer>
-  <div class="footer-links">
-    <a href="/">Home</a>
+<!--BEGIN:footer-->
+<footer class="site-footer">
+  <nav class="footer-links" aria-label="Footer">
+    <a href="/what-is-thalyn/">What is Thalyn</a>
     <a href="/core/">The Tool</a>
-    <a href="/roblox/">World Export</a>
-    <a href="/research/">Research</a>
-    <a href="/developers/">Developers</a>
+    <a href="/roblox/">Make in Roblox</a>
+    <a href="/developers/">For Developers</a>
+    <a href="/research/">Why Thalyn</a>
+    <a href="/licensing/">Licensing</a>
     <a href="/prior-art/">Prior Art</a>
-    <a href="/demo/">Demo</a>
+    <a href="/legal/">Legal</a>
     <a href="https://discord.gg/22jxAwwgX" target="_blank" rel="noopener">Discord</a>
     <a href="mailto:hello@thalyn.world">Contact</a>
-  </div>
-  <p class="footer-legal">© 2026 Thalyn Ltd. All rights reserved. Thalyn® is a registered trademark of Thalyn Ltd, registered in the United Kingdom.<br>
-  Thalyn is not affiliated with or endorsed by Roblox Corporation, Valve Corporation, or Unity Technologies.</p>
+  </nav>
+  <span class="footer-gaelic">From ancient song, all worlds are born. &nbsp;&middot;&nbsp; &Oacute; Senchetel, Beirthir Cach Bith.</span>
+  <p class="footer-legal">&copy; 2026 Thalyn Ltd. All rights reserved. Thalyn&reg; is a registered trademark of Thalyn Ltd, registered in the United Kingdom.<br>Thalyn is not affiliated with or endorsed by Roblox Corporation, Valve Corporation, or Unity Technologies.</p>
 </footer>
+<!--END:footer-->
 
-<a href="/" class="thalyn-mark"><img src="../thalyn_figure_gold.png" alt="Thalyn"></a>
-
+<a href="/" class="thalyn-mark" aria-label="Thalyn home"><img src="/thalyn_figure_gold.png" alt="" width="64"></a>
 <canvas id="ember-canvas" aria-hidden="true"></canvas>
-<script>
-(function(){
-  const canvas=document.getElementById('ember-canvas');
-  const ctx=canvas.getContext('2d');
-  const GOLD='#E1B64A',GREEN='#78b45a';
-  let W,H,embers=[],RAF;
-  const COUNT=42;
-  const reduced=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-  function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
-  window.addEventListener('resize',resize);resize();
-  function mkEmber(){
-    const g=Math.random()>0.38;
-    return{x:Math.random()*W,y:H+Math.random()*60,r:0.8+Math.random()*2.2,
-      vy:-(0.22+Math.random()*0.55),vx:(Math.random()-0.5)*0.38,
-      a:0.55+Math.random()*0.45,da:-(0.0008+Math.random()*0.0012),
-      col:g?GOLD:GREEN,halo:g?'rgba(225,182,74,':'rgba(120,180,90,'};
-  }
-  for(let i=0;i<COUNT;i++){const e=mkEmber();e.y=Math.random()*H;embers.push(e);}
-  function drawEmber(e){
-    ctx.save();
-    const gr=ctx.createRadialGradient(e.x,e.y,0,e.x,e.y,e.r*5);
-    gr.addColorStop(0,e.halo+(e.a*0.45).toFixed(3)+')');
-    gr.addColorStop(1,e.halo+'0)');
-    ctx.fillStyle=gr;ctx.beginPath();ctx.arc(e.x,e.y,e.r*5,0,Math.PI*2);ctx.fill();
-    ctx.globalAlpha=e.a;ctx.fillStyle=e.col;
-    ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,Math.PI*2);ctx.fill();
-    ctx.restore();
-  }
-  function tick(){
-    ctx.clearRect(0,0,W,H);
-    embers.forEach(function(e,i){
-      e.y+=e.vy;e.x+=e.vx;e.a+=e.da;drawEmber(e);
-      if(e.a<=0||e.y<-20){embers[i]=mkEmber();}
-    });
-    RAF=requestAnimationFrame(tick);
-  }
-  if(!reduced){tick();}
-
-  /* TYPEWRITER */
-  document.querySelectorAll('.tw-target').forEach(function(el){
-    let phrases;
-    try{phrases=JSON.parse(el.dataset.phrases||'[]');}catch(ex){return;}
-    if(!phrases.length)return;
-    let pi=0,ci=0,del=false,paused=false;
-    function step(){
-      if(reduced){el.textContent=phrases[0];return;}
-      const word=phrases[pi];
-      if(paused){paused=false;del=true;setTimeout(step,28);return;}
-      if(!del){
-        el.textContent=word.slice(0,ci+1);ci++;
-        if(ci===word.length){paused=true;setTimeout(step,2200);return;}
-        setTimeout(step,55);
-      }else{
-        el.textContent=word.slice(0,ci-1);ci--;
-        if(ci===0){del=false;pi=(pi+1)%phrases.length;setTimeout(step,320);return;}
-        setTimeout(step,28);
-      }
-    }
-    el.textContent=phrases[0];
-    setTimeout(step,400+Math.random()*600);
-  });
-
-  /* SCROLL REVEAL */
-  if(!reduced){
-    const revEls=document.querySelectorAll('.reveal');
-    revEls.forEach(function(el){
-      el.style.opacity='0';el.style.transform='translateY(18px)';
-      el.style.transition='opacity 0.6s ease,transform 0.6s ease';
-    });
-    const obs=new IntersectionObserver(function(entries){
-      entries.forEach(function(entry){
-        if(!entry.isIntersecting)return;
-        const el=entry.target;
-        const sibs=Array.from(el.parentElement.querySelectorAll('.reveal'));
-        const si=sibs.indexOf(el);
-        setTimeout(function(){el.style.opacity='1';el.style.transform='translateY(0)';},si*150);
-        obs.unobserve(el);
-      });
-    },{threshold:0.12});
-    revEls.forEach(function(el){obs.observe(el);});
-  }
-})();
-</script>
-
+<script src="/assets/app.js" defer></script>
 </body>
 </html>
