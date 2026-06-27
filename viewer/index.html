@@ -415,7 +415,16 @@ function loadFromURL(url, name) {
       postUp({ type: 'thalyn:error', message: 'This world could not be loaded.' }); });
 }
 
+const MAX_GLB_BYTES = 2_000_000_000; // ~1.86 GiB — a single .glb above this won't fit a browser ArrayBuffer (~2 GB cap)
 async function loadFiles(fileList) {
+  // Reject oversized files up front (before touching the current view) with actionable guidance.
+  const oversized = [...fileList].filter(f => /\.(glb|gltf)$/i.test(f.name) && f.size > MAX_GLB_BYTES);
+  if (oversized.length) {
+    const gb = (Math.max(...oversized.map(f => f.size)) / 1073741824).toFixed(1);
+    const msg = `File too large (${gb} GB) — a browser can't open a .glb over ~2 GB. Open the optimised web export (e.g. World_web.glb) instead.`;
+    toast(msg); postUp({ type: 'thalyn:error', message: msg });
+    return;
+  }
   resetAtmosphere(); // reset scene + HUD before the manifest parse below (a dropped manifest's atmosphere survives)
   const all = [...fileList];
   const jsonFile = all.find(f => /\.json$/i.test(f.name)); // a dropped .json sidecar → atmosphere

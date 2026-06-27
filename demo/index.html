@@ -310,6 +310,13 @@
       var files = e.target.files;
       if (!files || !files.length) return;
       if (!webglOK()) { showError('Your browser cannot show 3D here. Try a recent version of Chrome, Edge, Firefox or Safari.'); return; }
+      var oversized = Array.prototype.filter.call(files, function (f) { return f.size > 2000000000; }); // ~1.86 GiB
+      if (oversized.length) {
+        var gb = (Math.max.apply(null, oversized.map(function (f) { return f.size; })) / 1073741824).toFixed(1);
+        showError('That file is ' + gb + ' GB — a browser can’t open a .glb over ~2 GB. Open the optimised web export (e.g. World_web.glb) instead.');
+        e.target.value = '';
+        return;
+      }
       clearError();
       setActive(null);
       showPlaceholder(false);
