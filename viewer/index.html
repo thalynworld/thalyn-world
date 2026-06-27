@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Thalyn&reg; World Viewer</title>
+<!--
+  Thalyn® World Viewer — a three.js glTF (.glb) viewer.
+
+  A .glb stores geometry + baked PBR materials. This viewer adds the lighting a
+  glTF file does not store — sky, sun, ambient IBL, tone mapping, an optional
+  foliage wind shimmer, and animated water/lava — so a world looks its best in a
+  browser. Built on three.js only.
+
+  Loads one or many .glb at once (drag-drop / file picker / ?model=URL); drop a
+  whole export folder and it reassembles at the origin. Supports KTX2 (Basis),
+  Meshopt and Draco. Embedded in /demo/ via an <iframe> + postMessage bridge.
+-->
+<style>
+  :root { --gold: #E8C66A; --ink: #0d1411; --panel: rgba(13,20,17,0.82); --ash: #9DBCAC; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1411; color: #e8efe9;
+    font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif; }
+  #c { display: block; width: 100vw; height: 100vh; }
+  #hud { position: fixed; top: 14px; left: 14px; width: 248px; padding: 14px 16px;
+    background: var(--panel); border: 1px solid rgba(232,198,106,0.30); border-radius: 12px;
+    backdrop-filter: blur(8px); font-size: 13px; line-height: 1.5; user-select: none; }
+  #hud h1 { margin: 0 0 8px; font-size: 15px; letter-spacing: 0.04em; color: var(--gold); font-weight: 600; }
+  #hud .row { display: flex; align-items: center; justify-content: space-between; margin: 6px 0; }
+  #hud label { color: #cfe0d7; }
+  #hud .stat { color: var(--ash); font-variant-numeric: tabular-nums; }
+  #hud input[type=range] { width: 110px; accent-color: var(--gold); }
+  #hud input[type=checkbox] { accent-color: var(--gold); width: 16px; height: 16px; }
+  #hud button { width: 100%; margin-top: 8px; padding: 8px; border-radius: 8px; cursor: pointer;
+    background: rgba(232,198,106,0.14); color: var(--gold); border: 1px solid rgba(232,198,106,0.45);
+    font-size: 13px; }
+  #hud button:hover { background: rgba(232,198,106,0.24); }
+  #drop { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    pointer-events: none; opacity: 0; transition: opacity .15s; background: rgba(13,20,17,0.55);
+    border: 3px dashed var(--gold); font-size: 22px; color: var(--gold); z-index: 5; }
+  #drop.show { opacity: 1; }
+  #toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    background: var(--panel); border: 1px solid rgba(232,198,106,0.30); border-radius: 10px;
+    padding: 9px 16px; font-size: 13px; color: #e8efe9; opacity: 0; transition: opacity .3s; }
+  #toast.show { opacity: 1; }
+  #empty { position: fixed; inset: 0; display: flex; flex-direction: column; gap: 8px;
+    align-items: center; justify-content: center; text-align: center; color: var(--ash); pointer-events: none; }
+  #empty .big { font-size: 20px; color: var(--gold); }
+  a { color: var(--gold); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <h1>Thalyn&reg; World Viewer</h1>
+  <div class="row"><label>Meshes</label><span class="stat" id="s-meshes">0</span></div>
+  <div class="row"><label>Triangles</label><span class="stat" id="s-tris">0</span></div>
+  <div class="row"><label><input type="checkbox" id="t-wind" /> Wind</label>
+    <input type="range" id="r-wind" min="0" max="2" step="0.05" value="1" /></div>
+  <div class="row"><label><input type="checkbox" id="t-sky" checked /> Sky &amp; sun</label></div>
+  <div class="row"><label><input type="checkbox" id="t-fog" /> Haze / mist</label>
+    <input type="range" id="r-fog" min="0" max="1" step="0.02" value="0.4" /></div>
+  <div class="row"><label><input type="checkbox" id="t-rotate" /> Auto-rotate</label></div>
+  <div class="row"><label>Sun</label><input type="range" id="r-sun" min="0.05" max="0.95" step="0.01" value="0.55" /></div>
+  <div class="row"><label>Tone</label>
+    <select id="r-tone">
+      <option value="aces">Filmic (ACES)</option>
+      <option value="agx">AgX (neutral)</option>
+      <option value="reinhard">Reinhard</option>
+      <option value="linear">Linear</option>
+      <option value="none">None (raw)</option>
+    </select></div>
+  <div class="row"><label>Exposure</label><input type="range" id="r-exp" min="0.3" max="2" step="0.05" value="1" /></div>
+  <button id="b-reset">Reset view</button>
+  <button id="b-open">Open .glb…</button>
+</div>
+
+<div id="empty">
+  <div class="big">Drop a Thalyn world (.glb) here</div>
+  <div>or click “Open .glb…” &nbsp;·&nbsp; drop a whole export folder’s files at once</div>
+</div>
+<div id="drop">Release to load</div>
+<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+<input type="file" id="file" accept=".glb,.gltf" multiple style="display:none" />
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+
+const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
+
+// Honour the OS "reduce motion" preference: when set, the render loop freezes the
+// ambient wind/water/lava animation (user-driven orbit/zoom still respond).
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+// ── Renderer / scene / camera ────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 100000);
+camera.position.set(40, 30, 40);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.maxDistance = 60000;
+
+// IBL so baked-PBR materials read correctly even before the sky is added.
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+// ── Sky + sun (lighting a .glb does not store) ───────────────────────────────
+const sky = new Sky();
+sky.scale.setScalar(450000);
+const sun = new THREE.DirectionalLight(0xfff4e0, 2.2);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0005;
+const hemi = new THREE.HemisphereLight(0xbfd8ff, 0x4a3f33, 0.6);
+let skyOn = true;
+
+// ── Atmospheric haze / mist ──────────────────────────────────────────────────
+// FogExp2 = exponential distance haze (aerial perspective); density scales with world size.
+let worldRadius = 100;
+const fogColor = new THREE.Color(0xbcd0e0);
+function refreshFog() {
+  const on = document.getElementById('t-fog')?.checked;
+  if (!on) { scene.fog = null; return; }
+  const s = parseFloat(document.getElementById('r-fog').value);
+  scene.fog = new THREE.FogExp2(fogColor.getHex(), s * 3 / Math.max(1, worldRadius));
+}
+
+// ── Atmosphere metadata ──────────────────────────────────────────────────────
+// Optional numeric block (sun/fog/wind) applied to the scene when present.
+let pendingAtmos = null;
+function applyAtmosphere(a) {
+  if (!a || typeof a !== 'object') return;
+  pendingAtmos = a;
+  // Sun: position from the time-of-day arc; colour + intensity from the metadata.
+  const t = (typeof a.timeOfDay === 'number' && a.timeOfDay >= 0) ? a.timeOfDay : 0.55;
+  const elev = (t < 0.25 || t > 0.75) ? 0.06 : 0.06 + 0.9 * Math.sin((t - 0.25) / 0.5 * Math.PI);
+  const sunSlider = document.getElementById('r-sun'); if (sunSlider) sunSlider.value = elev;
+  applySky(elev);
+  // Atmosphere colours are authored in sRGB — tag them sRGB so three.js converts them into its
+  // linear working space (without the tag they read washed-out / too bright).
+  if (Array.isArray(a.sunColor)) sun.color.setRGB(a.sunColor[0], a.sunColor[1], a.sunColor[2], THREE.SRGBColorSpace);
+  if (a.sunIntensity > 0) sun.intensity = Math.min(4, Math.max(0.15, a.sunIntensity));
+  // Only override the viewer's sky-blue hemisphere tint when the supplied ambient is meaningfully lit —
+  // else a near-black ambient would darken the whole scene (and crush down-facing normals to black).
+  if (Array.isArray(a.ambientColor) && (a.ambientColor[0] + a.ambientColor[1] + a.ambientColor[2]) > 0.15)
+    hemi.color.setRGB(a.ambientColor[0], a.ambientColor[1], a.ambientColor[2], THREE.SRGBColorSpace); // sky-side ambient tint
+  if (a.ambientIntensity > 0) hemi.intensity = Math.min(2, Math.max(0.05, a.ambientIntensity));
+  // Fog / haze
+  if (a.fogEnabled && Array.isArray(a.fogColor)) {
+    fogColor.setRGB(a.fogColor[0], a.fogColor[1], a.fogColor[2], THREE.SRGBColorSpace);
+    const fogChk = document.getElementById('t-fog'); if (fogChk) fogChk.checked = true;
+    const mode = (a.fogMode || '').toLowerCase();
+    if (mode.includes('linear') && a.fogEnd > a.fogStart) {
+      scene.fog = new THREE.Fog(fogColor.getHex(), a.fogStart, a.fogEnd);
+    } else {
+      const d = a.fogDensity > 0 ? a.fogDensity : 1.2 / Math.max(1, worldRadius);
+      scene.fog = new THREE.FogExp2(fogColor.getHex(), d);
+    }
+  }
+  if (a.skyboxExposure > 0) {
+    renderer.toneMappingExposure = Math.min(2.5, Math.max(0.3, a.skyboxExposure));
+    const expSlider = document.getElementById('r-exp'); if (expSlider) expSlider.value = renderer.toneMappingExposure;
+  }
+  // Wind (normalise supplied strength → viewer ~0..2)
+  if (a.windStrength > 0 && !reduceMotion.matches) {
+    const windChk = document.getElementById('t-wind'); if (windChk) windChk.checked = true;
+    const w = Math.min(2, a.windStrength * 0.4);
+    const windSlider = document.getElementById('r-wind'); if (windSlider) windSlider.value = w;
+    uWindStrength.value = w;
+  }
+  toast('Applied Thalyn atmosphere');
+}
+async function fetchAtmos(url) {
+  try { const r = await fetch(url); const j = await r.json(); applyAtmosphere(j.atmosphere || j); }
+  catch (e) { console.warn('[atmos] fetch failed', e); toast('Atmosphere load failed (CORS?)'); }
+}
+
+function applySky(elevationDeg) {
+  const u = sky.material.uniforms;
+  u['turbidity'].value = 8;
+  u['rayleigh'].value = 2.2;
+  u['mieCoefficient'].value = 0.005;
+  u['mieDirectionalG'].value = 0.8;
+  const phi = THREE.MathUtils.degToRad(90 - elevationDeg * 90);
+  const theta = THREE.MathUtils.degToRad(35);
+  const sunPos = new THREE.Vector3().setFromSphericalCoords(1, phi, theta);
+  u['sunPosition'].value.copy(sunPos);
+  sun.position.copy(sunPos).multiplyScalar(8000);
+  sun.intensity = 0.4 + elevationDeg * 2.4;
+}
+function setSky(on) {
+  skyOn = on;
+  if (on) { scene.add(sky, sun, hemi); scene.background = null; }
+  else { scene.remove(sky, sun, hemi); scene.background = new THREE.Color(0x0d1411); }
+}
+applySky(0.55);
+setSky(true);
+
+// ── Loaders (KTX2 + Meshopt + Draco → loads gltfpack-optimised output too) ───
+const ktx2 = new KTX2Loader().setTranscoderPath(CDN + 'libs/basis/').detectSupport(renderer);
+const draco = new DRACOLoader().setDecoderPath(CDN + 'libs/draco/');
+const loader = new GLTFLoader();
+loader.setKTX2Loader(ktx2);
+loader.setDRACOLoader(draco);
+loader.setMeshoptDecoder(MeshoptDecoder);
+
+// ── World root + load ────────────────────────────────────────────────────────
+let worldRoot = new THREE.Group();
+scene.add(worldRoot);
+const windMaterials = [];
+const liquidLavaMats = [];   // animated emissive pulse (updated each frame)
+const uWindTime = { value: 0 };
+const uWindStrength = { value: 0 };
+
+function clearWorld() {
+  scene.remove(worldRoot);
+  worldRoot.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose());
+  });
+  worldRoot = new THREE.Group();
+  scene.add(worldRoot);
+  windMaterials.length = 0;
+  liquidLavaMats.length = 0;
+}
+
+// Dispose the old world AND zero the HUD readouts, so a fully-failed load doesn't leave stale counts.
+function resetWorld() {
+  clearWorld();
+  meshCount = 0; triCount = 0;
+  document.getElementById('s-meshes').textContent = '0';
+  document.getElementById('s-tris').textContent = '0';
+}
+
+// Restore lighting/fog/wind/exposure to the viewer's defaults so a world with no atmosphere block
+// (or fewer fields) does not inherit the previous world's atmosphere when switching.
+function resetAtmosphere() {
+  pendingAtmos = null;
+  scene.fog = null;
+  sun.color.set(0xfff4e0);
+  hemi.color.set(0xbfd8ff); hemi.intensity = 0.6;
+  renderer.toneMappingExposure = 1.0;
+  uWindStrength.value = 0;
+  const ctl = (id, v, isCheck) => { const el = document.getElementById(id); if (el) { if (isCheck) el.checked = v; else el.value = v; } };
+  ctl('t-fog', false, true); ctl('r-fog', 0.4);
+  ctl('t-wind', false, true); ctl('r-wind', 1);
+  ctl('r-sun', 0.55); ctl('r-exp', 1);
+  applySky(0.55); // restore default sun position + intensity
+}
+
+// Match the keyword only at a start/underscore/CamelCase boundary so substrings in unrelated
+// names (e.g. 'ravine') don't false-match a foliage material.
+const FOLIAGE = /(^|[^a-z])(leaf|foliage|flower|petal|grass|shrub|frond|canopy|billboard|bush|fern|vine)/i;
+// A leaf card lit only by a bare viewer can read black when its visible face points away from the
+// sun. Give foliage an albedo-proportional ambient floor so a shadowed leaf never falls below a
+// fraction of its own colour. Viewer-only — the source file is untouched.
+const FOLIAGE_AMBIENT_FLOOR = 0.40; // LINEAR factor on albedo. Higher → brighter / flatter.
+function patchFoliageMaterial(mat, ownerName) {
+  if (!mat || mat.userData.__foliage) return;
+  const name = (mat.name || '') + '|' + (ownerName || '');
+  if (!FOLIAGE.test(name)) return;
+  mat.userData.__foliage = true;
+
+  // ── Relight ──
+  // Respect the glTF's per-material side (don't force DoubleSide — that re-renders coincident back
+  // faces and reintroduces z-fighting). Apply the ambient floor so a card facing away from the sun
+  // never reads pure black.
+  if (mat.map || mat.emissiveMap) {
+    if (!mat.emissiveMap && mat.map) mat.emissiveMap = mat.map; // floor follows the leaf's own colour (sRGB base map)
+    const cur = mat.emissive ? Math.max(mat.emissive.r, mat.emissive.g, mat.emissive.b) : 0;
+    // setScalar = RAW LINEAR grey (new THREE.Color(hex) would sRGB-decode → ~3x too dim).
+    if (cur < FOLIAGE_AMBIENT_FLOOR) mat.emissive = new THREE.Color().setScalar(FOLIAGE_AMBIENT_FLOOR);
+  } else if (mat.color) {
+    mat.emissive = mat.color.clone().multiplyScalar(FOLIAGE_AMBIENT_FLOOR); // untextured foliage → flat colour floor
+  }
+  mat.emissiveIntensity = 1.0;
+  // Soften the residual cross-card cutout z-fight at distance (different leaf cards coplanar in 3D — not fixable
+  // by culling). alphaToCoverage uses the renderer's MSAA (antialias:true) to anti-alias the cutout edges.
+  mat.alphaToCoverage = true;
+
+  // ── Wind sway ──
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uWindTime = uWindTime;
+    shader.uniforms.uWindStrength = uWindStrength;
+    shader.vertexShader = 'uniform float uWindTime;\nuniform float uWindStrength;\n' + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      `#include <begin_vertex>
+       float _wph = transformed.x * 0.35 + transformed.z * 0.35;
+       float _h = max(transformed.y, 0.0);
+       transformed.x += sin(uWindTime * 1.6 + _wph) * uWindStrength * _h * 0.06;
+       transformed.z += cos(uWindTime * 1.3 + _wph) * uWindStrength * _h * 0.045;`
+    );
+  };
+  mat.needsUpdate = true;
+  windMaterials.push(mat);
+}
+
+// ── Liquids ───────────────────────────────────────────────────────────────────
+// Detect water/lava surfaces by material name and upgrade them in place to an animated surface.
+const LIQUID = /^Thalyn_(Water|Lava)_Baked/i;
+function upgradeLiquid(mesh) {
+  const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  if (!mats.some(m => m && LIQUID.test(m.name || ''))) return false;
+  const isLava = mats.some(m => m && /Lava/i.test(m.name || '')) || /lava/i.test(mesh.name || '');
+  let mat;
+  if (isLava) {
+    mat = new THREE.MeshStandardMaterial({ color: 0x3a0c03, emissive: new THREE.Color(1.0, 0.42, 0.10),
+      emissiveIntensity: 1.5, roughness: 0.55, metalness: 0.0 });
+    liquidLavaMats.push(mat);
+  } else {
+    mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(0.02, 0.13, 0.28), roughness: 0.04,
+      metalness: 0.0, transparent: true, opacity: 0.82, depthWrite: true, envMapIntensity: 1.4 });
+  }
+  const amp = isLava ? 0.22 : 0.12, freq = isLava ? 0.55 : 1.1;
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uWindTime = uWindTime;
+    shader.vertexShader = 'uniform float uWindTime;\n' + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>',
+      `#include <begin_vertex>
+       transformed.y += sin(uWindTime*${freq.toFixed(2)} + transformed.x*0.12 + transformed.z*0.12)*${amp.toFixed(2)}
+                      + cos(uWindTime*${(freq * 0.6).toFixed(2)} + transformed.x*0.05)*${(amp * 0.6).toFixed(2)};`);
+  };
+  mat.needsUpdate = true;
+  mesh.castShadow = false; mesh.receiveShadow = false;
+  mesh.userData.__liquid = true; // excluded from auto-frame (an infinite water plane must not blow up the box)
+  if (Array.isArray(mesh.material)) mesh.material = mesh.material.map(m => (m && LIQUID.test(m.name || '')) ? (m.dispose(), mat) : m);
+  else { mesh.material.dispose(); mesh.material = mat; }
+  return true;
+}
+
+let meshCount = 0, triCount = 0;
+function ingest(gltf) {
+  gltf.scene.traverse(o => {
+    if (o.isMesh) {
+      o.castShadow = true; o.receiveShadow = true;
+      meshCount++;
+      const g = o.geometry;
+      if (g && g.index) triCount += g.index.count / 3;
+      else if (g && g.attributes.position) triCount += g.attributes.position.count / 3;
+      if (upgradeLiquid(o)) return; // animated water/lava — no wind sway
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => patchFoliageMaterial(m, o.name));
+    }
+  });
+  // This viewer supplies its own sun + sky + IBL, so strip any punctual lights baked into the file
+  // (present for DCC tools) to avoid double-lighting.
+  const bakedLights = [];
+  gltf.scene.traverse(o => { if (o.isLight) bakedLights.push(o); });
+  bakedLights.forEach(l => l.parent && l.parent.remove(l));
+  // Apply an embedded atmosphere block from the file's root extras if present and none was supplied separately.
+  const tx = gltf.parser && gltf.parser.json && gltf.parser.json.extras && gltf.parser.json.extras.thalyn;
+  if (tx && tx.atmosphere && !pendingAtmos) applyAtmosphere(tx.atmosphere);
+  worldRoot.add(gltf.scene);
+  document.getElementById('s-meshes').textContent = meshCount.toLocaleString();
+  document.getElementById('s-tris').textContent = Math.round(triCount).toLocaleString();
+}
+
+function frameWorld() {
+  // Frame on terrain + species, NOT liquids — an infinite water/lava plane extends far past the
+  // world and would otherwise blow up the box (camera zooms out, world becomes a speck).
+  worldRoot.updateMatrixWorld(true); // ensure freshly-added .glb nodes have world matrices before bounds
+  const box = new THREE.Box3();
+  let any = false;
+  worldRoot.traverse(o => { if (o.isMesh && !o.userData.__liquid) { box.expandByObject(o); any = true; } });
+  if (!any) box.setFromObject(worldRoot); // liquid-only world → frame everything
+  if (box.isEmpty()) return;
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const radius = Math.max(size.x, size.y, size.z) * 0.5 || 10;
+  controls.target.copy(center);
+  const dist = radius / Math.sin(THREE.MathUtils.degToRad(camera.fov * 0.5));
+  camera.position.set(center.x + dist * 0.7, center.y + dist * 0.5, center.z + dist * 0.7);
+  camera.near = Math.max(0.05, radius / 1000);
+  camera.far = dist * 8;
+  camera.updateProjectionMatrix();
+  worldRadius = radius;
+  refreshFog();
+  if (pendingAtmos) applyAtmosphere(pendingAtmos); // re-apply now that worldRadius is known
+  controls.update();
+}
+
+function loadFromURL(url, name) {
+  toast('Loading ' + (name || url) + ' …');
+  loader.load(url, gltf => { ingest(gltf); frameWorld(); toast('Loaded ' + (name || '') ); document.getElementById('empty').style.display = 'none';
+      postUp({ type: 'thalyn:loaded', label: name || '', meshes: meshCount }); },
+    undefined, err => { console.error(err); toast('Failed: ' + (err?.message || err));
+      postUp({ type: 'thalyn:error', message: 'This world could not be loaded.' }); });
+}
+
+async function loadFiles(fileList) {
+  resetAtmosphere(); // reset scene + HUD before the manifest parse below (a dropped manifest's atmosphere survives)
+  const all = [...fileList];
+  const jsonFile = all.find(f => /\.json$/i.test(f.name)); // a dropped .json sidecar → atmosphere
+  if (jsonFile) {
+    try { const j = JSON.parse(await jsonFile.text()); applyAtmosphere(j.atmosphere || j); }
+    catch (e) { console.warn('[atmos] json parse', e); }
+  }
+  const files = all.filter(f => /\.(glb|gltf)$/i.test(f.name));
+  if (!files.length) return;
+  resetWorld();
+  document.getElementById('empty').style.display = 'none';
+  // Map sibling files (so a .gltf + its .bin/textures dropped together resolve).
+  const byName = new Map(files.map(f => [f.name, f]));
+  const siblingURLs = [];
+  const manager = new THREE.LoadingManager();
+  manager.setURLModifier((u) => {
+    const base = u.split('/').pop().split('?')[0];
+    if (byName.has(base)) { const o = URL.createObjectURL(byName.get(base)); siblingURLs.push(o); return o; }
+    return u;
+  });
+  const fl = new GLTFLoader(manager);
+  fl.setKTX2Loader(ktx2); fl.setDRACOLoader(draco); fl.setMeshoptDecoder(MeshoptDecoder);
+  let done = 0;
+  for (const f of files) {
+    const url = URL.createObjectURL(f);
+    await new Promise(res => fl.load(url, g => { ingest(g); done++; toast(`Loaded ${done}/${files.length}`); URL.revokeObjectURL(url); res(); },
+      undefined, e => { console.error(f.name, e); done++; URL.revokeObjectURL(url); res(); }));
+  }
+  siblingURLs.forEach(u => URL.revokeObjectURL(u)); // free .bin/texture blob URLs created by the URL modifier
+  frameWorld();
+  toast(`Loaded ${done} file(s) — ${meshCount.toLocaleString()} meshes`);
+  postUp(meshCount ? { type: 'thalyn:loaded', label: '', meshes: meshCount }
+                   : { type: 'thalyn:error', message: 'That file could not be loaded.' });
+}
+
+// ── UI wiring ────────────────────────────────────────────────────────────────
+const dropEl = document.getElementById('drop');
+addEventListener('dragover', e => { e.preventDefault(); dropEl.classList.add('show'); });
+addEventListener('dragleave', e => { if (e.target === document || e.relatedTarget === null) dropEl.classList.remove('show'); });
+addEventListener('drop', e => { e.preventDefault(); dropEl.classList.remove('show'); if (e.dataTransfer?.files?.length) loadFiles(e.dataTransfer.files); });
+document.getElementById('b-open').onclick = () => document.getElementById('file').click();
+document.getElementById('file').onchange = e => loadFiles(e.target.files);
+document.getElementById('b-reset').onclick = frameWorld;
+document.getElementById('t-wind').onchange = e => { uWindStrength.value = e.target.checked ? parseFloat(document.getElementById('r-wind').value) : 0; };
+document.getElementById('r-wind').oninput = e => { if (document.getElementById('t-wind').checked) uWindStrength.value = parseFloat(e.target.value); };
+document.getElementById('t-sky').onchange = e => setSky(e.target.checked);
+document.getElementById('t-fog').onchange = refreshFog;
+document.getElementById('r-fog').oninput = refreshFog;
+document.getElementById('t-rotate').onchange = e => { controls.autoRotate = e.target.checked; controls.autoRotateSpeed = 0.6; };
+document.getElementById('r-sun').oninput = e => applySky(parseFloat(e.target.value));
+// Live colour controls — tone mapping shapes saturation/contrast; exposure = brightness.
+// (Tone mapping is compiled into each material's shader, so a change must flag loaded materials for recompile.)
+const TONEMAPS = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping, reinhard: THREE.ReinhardToneMapping, linear: THREE.LinearToneMapping, none: THREE.NoToneMapping };
+function setToneMapping(mode) {
+  renderer.toneMapping = TONEMAPS[mode] ?? THREE.ACESFilmicToneMapping;
+  worldRoot.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m) m.needsUpdate = true; }); });
+}
+document.getElementById('r-tone').onchange = e => setToneMapping(e.target.value);
+document.getElementById('r-exp').oninput = e => { renderer.toneMappingExposure = parseFloat(e.target.value); };
+
+let toastT;
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+renderer.setSize(innerWidth, innerHeight);
+
+// ── Embed bridge ──────────────────────────────────────────────────────────────
+// When this viewer is embedded in an <iframe> (the /demo/ page), the parent drives it via
+// postMessage instead of reloading the frame. Same-origin only.
+function postUp(msg) { try { if (parent && parent !== window) parent.postMessage(msg, location.origin); } catch (e) {} }
+function loadURLFresh(url, label) {
+  resetWorld(); resetAtmosphere();
+  loadFromURL(url, label);
+}
+addEventListener('message', (e) => {
+  if (e.origin !== location.origin) return;
+  const d = e.data;
+  if (!d || typeof d !== 'object') return;
+  if (d.type === 'thalyn:ping') { postUp({ type: 'thalyn:ready' }); return; }
+  if (d.type === 'thalyn:loadURL' && d.url) { loadURLFresh(d.url, d.label); }
+  else if (d.type === 'thalyn:loadFiles' && d.files && d.files.length) { loadFiles(d.files); }
+});
+postUp({ type: 'thalyn:ready' }); // announce once on startup (parent also pings as a fallback)
+
+// ?model=URL deep link + ?atmos=URL for a sidecar atmosphere block.
+// Only allow https: or same-origin URLs — a deep link must not make the page fetch arbitrary
+// schemes (javascript:/data:/file:) or be used to render attacker content under this domain.
+function safeURL(raw) {
+  try { const u = new URL(raw, location.href);
+    if (u.protocol === 'https:' || u.origin === location.origin) return u.href;
+  } catch (e) {}
+  return null;
+}
+const params = new URLSearchParams(location.search);
+const qp = params.get('model');
+if (qp) { const s = safeURL(qp); if (s) loadFromURL(s); else toast('That world link is not allowed.'); }
+const atmosUrl = params.get('atmos');
+if (atmosUrl) { const s = safeURL(atmosUrl); if (s) fetchAtmos(s); }
+
+// ── Render loop ──────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = clock.getDelta();
+  if (!reduceMotion.matches) {           // freeze ambient wind/water/lava motion under "reduce motion"
+    uWindTime.value += dt;
+    const t = uWindTime.value;
+    for (let i = 0; i < liquidLavaMats.length; i++)
+      liquidLavaMats[i].emissiveIntensity = 1.3 + Math.sin(t * 0.8 + i) * 0.5; // slow molten glow
+  }
+  controls.update();
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
