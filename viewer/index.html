@@ -47,6 +47,16 @@
     align-items: center; justify-content: center; text-align: center; color: var(--ash); pointer-events: none; }
   #empty .big { font-size: 20px; color: var(--gold); }
   a { color: var(--gold); }
+  #b-fs { position: fixed; right: 14px; bottom: 14px; z-index: 10; width: 40px; height: 40px; padding: 0;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    background: var(--panel); border: 1px solid rgba(232,198,106,0.30); border-radius: 10px;
+    color: var(--gold); backdrop-filter: blur(8px); }
+  #b-fs:hover { background: rgba(232,198,106,0.18); border-color: rgba(232,198,106,0.55); }
+  #b-fs:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  #b-fs svg { width: 20px; height: 20px; display: block; }
+  #b-fs .fs-exit { display: none; }
+  #b-fs.is-fs .fs-enter { display: none; }
+  #b-fs.is-fs .fs-exit { display: block; }
 </style>
 </head>
 <body>
@@ -82,6 +92,10 @@
 </div>
 <div id="drop">Release to load</div>
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+<button id="b-fs" type="button" aria-label="Enter fullscreen" title="Fullscreen">
+  <svg class="fs-enter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+  <svg class="fs-exit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+</button>
 <input type="file" id="file" accept=".glb,.gltf" multiple style="display:none" />
 
 <script type="importmap">
@@ -488,11 +502,26 @@ document.getElementById('r-exp').oninput = e => { renderer.toneMappingExposure =
 let toastT;
 function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
 
-addEventListener('resize', () => {
+function resizeToViewport() {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
-});
+}
+addEventListener('resize', resizeToViewport);
 renderer.setSize(innerWidth, innerHeight);
+
+// ── Fullscreen toggle (bottom-right) ──────────────────────────────────────────
+// Works standalone and embedded (the parent iframe carries allow="fullscreen").
+const fsBtn = document.getElementById('b-fs');
+fsBtn.addEventListener('click', () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else (document.documentElement.requestFullscreen ? document.documentElement.requestFullscreen() : Promise.reject()).catch(() => toast('Fullscreen is not available here.'));
+});
+document.addEventListener('fullscreenchange', () => {
+  const on = !!document.fullscreenElement;
+  fsBtn.classList.toggle('is-fs', on);
+  fsBtn.setAttribute('aria-label', on ? 'Exit fullscreen' : 'Enter fullscreen');
+  requestAnimationFrame(resizeToViewport); // re-fit the canvas once the viewport has changed
+});
 
 // ── Embed bridge ──────────────────────────────────────────────────────────────
 // When this viewer is embedded in an <iframe> (the /demo/ page), the parent drives it via
