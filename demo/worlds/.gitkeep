@@ -1,0 +1,5 @@
+# Demo world .glb files go here, named <id>_web.glb (serene_web.glb, joyful_web.glb,
+# oppressive_web.glb, desolate_web.glb, eerie_web.glb, chaotic_web.glb).
+# Use the OPTIMISED "_web" export only (KTX2 + meshopt). Keep each under 100 MB
+# (GitHub's per-file limit) — host larger scenes on https/R2 and point SITE_CONFIG there.
+# After adding a file, flip its available:false → true in /assets/app.js.

@@ -19,15 +19,21 @@
     steamFallbackUrl: 'https://discord.gg/22jxAwwgX',
 
     // ── DROP-IN SLOT 2 — DEMO WORLDS (.glb) ─────────────────────────────
-    // When a world is ready: set available:true and paste its url.
-    // The /demo/ page reads this list; nothing else needs touching.
+    // Paths are pre-wired to /demo/worlds/<id>_web.glb. To make a world live:
+    //   1. Drop the OPTIMISED export (the "_web" .glb — KTX2 + meshopt) at that path
+    //      in thalyn-world/demo/worlds/  (NEVER a raw export — a browser can't open a
+    //      .glb over ~2 GB; and GitHub rejects any single file over 100 MB, so host
+    //      large scenes on https/R2 and paste the full URL instead).
+    //   2. Flip available:false → true for that world.
+    // Each world goes live independently. The /demo/ page reads this list; nothing
+    // else needs touching. (Card titles/descriptions already live in /demo/index.html.)
     demoWorlds: [
-      { id: 'serene',    label: 'Serene',    url: '', available: false },
-      { id: 'joyful',    label: 'Joyful',    url: '', available: false },
-      { id: 'oppressive',label: 'Oppressive',url: '', available: false },
-      { id: 'desolate',  label: 'Desolate',  url: '', available: false },
-      { id: 'eerie',     label: 'Eerie',     url: '', available: false },
-      { id: 'chaotic',   label: 'Chaotic',   url: '', available: false }
+      { id: 'serene',    label: 'Serene',    url: '/demo/worlds/serene_web.glb',     available: false },
+      { id: 'joyful',    label: 'Joyful',    url: '/demo/worlds/joyful_web.glb',     available: false },
+      { id: 'oppressive',label: 'Oppressive',url: '/demo/worlds/oppressive_web.glb', available: false },
+      { id: 'desolate',  label: 'Desolate',  url: '/demo/worlds/desolate_web.glb',   available: false },
+      { id: 'eerie',     label: 'Eerie',     url: '/demo/worlds/eerie_web.glb',      available: false },
+      { id: 'chaotic',   label: 'Chaotic',   url: '/demo/worlds/chaotic_web.glb',    available: false }
     ],
 
     discordUrl: 'https://discord.gg/22jxAwwgX'
