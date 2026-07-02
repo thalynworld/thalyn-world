@@ -174,7 +174,7 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible,
 
 /* ── EMBER CANVAS ────────────────────────────────────────────────────────── */
 #ember-canvas{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;}
-.site-nav,main,.site-footer,.thalyn-mark{position:relative;z-index:1;}
+main,.site-footer,.thalyn-mark{position:relative;z-index:1;}
 
 /* ── SCROLL REVEAL (only hidden when JS is present, so no-JS shows all) ───── */
 .js .reveal{opacity:0;transform:translateY(18px);transition:opacity 0.6s ease,transform 0.6s ease;}
