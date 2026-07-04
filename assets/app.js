@@ -16,7 +16,7 @@
     // Leave '' until then. While empty, every "Wishlist on Steam" button
     // shows its pending label and routes to Discord instead (no dead links).
     steamUrl: '',
-    steamFallbackUrl: 'https://discord.gg/22jxAwwgX',
+    steamFallbackUrl: 'https://discord.gg/UH9ukaR5Ew',
 
     // ── DROP-IN SLOT 2 — DEMO WORLDS (.glb) ─────────────────────────────
     // Paths are pre-wired to /demo/worlds/<id>_web.glb. To make a world live:
@@ -36,7 +36,7 @@
       { id: 'chaotic',   label: 'Chaotic',   url: '/demo/worlds/chaotic_web.glb',    available: false }
     ],
 
-    discordUrl: 'https://discord.gg/22jxAwwgX'
+    discordUrl: 'https://discord.gg/UH9ukaR5Ew'
   };
   window.SITE_CONFIG = SITE_CONFIG; // so the demo page can read the world list
 
