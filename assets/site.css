@@ -16,7 +16,7 @@
   --gild-soft: linear-gradient(135deg,#B8860B,#E8C66A 45%,#FFF3C4 55%,#D4880A);
   --gold-base: #E8C66A;   /* flat gold for small accents / dots / thin borders */
   --gild-ink:  #3A2704;   /* text colour that sits ON a gild fill */
-  --green:     #4A9E7A;   /* celtic green — the calm secondary */
+  --green:     #55AE86;   /* celtic green — the calm secondary (AA-normal on every ground) */
   --teal:#00A8A0; --teal-dim:rgba(0,168,160,0.72);
   --parchment:#D9CBA8; --parchment-dim:rgba(217,203,168,0.8);
   --text-bright:#EDE5D0;
@@ -109,7 +109,7 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible,
 .btn-primary:hover{filter:brightness(1.06);box-shadow:0 3px 18px rgba(212,136,10,.5), inset 0 1px 0 rgba(255,255,255,.5);}
 /* Secondary / ghost — green is the calm counterpoint, never competes (§4). */
 .btn-secondary,.btn-ghost{color:var(--green);background:transparent;border-color:var(--green);}
-.btn-secondary:hover,.btn-ghost:hover{border-color:#5CB88A;color:#5CB88A;}
+.btn-secondary:hover,.btn-ghost:hover{border-color:#62C091;color:#62C091;}
 .btn-sm{padding:0.6rem 1.4rem;font-size:0.68rem;}
 .cta-row{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;}
 @keyframes sheen{0%,60%{left:-60%}100%{left:130%}}
