@@ -9,6 +9,14 @@
   --root-bg:#0B1515; --panel:#0E2E2A; --panel-light:#183830;
   --border:rgba(212,136,10,0.18); --border-subtle:rgba(0,168,160,0.12);
   --gold:#D4880A; --gold-bright:#E8990E; --gold-dim:rgba(212,136,10,0.7);
+  /* Gilded metallic gold — matches the app's ThalynGild ramp. --gild = full
+     metallic (dark→gold→white highlight→gold→dark) for FILLS; --gild-soft =
+     gentler ramp for background-clip TEXT. Do not alter the stops. */
+  --gild:      linear-gradient(135deg,#8A5E08 0%,#D4880A 22%,#F0C862 46%,#FFF6D6 54%,#E8C66A 62%,#C08A16 80%,#7A5406 100%);
+  --gild-soft: linear-gradient(135deg,#B8860B,#E8C66A 45%,#FFF3C4 55%,#D4880A);
+  --gold-base: #E8C66A;   /* flat gold for small accents / dots / thin borders */
+  --gild-ink:  #3A2704;   /* text colour that sits ON a gild fill */
+  --green:     #4A9E7A;   /* celtic green — the calm secondary */
   --teal:#00A8A0; --teal-dim:rgba(0,168,160,0.72);
   --parchment:#D9CBA8; --parchment-dim:rgba(217,203,168,0.8);
   --text-bright:#EDE5D0;
@@ -63,7 +71,7 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible,
   background:rgba(11,21,21,0.92); backdrop-filter:blur(12px);
   border-bottom:1px solid var(--border-subtle);
 }
-.nav-logo{font-family:var(--font-display);font-size:1.15rem;font-weight:700;color:var(--gold);text-decoration:none;letter-spacing:0.08em;white-space:nowrap;}
+.nav-logo{font-family:var(--font-display);font-size:1.15rem;font-weight:700;background:var(--gild-soft);-webkit-background-clip:text;background-clip:text;color:transparent;text-decoration:none;letter-spacing:0.08em;white-space:nowrap;}
 .nav-logo sup{font-size:0.5em;vertical-align:super;color:var(--teal);}
 .nav-links{display:flex;gap:1.6rem;list-style:none;align-items:center;margin-left:auto;}
 .nav-links a{
@@ -86,12 +94,25 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible,
   padding:0.9rem 2.1rem; cursor:pointer; display:inline-block; border:1px solid transparent;
   transition:background 0.2s,box-shadow 0.2s,border-color 0.2s,color 0.2s; white-space:nowrap;
 }
-.btn-primary{color:#0B1515;background:var(--gold);}
-.btn-primary:hover{background:var(--gold-bright);box-shadow:0 0 26px rgba(212,136,10,0.4);}
-.btn-secondary{color:var(--parchment-dim);background:transparent;border-color:var(--border);}
-.btn-secondary:hover{border-color:var(--gold-dim);color:var(--parchment);}
+/* Primary CTA — gilded metallic fill, bevel, and a slow moving sheen (§2a). */
+.btn-primary{
+  position:relative; overflow:hidden;
+  color:var(--gild-ink); background:var(--gild);
+  text-shadow:0 1px 0 rgba(255,255,255,.25);
+  box-shadow:0 2px 10px rgba(212,136,10,.35), inset 0 1px 0 rgba(255,255,255,.45);
+}
+.btn-primary::after{           /* the moving reflection */
+  content:""; position:absolute; top:0; left:-60%; width:40%; height:100%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);
+  transform:skewX(-18deg); animation:sheen 3.2s ease-in-out infinite; pointer-events:none;
+}
+.btn-primary:hover{filter:brightness(1.06);box-shadow:0 3px 18px rgba(212,136,10,.5), inset 0 1px 0 rgba(255,255,255,.5);}
+/* Secondary / ghost — green is the calm counterpoint, never competes (§4). */
+.btn-secondary,.btn-ghost{color:var(--green);background:transparent;border-color:var(--green);}
+.btn-secondary:hover,.btn-ghost:hover{border-color:#5CB88A;color:#5CB88A;}
 .btn-sm{padding:0.6rem 1.4rem;font-size:0.68rem;}
 .cta-row{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;}
+@keyframes sheen{0%,60%{left:-60%}100%{left:130%}}
 
 /* ── HERO ────────────────────────────────────────────────────────────────── */
 .hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8rem 2rem 5rem;position:relative;overflow:hidden;}
@@ -100,7 +121,7 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible,
              radial-gradient(ellipse 40% 30% at 50% 65%,rgba(212,136,10,0.04),transparent 60%);}
 .hero-gaelic{font-size:0.62rem;letter-spacing:0.28em;margin-bottom:2rem;}
 .hero-myth{font-family:var(--font-display);font-size:clamp(2rem,5.5vw,4.4rem);font-weight:700;line-height:1.1;color:var(--text-bright);letter-spacing:0.01em;}
-.hero-myth-next{display:block;color:var(--gold);margin-bottom:2.2rem;}
+.hero-myth-next{display:block;background:var(--gild-soft);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:2.2rem;}
 .hero-threshold{font-family:var(--font-body);font-size:clamp(1rem,2.2vw,1.25rem);font-weight:300;font-style:italic;color:var(--parchment-dim);max-width:580px;margin:0 auto 0.6rem;line-height:1.5;}
 
 /* Typewriter — CLS-safe. A hidden ghost of the longest phrase reserves the box;
@@ -131,7 +152,7 @@ a:focus-visible,button:focus-visible,[tabindex]:focus-visible,
 .doors-grid.is-2x2{grid-template-columns:repeat(2,minmax(0,1fr));}
 @media(max-width:680px){.doors-grid.is-2x2{grid-template-columns:1fr;}}
 .door{background:var(--panel);padding:2.5rem 2rem;text-decoration:none;display:flex;flex-direction:column;gap:0.75rem;transition:background 0.2s;position:relative;overflow:hidden;}
-.door::after{content:'';position:absolute;inset:auto 0 0 0;height:2px;background:var(--gold);transform:scaleX(0);transform-origin:left;transition:transform 0.3s ease;}
+.door::after{content:'';position:absolute;inset:auto 0 0 0;height:2px;background:var(--gild);transform:scaleX(0);transform-origin:left;transition:transform 0.3s ease;}
 .door:hover{background:var(--panel-light);}
 .door:hover::after,.door:focus-visible::after{transform:scaleX(1);}
 .door-label{font-family:var(--font-display);font-size:0.65rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--teal);}
@@ -191,7 +212,7 @@ main,.site-footer,.thalyn-mark{position:relative;z-index:1;}
   background:radial-gradient(ellipse 55% 45% at 50% 35%,rgba(0,168,160,0.06),transparent 70%);}
 .page-eyebrow{font-family:var(--font-display);font-size:0.68rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--teal);margin-bottom:1.2rem;display:block;}
 .page-title{font-family:var(--font-display);font-size:clamp(2rem,5vw,3.6rem);font-weight:700;color:var(--text-bright);line-height:1.15;margin-bottom:1.2rem;}
-.page-title em{font-style:normal;color:var(--gold);}
+.page-title em{font-style:normal;background:var(--gild-soft);-webkit-background-clip:text;background-clip:text;color:transparent;}
 .page-sub{font-size:1.15rem;font-weight:300;font-style:italic;color:var(--parchment-dim);max-width:620px;margin:0 auto 2.4rem;line-height:1.55;}
 
 /* Prose block */
@@ -222,8 +243,11 @@ main,.site-footer,.thalyn-mark{position:relative;z-index:1;}
 .tile-desc{font-size:0.88rem;font-weight:300;color:var(--parchment-dim);line-height:1.5;}
 
 /* Callout (left gold rule) */
-.callout{background:var(--panel);border-left:3px solid var(--gold);padding:2rem 2rem 2rem 2.5rem;max-width:820px;margin:3rem auto;}
+.callout{background:var(--panel);border-left:3px solid transparent;border-image:var(--gild) 1;padding:2rem 2rem 2rem 2.5rem;max-width:820px;margin:3rem auto;}
 .callout .label{color:var(--gold);font-size:0.62rem;margin-bottom:0.8rem;}
+/* Gilded accent surfaces (§2c) and active/selected/featured borders (§2d). */
+.accent-line,.divider-gold,.progress-fill{background:var(--gild);}
+.is-active,.selected,.card-featured{border:1px solid transparent;border-image:var(--gild) 1;}
 .callout h3{font-family:var(--font-display);font-size:1.05rem;font-weight:600;color:var(--text-bright);margin-bottom:0.7rem;line-height:1.3;}
 .callout p{font-size:0.98rem;font-weight:300;color:var(--parchment);line-height:1.7;}
 
@@ -261,7 +285,10 @@ main,.site-footer,.thalyn-mark{position:relative;z-index:1;}
 
 /* Enemy/hook line — a single sharp line that opens a section */
 .hook{font-family:var(--font-display);font-size:clamp(1.2rem,2.6vw,1.7rem);font-weight:600;color:var(--text-bright);max-width:760px;margin:0 auto;line-height:1.35;text-align:center;}
-.hook em{font-style:normal;color:var(--gold);}
+.hook em{font-style:normal;background:var(--gild-soft);-webkit-background-clip:text;background-clip:text;color:transparent;}
+/* Reusable gilded-text utility — large display type only; on small text
+   background-clip kills contrast (§2b/§5). */
+.gild-text{background:var(--gild-soft);-webkit-background-clip:text;background-clip:text;color:transparent;}
 
 @media(max-width:768px){
   .tile-grid,.steps{grid-template-columns:1fr;}
@@ -294,5 +321,6 @@ main,.site-footer,.thalyn-mark{position:relative;z-index:1;}
   html{scroll-behavior:auto;}
   *,*::before,*::after{animation-duration:0.001ms!important;animation-iteration-count:1!important;transition-duration:0.001ms!important;}
   .tw-target::after{animation:none;}
+  .btn-primary::after{animation:none;}   /* park the sheen off-screen (§3) */
   .reveal{opacity:1;transform:none;}
 }

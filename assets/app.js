@@ -76,7 +76,7 @@
     var canvas = document.getElementById('ember-canvas');
     if (!canvas || reduced) return;
     var ctx = canvas.getContext('2d');
-    var GOLD = '#E1B64A', GREEN = '#78b45a';
+    var GOLD = '#E8C66A', GREEN = '#78b45a';  /* warmed toward the gild ramp */
     var W, H, embers = [], COUNT = 42;
     function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
     window.addEventListener('resize', resize); resize();
@@ -85,7 +85,7 @@
       return { x: Math.random() * W, y: H + Math.random() * 60, r: 0.8 + Math.random() * 2.2,
         vy: -(0.22 + Math.random() * 0.55), vx: (Math.random() - 0.5) * 0.38,
         a: 0.55 + Math.random() * 0.45, da: -(0.0008 + Math.random() * 0.0012),
-        col: g ? GOLD : GREEN, halo: g ? 'rgba(225,182,74,' : 'rgba(120,180,90,' };
+        col: g ? GOLD : GREEN, halo: g ? 'rgba(232,198,106,' : 'rgba(120,180,90,' };
     }
     for (var i = 0; i < COUNT; i++) { var e = mk(); e.y = Math.random() * H; embers.push(e); }
     function tick() {
