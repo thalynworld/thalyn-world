@@ -290,6 +290,30 @@ main,.site-footer,.thalyn-mark{position:relative;z-index:1;}
    background-clip kills contrast (§2b/§5). */
 .gild-text{background:var(--gild-soft);-webkit-background-clip:text;background-clip:text;color:transparent;}
 
+/* ── EMAIL CAPTURE — the pre-Steam conversion path (home / core / demo) ──── */
+.email-capture{background:var(--panel);padding:4.5rem 2rem;border-block:1px solid var(--border-subtle);text-align:center;}
+.email-capture-inner{max-width:520px;margin-inline:auto;}
+.email-capture .label{color:var(--gold);margin-bottom:0.6rem;}
+.ec-sub{font-size:0.98rem;font-weight:300;color:var(--parchment-dim);line-height:1.6;margin:0 0 2rem;}
+.email-capture-form{display:flex;gap:0.75rem;flex-wrap:wrap;justify-content:center;}
+.email-capture-form input[type="email"]{
+  flex:1 1 240px;min-width:0;background:var(--root-bg);border:1px solid var(--border);color:var(--text-bright);
+  font-family:var(--font-body);font-size:1rem;padding:0.85rem 1.1rem;
+}
+.email-capture-form input[type="email"]::placeholder{color:var(--parchment-dim);opacity:0.6;}
+.email-capture-form input[type="email"]:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-color:var(--gold-dim);}
+.email-capture-status{font-size:0.9rem;color:var(--teal);margin-top:1rem;}
+.ec-fine{display:block;font-size:0.78rem;color:var(--parchment-dim);opacity:0.75;margin-top:1.2rem;line-height:1.6;}
+.ec-fine a{color:var(--teal-dim);text-decoration:underline;text-underline-offset:2px;}
+@media(max-width:480px){.email-capture-form{flex-direction:column;}.email-capture-form input[type="email"],.email-capture-form button{width:100%;}}
+
+/* ── PROOF VIDEO — reskin loop / walk clip (P1-1/P1-2). Pre-built so the
+   commented-out HTML blocks are a five-minute publish once the asset lands. ── */
+.proof-video{max-width:900px;margin:3rem auto;padding:0 2rem;text-align:center;}
+.proof-video video{width:100%;aspect-ratio:16/9;background:var(--panel);border:1px solid var(--border);display:block;}
+.proof-video .label{color:var(--gold);margin-bottom:1rem;}
+.proof-video .pv-cap{font-size:0.95rem;font-weight:300;color:var(--parchment-dim);line-height:1.6;max-width:640px;margin:1rem auto 0;}
+
 @media(max-width:768px){
   .tile-grid,.steps{grid-template-columns:1fr;}
   .cancant{grid-template-columns:1fr;}

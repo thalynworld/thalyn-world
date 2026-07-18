@@ -36,6 +36,17 @@
       { id: 'chaotic',   label: 'Chaotic',   url: '/demo/worlds/chaotic_web.glb',    available: false }
     ],
 
+    // ── DROP-IN SLOT 3 — EMAIL CAPTURE (launch notify list) ─────────────
+    // Paste a static-form-service endpoint here once a provider is chosen, e.g.
+    // Buttondown's embeddable-form action:
+    //   'https://buttondown.com/api/emails/embed-subscribe/YOUR-USERNAME'
+    // Leave '' until then. While empty, every .email-capture-form falls back
+    // to a plain mailto: (opens the visitor's mail app, pre-addressed and
+    // pre-filled) — it still works, it just isn't a managed list yet. Once a
+    // real endpoint is set, the form POSTs there instead and no other change
+    // is needed.
+    formEndpoint: '',
+
     discordUrl: 'https://discord.gg/UH9ukaR5Ew'
   };
   window.SITE_CONFIG = SITE_CONFIG; // so the demo page can read the world list
@@ -50,6 +61,51 @@
       var label = live ? el.dataset.labelSteam : el.dataset.labelPending;
       if (label) el.textContent = label;
       if (!live) el.setAttribute('data-pending', 'true');
+    });
+  }
+
+  /* ── Cookieless analytics — no-ops until a real snippet defines
+       window.plausible or window.goatcounter (paste it at the
+       ANALYTICS_SNIPPET marker in _build/build.py's meta_html, then
+       rebuild). Safe to call anywhere; never loads a script itself. ── */
+  function trackEvent(name, props) {
+    try {
+      if (window.plausible) window.plausible(name, props ? { props: props } : undefined);
+      else if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: name, title: name, event: true });
+    } catch (e) {}
+  }
+  window.ThalynTrack = trackEvent; // so page-specific inline scripts (e.g. /demo/) can log events too
+
+  /* ── Click tracking: Discord + Steam CTAs ─────────────────────────────── */
+  function initClickTracking() {
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a');
+      if (!a) return;
+      if (a.classList.contains('cta-steam')) trackEvent(SITE_CONFIG.steamUrl ? 'Steam Wishlist Click' : 'Discord Click');
+      else if (/discord\.gg/.test(a.href || '')) trackEvent('Discord Click');
+    });
+  }
+
+  /* ── Email capture: mailto: fallback until SITE_CONFIG.formEndpoint is set.
+       Markup contract: <form class="email-capture-form"> containing an
+       input[type=email], with a sibling .email-capture-status for feedback. ── */
+  function initEmailForms() {
+    document.querySelectorAll('.email-capture-form').forEach(function (form) {
+      var status = form.parentElement && form.parentElement.querySelector('.email-capture-status');
+      if (SITE_CONFIG.formEndpoint) { form.action = SITE_CONFIG.formEndpoint; form.method = 'post'; }
+      form.addEventListener('submit', function (e) {
+        var input = form.querySelector('input[type="email"]');
+        var email = input && input.value.trim();
+        if (!email) return; // let native required/type=email validation handle it
+        trackEvent('Email Signup');
+        if (SITE_CONFIG.formEndpoint) return; // real endpoint set — let the form POST natively
+        e.preventDefault();
+        var subject = encodeURIComponent('Notify me when Thalyn launches');
+        var body = encodeURIComponent('Add me to the launch list: ' + email);
+        window.location.href = 'mailto:hello@thalyn.world?subject=' + subject + '&body=' + body;
+        if (status) { status.hidden = false; status.textContent = 'Opening your email app to confirm — thank you.'; }
+        form.reset();
+      });
     });
   }
 
@@ -174,7 +230,7 @@
     els.forEach(function (el) { obs.observe(el); });
   }
 
-  function init() { wireSteamCtas(); initNav(); initEmbers(); initTypewriter(); initReveal(); }
+  function init() { wireSteamCtas(); initNav(); initEmbers(); initTypewriter(); initReveal(); initEmailForms(); initClickTracking(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
