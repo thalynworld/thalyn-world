@@ -11,11 +11,11 @@
      ══════════════════════════════════════════════════════════════════════ */
   var SITE_CONFIG = {
     // ── DROP-IN SLOT 1 — STEAM ──────────────────────────────────────────
-    // Paste the real Thalyn store URL here the moment you have it, e.g.
-    //   'https://store.steampowered.com/app/0000000/Thalyn/'
-    // Leave '' until then. While empty, every "Wishlist on Steam" button
-    // shows its pending label and routes to Discord instead (no dead links).
-    steamUrl: '',
+    // LIVE since 2026-08-11 (store page posted as Coming Soon → Early Access,
+    // September 2026). Every .cta-steam button now reads "Wishlist on Steam"
+    // and points here; the static hrefs in the pages match, so it works
+    // without JS too. Set back to '' to fall the whole site back to Discord.
+    steamUrl: 'https://store.steampowered.com/app/4581800/Thalyn/',
     steamFallbackUrl: 'https://discord.gg/UH9ukaR5Ew',
 
     // ── DROP-IN SLOT 2 — DEMO WORLDS (.glb) ─────────────────────────────
