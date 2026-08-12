@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>document.documentElement.classList.add('js');</script>
-<title>Thalyn® Demo — Walk a World</title>
-<meta name="description" content="Don't just watch a world — walk it. Orbit, lean in and explore a 3D world Thalyn grew from a single feeling, right in your browser. No install.">
-<meta property="og:title" content="Thalyn® Demo — Walk a World">
-<meta property="og:description" content="Step inside a 3D world built from a single feeling. Drag to look around, come closer, and wander — no install, right in your browser.">
+<title>Thalyn® Demo — Open Your Own Model, In Your Browser</title>
+<meta name="description" content="A real 3D viewer in your browser. Open a .glb from your own drive and turn it — nothing uploaded, nothing installed. Thalyn's six worlds are still in the forge.">
+<meta property="og:title" content="Thalyn® Demo — Open Your Own Model, In Your Browser">
+<meta property="og:description" content="Choose a .glb from your own drive and it opens right here on your device — drag to orbit, scroll to come closer. No upload, no install. Thalyn's six worlds arrive as each one is finished.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://thalyn.world/demo/">
 <meta property="og:image" content="https://thalyn.world/enhanced_4k_169_thalyn_splash_5_.webp">
@@ -105,13 +105,13 @@
 
 <main id="main">
 <section class="page-hero">
-  <p class="page-eyebrow">Interactive Demo</p>
-  <h1 class="page-title">Don't watch a world. <em>Walk it.</em></h1>
-  <div class="tw-wrap"><span class="tw-target" data-phrases='["Walk a world built from a feeling.","Not watched. Walked.","Yours to wander.","Soon: step inside."]'>Walk a world built from a feeling.</span></div>
-  <p class="page-sub">Each one grew around a single feeling. Drag to look around, scroll to come closer, and wander where you like.</p>
+  <p class="page-eyebrow">Live in your browser</p>
+  <h1 class="page-title">That model on your drive. <em>Open it here.</em></h1>
+  <div class="tw-wrap"><span class="tw-target" data-phrases='["Bring the thing you made.","Nothing uploaded. Nothing installed.","Your file, your device, your model.","The six worlds are still in the forge."]'>Bring the thing you made.</span></div>
+  <p class="page-sub">A real 3D viewer, running in this page — nothing installed, nothing uploaded. Thalyn's six worlds land here as each one is finished. Until then, choose a .glb from your own drive and the thing you made is on screen in front of you.</p>
   <div class="cta-row">
     <a class="btn btn-primary cta-steam" href="https://store.steampowered.com/app/4581800/Thalyn/" target="_blank" rel="noopener" data-label-steam="Wishlist on Steam" data-label-pending="Join the Discord">Wishlist on Steam</a>
-    <a class="btn btn-secondary" href="#walk">Step inside</a>
+    <a class="btn btn-secondary" href="#walk">Open your own model</a>
   </div>
 </section>
 
@@ -129,26 +129,40 @@
 
 <section class="section" id="walk">
   <div class="wrap">
-    <div class="world-select" id="worldSelect" role="group" aria-label="Choose a world to walk"></div>
+    <p class="eyebrow" style="text-align:center;">Working right now</p>
+    <h2 class="hook">The model sitting on your drive, <em>on screen in front of you.</em></h2>
+    <div class="prose tight">
+      <p>This is a real 3D viewer, running in this page. Choose a .glb or .gltf from your own drive — the castle, the cottage, the creature you have had for months with nowhere to put it — and it opens here on your device. Nothing is uploaded, nothing is installed, nothing leaves your machine.</p>
+      <p>Turn it. Come closer. Look at it from the side you have never quite managed to get a screenshot of.</p>
+    </div>
+
+    <div class="viewer-tools" style="margin:0 auto 1.4rem;">
+      <label class="btn btn-secondary btn-sm own-glb">
+        Open your own .glb
+        <input type="file" id="ownFile" accept=".glb,.gltf" multiple>
+      </label>
+      <p class="viewer-hint">Drag to orbit · scroll to zoom · two fingers to pan</p>
+    </div>
 
     <div class="viewer-stage">
       <iframe id="viewer" title="Interactive 3D world viewer — drag to look around, scroll to come closer" allow="fullscreen"></iframe>
       <p class="viewer-label" id="viewerLabel" aria-live="polite"></p>
       <div class="viewer-placeholder" id="viewerPlaceholder">
-        <span class="vp-eyebrow">Coming soon</span>
-        <p class="vp-title">Worlds are being forged. Walk one here soon.</p>
-        <p class="vp-note">Want first word when the doors open? Join the Discord.</p>
+        <span class="vp-eyebrow">Nothing open yet</span>
+        <p class="vp-title">Open one of your own models here now — it never leaves your device.</p>
+        <p class="vp-note">The six Thalyn worlds are still being forged. Leave your email below and you'll know the day the doors open.</p>
       </div>
       <p class="viewer-error" id="viewerError" role="alert" hidden></p>
     </div>
 
-    <div class="viewer-tools">
-      <p class="viewer-hint">Drag to orbit · scroll to zoom · two fingers to pan</p>
-      <label class="btn btn-secondary btn-sm own-glb">
-        Explore your own .glb
-        <input type="file" id="ownFile" accept=".glb,.gltf" multiple>
-      </label>
+    <div class="prose tight">
+      <span class="label">Still in the forge</span>
+      <p>The six worlds below — serene, joyful, oppressive, desolate, eerie and chaotic — are each grown from a single feeling, and none of them is finished. Each one lights up on this page the day it is ready, and you will need nothing but this page to walk it.</p>
     </div>
+
+    <div class="world-select" id="worldSelect" role="group" aria-label="Choose a world to walk"></div>
+
+    <p class="after-state">Every one of them will open the same way your own model does — in this page, on your machine, the moment you pick it.</p>
   </div>
 </section>
 
@@ -170,32 +184,35 @@
 
 <section class="band">
   <div class="band-inner section">
-    <p class="eyebrow" style="text-align:center;">What you're walking</p>
-    <h2 class="hook">Not a trailer. <em>The actual world.</em></h2>
+    <p class="eyebrow" style="text-align:center;">What you're actually looking at</p>
+    <h2 class="hook">Not a picture of it. <em>The thing itself.</em></h2>
     <div class="feature-grid">
       <div class="feature-card reveal">
-        <h3>Grown from one feeling</h3>
-        <p>You are not looking at a picture of a world — you are standing in it. Every hill, tree, and shift of light grew from a single feeling you would pick. None of it was placed by hand.</p>
+        <h3>The real thing, not a render</h3>
+        <p>You are not looking at an angle somebody else chose. You are turning the actual model, live, and the side nobody has ever photographed comes round to meet you.</p>
       </div>
       <div class="feature-card reveal">
         <h3>Move how you like</h3>
-        <p>Drag to look around. Scroll to come closer. Lean in on a far ridge or follow the water. The world answers in real time, right here in your browser.</p>
+        <p>Drag to look around. Scroll to come closer. Follow a rooftop, a ridge or a shoreline as far as you want. It answers in real time, right here in your browser.</p>
       </div>
       <div class="feature-card reveal">
-        <h3>Bring your own</h3>
-        <p>Have a .glb model of your own? Open it below and wander it the same way. Your file stays on your device — nothing is uploaded.</p>
+        <h3>Your file never leaves you</h3>
+        <p>No account, no upload, no install. The .glb you choose is read on your own device and stays there — close the tab and nothing of yours is left behind.</p>
       </div>
     </div>
+    <p class="after-state">The first thing you'll do is turn it round to the side you've never seen. The second is call someone over.</p>
   </div>
 </section>
 
 <section class="cta-band">
   <p class="eyebrow">From ancient song, all worlds are born. Yours is next.</p>
+  <h2 class="hook">Your models deserve better than <em>a folder.</em></h2>
+  <p class="after-state">Wishlist Thalyn, and be there the day they get a world to stand in.</p>
   <div class="cta-row">
     <a class="btn btn-primary cta-steam" href="https://store.steampowered.com/app/4581800/Thalyn/" target="_blank" rel="noopener" data-label-steam="Wishlist on Steam" data-label-pending="Join the Discord">Wishlist on Steam</a>
     <a class="btn btn-secondary" href="/core/">See how it works</a>
   </div>
-  <p class="note">One pick grows a whole, walkable world. £19.99 once — no subscription, and the world is yours.</p>
+  <p class="note">Say how it should feel, and a whole walkable world forms around your models. £19.99 once — no subscription, and the world is yours.</p>
 </section>
 </main>
 
@@ -224,7 +241,14 @@
 <canvas id="ember-canvas" aria-hidden="true"></canvas>
 <script src="/assets/app.js" defer></script>
 <script>
-(function () {
+/* ⚠ MUST stay wrapped in DOMContentLoaded. This is a classic inline script, so it
+   executes during parsing — i.e. BEFORE the deferred app.js above has run and set
+   window.SITE_CONFIG. Invoked immediately (the original `(function(){…})()`), cfg
+   read as [] every time and the six world buttons NEVER rendered, silently, on the
+   live site. Deferred scripts are guaranteed to finish before DOMContentLoaded
+   fires, so SITE_CONFIG.demoWorlds is populated by the time this runs. Fixed
+   2026-08-12. */
+document.addEventListener('DOMContentLoaded', function () {
   'use strict';
 
   var cfg = (window.SITE_CONFIG && window.SITE_CONFIG.demoWorlds) || [];
@@ -299,7 +323,7 @@
     if (!url) return;
     clearError();
     showPlaceholder(false);
-    if (labelEl) labelEl.textContent = label ? ('Now walking: ' + label) : '';
+    if (labelEl) labelEl.textContent = label ? ('Now viewing: ' + label) : '';
     send({ type: 'thalyn:loadURL', url: url, label: label || '' });
   };
 
@@ -360,12 +384,12 @@
       showPlaceholder(false);
       window.ThalynTrack && window.ThalynTrack('GLB Upload Viewer Use');
       var names = Array.prototype.map.call(files, function (f) { return f.name; }).join(', ');
-      if (labelEl) labelEl.textContent = 'Now walking: ' + names;
+      if (labelEl) labelEl.textContent = 'Now viewing: ' + names;
       send({ type: 'thalyn:loadFiles', files: Array.prototype.slice.call(files) });
       e.target.value = ''; // allow re-picking the same file
     });
   }
-})();
+});
 </script>
 </body>
 </html>
