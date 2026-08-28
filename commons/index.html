@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Thalyn&reg; Commons</title>
+<link rel="icon" href="/thalyn_figure_gold.png" />
+<meta name="robots" content="noindex" />
+<!--
+  Thalyn® Commons — several exported worlds (.glb) side by side in one realm.
+
+  A realm is a small JSON manifest: a name, a gap in metres, and a list of worlds
+  (url, slot, name, creator, code). It arrives as ?realm=URL (fetched) or packed
+  straight into the link as ?r=<base64url JSON>, so a realm is shareable as a link
+  with no server and no account. Each world sits on a hex slot; planks bridge
+  neighbouring slots; a plaque names each one. Orbit, or walk it in first person.
+  Built on three.js only (KTX2 / Meshopt / Draco), sharing the World Viewer's sky.
+-->
+<style>
+  :root { --gold: #E8C66A; --ink: #0d1411; --panel: rgba(13,20,17,0.84); --ash: #9DBCAC; --line: rgba(232,198,106,0.30); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1411; color: #e8efe9;
+    font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif; }
+  #c { display: block; width: 100vw; height: 100vh; }
+  .panel { position: fixed; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; backdrop-filter: blur(8px); font-size: 13px; line-height: 1.45; user-select: none; }
+  #hud { top: 14px; left: 14px; width: 272px; max-height: calc(100vh - 28px); overflow-y: auto; }
+  #hud h1 { margin: 0 0 2px; font-size: 15px; letter-spacing: 0.04em; color: var(--gold); font-weight: 600; }
+  #hud .sub { color: var(--ash); font-size: 12px; margin-bottom: 8px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0; }
+  .row label { color: #cfe0d7; }
+  .stat { color: var(--ash); font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100px; accent-color: var(--gold); }
+  input[type=checkbox] { accent-color: var(--gold); width: 16px; height: 16px; }
+  button, .btn { padding: 7px 10px; border-radius: 8px; cursor: pointer; background: rgba(232,198,106,0.14);
+    color: var(--gold); border: 1px solid rgba(232,198,106,0.45); font-size: 13px; font-family: inherit; }
+  button:hover, .btn:hover { background: rgba(232,198,106,0.24); }
+  button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  button.wide { width: 100%; margin-top: 8px; }
+  button.mini { padding: 3px 8px; font-size: 12px; }
+  #worlds { list-style: none; margin: 8px 0 0; padding: 0; border-top: 1px solid var(--line); }
+  #worlds li { padding: 7px 0; border-bottom: 1px solid rgba(232,198,106,0.12); }
+  #worlds .name { color: #e8efe9; font-weight: 600; }
+  #worlds .meta { color: var(--ash); font-size: 12px; }
+  #worlds .code { font-family: ui-monospace, Consolas, monospace; color: var(--gold); font-size: 12px; }
+  #worlds .bar { height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; margin-top: 5px; overflow: hidden; }
+  #worlds .bar > i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .2s; }
+  #worlds li.ok .bar > i { background: #55AE86; }
+  #worlds li.fail .bar > i { background: #c25b4a; width: 100%; }
+  #worlds .st { font-size: 11px; color: var(--ash); margin-top: 3px; }
+  details { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 6px; }
+  summary { cursor: pointer; color: var(--gold); font-size: 13px; }
+  details input[type=text], details input[type=url] { width: 100%; margin: 4px 0; padding: 6px 8px; border-radius: 6px;
+    border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: #e8efe9; font-size: 13px; font-family: inherit; }
+  #controls { bottom: 14px; left: 14px; display: flex; gap: 8px; padding: 8px; align-items: center; }
+  #controls .hint { color: var(--ash); font-size: 12px; max-width: 320px; }
+  #toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 20;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 9px 16px; font-size: 13px; color: #e8efe9; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  #empty { position: fixed; inset: 0; display: flex; flex-direction: column; gap: 8px; padding: 20px;
+    align-items: center; justify-content: center; text-align: center; color: var(--ash); pointer-events: none; }
+  #empty .big { font-size: 20px; color: var(--gold); }
+  #empty code { color: #e8efe9; }
+  #cross { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
+    background: var(--gold); opacity: 0; pointer-events: none; box-shadow: 0 0 0 1px rgba(0,0,0,0.6); }
+  body.walking #cross { opacity: 0.9; }
+  body.walking #hud { opacity: 0.25; pointer-events: none; }
+  a { color: var(--gold); }
+  #b-fs { position: fixed; right: 14px; bottom: 14px; z-index: 10; width: 40px; height: 40px; padding: 0;
+    display: flex; align-items: center; justify-content: center; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; color: var(--gold); backdrop-filter: blur(8px); }
+  #b-fs svg { width: 20px; height: 20px; display: block; }
+  @media (max-width: 720px) {
+    #hud { width: calc(100vw - 28px); max-height: 46vh; }
+    #controls { left: 14px; right: 66px; bottom: 14px; flex-wrap: wrap; }
+    #controls .hint { display: none; }
+    input[type=range] { width: 70px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="cross" aria-hidden="true"></div>
+
+<div id="hud" class="panel">
+  <h1 id="realm-name">Thalyn&reg; Commons</h1>
+  <div class="sub" id="realm-sub">A shared realm of exported worlds</div>
+  <div class="row"><label>Worlds</label><span class="stat" id="s-worlds">0 / 0</span></div>
+  <div class="row"><label>Triangles</label><span class="stat" id="s-tris">0</span></div>
+  <div class="row"><label><input type="checkbox" id="t-wind" /> Wind</label>
+    <input type="range" id="r-wind" min="0" max="2" step="0.05" value="1" /></div>
+  <div class="row"><label><input type="checkbox" id="t-fog" /> Haze</label>
+    <input type="range" id="r-fog" min="0" max="1" step="0.02" value="0.4" /></div>
+  <div class="row"><label>Sun</label><input type="range" id="r-sun" min="0.05" max="0.95" step="0.01" value="0.55" /></div>
+  <div class="row"><label>Exposure</label><input type="range" id="r-exp" min="0.3" max="2" step="0.05" value="1" /></div>
+  <ul id="worlds"></ul>
+  <details id="add">
+    <summary>Add a world</summary>
+    <input type="url" id="a-url" placeholder="https://…/World_web.glb" />
+    <input type="text" id="a-name" placeholder="World name" maxlength="60" />
+    <input type="text" id="a-creator" placeholder="Creator" maxlength="60" />
+    <input type="text" id="a-code" placeholder="Postcard code (THALYN-…)" maxlength="40" />
+    <button class="wide" id="b-add">Add to this realm</button>
+  </details>
+  <button class="wide" id="b-share">Copy realm link</button>
+  <button class="wide" id="b-reset">Reset view</button>
+</div>
+
+<div id="controls" class="panel">
+  <button id="b-walk" type="button" title="Toggle first-person walk (V)">Walk (V)</button>
+  <span class="hint" id="walk-hint">Orbit: drag · scroll · right-drag pans. Click a plaque to copy its code.</span>
+</div>
+
+<div id="empty">
+  <div class="big">No realm loaded</div>
+  <div>Open this page with <code>?realm=https://…/realm.json</code> or a packed <code>?r=…</code> link,<br/>or use <b>Add a world</b> to start one.</div>
+</div>
+<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+<button id="b-fs" type="button" aria-label="Enter fullscreen" title="Fullscreen">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+</button>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+
+const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const coarsePointer = matchMedia('(pointer: coarse)').matches; // phones/tablets → orbit only
+const $ = id => document.getElementById(id);
+
+// ── Renderer / scene / camera (as the World Viewer) ─────────────────────────
+const canvas = $('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 100000);
+camera.position.set(120, 80, 120);
+
+const orbit = new OrbitControls(camera, canvas);
+orbit.enableDamping = true;
+orbit.dampingFactor = 0.08;
+orbit.maxDistance = 60000;
+
+orbit.addEventListener('start', () => { userMoved = true; });
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+// ── Shared sky + sun ────────────────────────────────────────────────────────
+const sky = new Sky();
+sky.scale.setScalar(450000);
+const sun = new THREE.DirectionalLight(0xfff4e0, 2.2);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0005;
+const hemi = new THREE.HemisphereLight(0xbfd8ff, 0x4a3f33, 0.6);
+function applySky(elevationDeg) {
+  const u = sky.material.uniforms;
+  u['turbidity'].value = 8; u['rayleigh'].value = 2.2;
+  u['mieCoefficient'].value = 0.005; u['mieDirectionalG'].value = 0.8;
+  const phi = THREE.MathUtils.degToRad(90 - elevationDeg * 90);
+  const theta = THREE.MathUtils.degToRad(35);
+  const sunPos = new THREE.Vector3().setFromSphericalCoords(1, phi, theta);
+  u['sunPosition'].value.copy(sunPos);
+  sun.position.copy(sunPos).multiplyScalar(8000);
+  sun.intensity = 0.4 + elevationDeg * 2.4;
+}
+applySky(0.55);
+scene.add(sky, sun, hemi);
+
+let realmRadius = 150;
+const fogColor = new THREE.Color(0xbcd0e0);
+function refreshFog() {
+  if (!$('t-fog').checked) { scene.fog = null; return; }
+  const s = parseFloat($('r-fog').value);
+  scene.fog = new THREE.FogExp2(fogColor.getHex(), s * 3 / Math.max(1, realmRadius));
+}
+
+// ── Loaders (KTX2 + Meshopt + Draco → gltfpack output loads) ────────────────
+const ktx2 = new KTX2Loader().setTranscoderPath(CDN + 'libs/basis/').detectSupport(renderer);
+const draco = new DRACOLoader().setDecoderPath(CDN + 'libs/draco/');
+const loader = new GLTFLoader();
+loader.setKTX2Loader(ktx2);
+loader.setDRACOLoader(draco);
+loader.setMeshoptDecoder(MeshoptDecoder);
+
+// ── Foliage relight + wind, liquids (as the World Viewer) ───────────────────
+const windMaterials = [];
+const liquidLavaMats = [];
+const uWindTime = { value: 0 };
+const uWindStrength = { value: 0 };
+const FOLIAGE = /(^|[^a-z])(leaf|foliage|flower|petal|grass|shrub|frond|canopy|billboard|bush|fern|vine)/i;
+const FOLIAGE_AMBIENT_FLOOR = 0.40;
+function patchFoliageMaterial(mat, ownerName) {
+  if (!mat || mat.userData.__foliage) return;
+  if (!FOLIAGE.test((mat.name || '') + '|' + (ownerName || ''))) return;
+  mat.userData.__foliage = true;
+  if (mat.map || mat.emissiveMap) {
+    if (!mat.emissiveMap && mat.map) mat.emissiveMap = mat.map;
+    const cur = mat.emissive ? Math.max(mat.emissive.r, mat.emissive.g, mat.emissive.b) : 0;
+    if (cur < FOLIAGE_AMBIENT_FLOOR) mat.emissive = new THREE.Color().setScalar(FOLIAGE_AMBIENT_FLOOR);
+  } else if (mat.color) {
+    mat.emissive = mat.color.clone().multiplyScalar(FOLIAGE_AMBIENT_FLOOR);
+  }
+  mat.emissiveIntensity = 1.0;
+  mat.alphaToCoverage = true;
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uWindTime = uWindTime;
+    shader.uniforms.uWindStrength = uWindStrength;
+    shader.vertexShader = 'uniform float uWindTime;\nuniform float uWindStrength;\n' + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>',
+      `#include <begin_vertex>
+       float _wph = transformed.x * 0.35 + transformed.z * 0.35;
+       float _h = max(transformed.y, 0.0);
+       transformed.x += sin(uWindTime * 1.6 + _wph) * uWindStrength * _h * 0.06;
+       transformed.z += cos(uWindTime * 1.3 + _wph) * uWindStrength * _h * 0.045;`);
+  };
+  mat.needsUpdate = true;
+  windMaterials.push(mat);
+}
+const LIQUID = /^Thalyn_(Water|Lava)_Baked/i;
+function upgradeLiquid(mesh) {
+  const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  if (!mats.some(m => m && LIQUID.test(m.name || ''))) return false;
+  const isLava = mats.some(m => m && /Lava/i.test(m.name || '')) || /lava/i.test(mesh.name || '');
+  let mat;
+  if (isLava) {
+    mat = new THREE.MeshStandardMaterial({ color: 0x3a0c03, emissive: new THREE.Color(1.0, 0.42, 0.10),
+      emissiveIntensity: 1.5, roughness: 0.55, metalness: 0.0 });
+    liquidLavaMats.push(mat);
+  } else {
+    mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(0.02, 0.13, 0.28), roughness: 0.04,
+      metalness: 0.0, transparent: true, opacity: 0.82, depthWrite: true, envMapIntensity: 1.4 });
+  }
+  const amp = isLava ? 0.22 : 0.12, freq = isLava ? 0.55 : 1.1;
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uWindTime = uWindTime;
+    shader.vertexShader = 'uniform float uWindTime;\n' + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>',
+      `#include <begin_vertex>
+       transformed.y += sin(uWindTime*${freq.toFixed(2)} + transformed.x*0.12 + transformed.z*0.12)*${amp.toFixed(2)}
+                      + cos(uWindTime*${(freq * 0.6).toFixed(2)} + transformed.x*0.05)*${(amp * 0.6).toFixed(2)};`);
+  };
+  mat.needsUpdate = true;
+  mesh.castShadow = false; mesh.receiveShadow = false;
+  mesh.userData.__liquid = true;
+  if (Array.isArray(mesh.material)) mesh.material = mesh.material.map(m => (m && LIQUID.test(m.name || '')) ? (m.dispose(), mat) : m);
+  else { mesh.material.dispose(); mesh.material = mat; }
+  return true;
+}
+
+// ── Realm manifest ──────────────────────────────────────────────────────────
+// { name, gap, worlds:[{ url, slot, name, creator, code }] }
+function safeURL(raw) {
+  try { const u = new URL(raw, location.href);
+    if (u.protocol === 'https:' || u.origin === location.origin) return u.href;
+  } catch (e) {}
+  return null;
+}
+const clip = (s, n) => (typeof s === 'string' ? s : '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, n);
+function normaliseRealm(j) {
+  const realm = { name: clip(j && j.name, 60) || 'Untitled realm', gap: 12, worlds: [] };
+  if (j && Number.isFinite(+j.gap)) realm.gap = Math.min(200, Math.max(0, +j.gap));
+  const list = Array.isArray(j && j.worlds) ? j.worlds : [];
+  const used = new Set();
+  list.slice(0, 24).forEach((w, i) => {
+    if (!w || typeof w !== 'object') return;
+    let slot = Number.isInteger(+w.slot) && +w.slot >= 0 ? +w.slot : null;
+    if (slot === null || used.has(slot)) { slot = 0; while (used.has(slot)) slot++; }
+    used.add(slot);
+    realm.worlds.push({ url: clip(w.url, 2000), slot, name: clip(w.name, 60) || ('World ' + (i + 1)),
+      creator: clip(w.creator, 60), code: clip(w.code, 40) });
+  });
+  realm.worlds.sort((a, b) => a.slot - b.slot);
+  return realm;
+}
+function b64urlEncode(str) {
+  const bytes = new TextEncoder().encode(str); let bin = '';
+  bytes.forEach(b => { bin += String.fromCharCode(b); });
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function b64urlDecode(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '=';
+  const bin = atob(s); const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+function realmToParam(realm) {
+  return b64urlEncode(JSON.stringify({ name: realm.name, gap: realm.gap,
+    worlds: realm.worlds.map(w => ({ url: w.url, slot: w.slot, name: w.name, creator: w.creator, code: w.code })) }));
+}
+function writeRealmToURL() {
+  const u = new URL(location.href);
+  u.searchParams.delete('realm');
+  u.searchParams.set('r', realmToParam(realm));
+  history.replaceState(null, '', u.toString());
+}
+
+// ── Hex slots ───────────────────────────────────────────────────────────────
+// Slot index → axial (q, r) along an outward spiral; pointy-top hexes.
+const HEX_DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+const hexCache = [[0, 0]];
+function hexOf(slot) {
+  let k = 1;
+  while (hexCache.length <= slot) {
+    let q = -k, r = k; // start of ring k
+    for (let i = 0; i < 6; i++) for (let j = 0; j < k; j++) { hexCache.push([q, r]); q += HEX_DIRS[i][0]; r += HEX_DIRS[i][1]; }
+    k++;
+  }
+  return hexCache[slot];
+}
+function hexToXZ(q, r, size) { return [size * (Math.sqrt(3) * q + Math.sqrt(3) / 2 * r), size * 1.5 * r]; }
+const areNeighbours = (a, b) => HEX_DIRS.some(d => a[0] + d[0] === b[0] && a[1] + d[1] === b[1]);
+
+// ── Realm state ─────────────────────────────────────────────────────────────
+let realm = { name: 'Thalyn Commons', gap: 12, worlds: [] };
+const placed = [];              // { w, group, radius, groundY, ok, plaque, box }
+const worldsRoot = new THREE.Group();
+const planksRoot = new THREE.Group();
+const plaquesRoot = new THREE.Group();
+scene.add(worldsRoot, planksRoot, plaquesRoot);
+const walkMeshes = [];          // meshes the walk mode stands on (+ their world boxes)
+const PLINTH_RADIUS = 24;       // placeholder footprint for a world that failed to load
+let triCount = 0;
+let loadedCount = 0;
+let userMoved = false;          // once the visitor takes the camera, arrivals stop re-framing the realm
+
+const plankMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.85, metalness: 0.0 });
+const plinthMat = new THREE.MeshStandardMaterial({ color: 0x3b4a44, roughness: 0.9, metalness: 0.05 });
+
+function makePlaqueTexture(w, failed) {
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 256;
+  const g = cv.getContext('2d');
+  g.fillStyle = 'rgba(13,20,17,0.92)'; g.fillRect(0, 0, 512, 256);
+  g.strokeStyle = '#E8C66A'; g.lineWidth = 6; g.strokeRect(10, 10, 492, 236);
+  g.textAlign = 'center'; g.fillStyle = '#E8C66A';
+  g.font = '600 40px Georgia, serif';
+  g.fillText(w.name.slice(0, 26), 256, 82, 460);
+  g.fillStyle = '#cfe0d7'; g.font = '28px Georgia, serif';
+  g.fillText(w.creator ? ('by ' + w.creator.slice(0, 30)) : ' ', 256, 132, 460);
+  g.fillStyle = failed ? '#c25b4a' : '#E8C66A'; g.font = '26px Consolas, monospace';
+  g.fillText(failed ? 'could not be loaded' : (w.code || ''), 256, 190, 460);
+  g.fillStyle = '#9DBCAC'; g.font = '18px sans-serif';
+  if (!failed && w.code) g.fillText('click to copy the code', 256, 228, 460);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+function makePlaque(w, failed) {
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: makePlaqueTexture(w, failed), depthTest: true, transparent: true }));
+  sp.scale.set(12, 6, 1);
+  sp.userData.world = w;
+  return sp;
+}
+
+function worldBox(obj) {
+  obj.updateMatrixWorld(true);
+  const box = new THREE.Box3(); let any = false;
+  obj.traverse(o => { if (o.isMesh && !o.userData.__liquid) { box.expandByObject(o); any = true; } });
+  if (!any) box.setFromObject(obj);
+  return box;
+}
+
+function ingest(gltf, w) {
+  gltf.scene.traverse(o => {
+    if (o.isMesh) {
+      o.castShadow = true; o.receiveShadow = true;
+      const g = o.geometry;
+      if (g && g.index) triCount += g.index.count / 3;
+      else if (g && g.attributes.position) triCount += g.attributes.position.count / 3;
+      if (upgradeLiquid(o)) return;
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => patchFoliageMaterial(m, o.name));
+    }
+  });
+  const baked = []; gltf.scene.traverse(o => { if (o.isLight) baked.push(o); });
+  baked.forEach(l => l.parent && l.parent.remove(l));
+  // Recentre: XZ centre → slot origin, lowest solid point → y=0, so every world stands on the same floor.
+  const box = worldBox(gltf.scene);
+  const c = box.getCenter(new THREE.Vector3());
+  const group = new THREE.Group();
+  gltf.scene.position.set(-c.x, -box.min.y, -c.z);
+  group.add(gltf.scene);
+  const size = box.getSize(new THREE.Vector3());
+  const radius = Math.max(size.x, size.z) * 0.5 || PLINTH_RADIUS;
+  $('s-tris').textContent = Math.round(triCount).toLocaleString();
+  return { group, radius, height: size.y };
+}
+
+function makePlinth(w) {
+  const group = new THREE.Group();
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(PLINTH_RADIUS, PLINTH_RADIUS * 1.08, 2, 6), plinthMat);
+  m.position.y = 1; m.receiveShadow = true; m.castShadow = true;
+  m.userData.__plinth = true;
+  group.add(m);
+  return { group, radius: PLINTH_RADIUS, height: 2 };
+}
+
+// Re-lay every placed world on the hex grid. Cell spacing = 2 × the largest footprint + gap, so the
+// grid stays regular and no two worlds overlap; it is recomputed as each world arrives.
+function layout() {
+  if (!placed.length) return;
+  const maxR = Math.max(...placed.map(p => p.radius));
+  const spacing = 2 * maxR + realm.gap;
+  const size = spacing / Math.sqrt(3);
+  for (const p of placed) {
+    const [q, r] = hexOf(p.w.slot);
+    const [x, z] = hexToXZ(q, r, size);
+    p.group.position.set(x, 0, z);
+    p.hex = [q, r];
+  }
+  worldsRoot.updateMatrixWorld(true);
+  // Walkable meshes + their world-space boxes (used to prune the ground raycast).
+  walkMeshes.length = 0;
+  for (const p of placed) p.group.traverse(o => {
+    if (o.isMesh && !o.userData.__liquid) { walkMeshes.push({ mesh: o, box: new THREE.Box3().setFromObject(o) }); }
+  });
+  rebuildPlanks(spacing);
+  rebuildPlaques();
+  realmRadius = spacing * (1 + Math.sqrt(Math.max(0, placed.length - 1))) * 0.5 + maxR;
+  refreshFog();
+}
+
+const _ray = new THREE.Raycaster();
+const _down = new THREE.Vector3(0, -1, 0);
+function groundAt(x, z, fromY = 5000) {
+  _ray.set(new THREE.Vector3(x, fromY, z), _down);
+  _ray.far = fromY + 1000;
+  let best = null;
+  for (const e of walkMeshes) {
+    if (x < e.box.min.x || x > e.box.max.x || z < e.box.min.z || z > e.box.max.z) continue;
+    const hits = _ray.intersectObject(e.mesh, false);
+    if (hits.length && (best === null || hits[0].point.y > best)) best = hits[0].point.y;
+  }
+  return best;
+}
+
+function rebuildPlanks(spacing) {
+  planksRoot.clear();
+  for (let i = 0; i < placed.length; i++) for (let j = i + 1; j < placed.length; j++) {
+    const a = placed[i], b = placed[j];
+    if (!areNeighbours(a.hex, b.hex)) continue;
+    const pa = a.group.position, pb = b.group.position;
+    const dir = pb.clone().sub(pa).setY(0).normalize();
+    // Each plank starts a little inside its world's footprint so the seam is covered on both ends.
+    const start = pa.clone().addScaledVector(dir, Math.max(2, a.radius - 6));
+    const end = pb.clone().addScaledVector(dir, -Math.max(2, b.radius - 6));
+    const ya = groundAt(start.x, start.z), yb = groundAt(end.x, end.z);
+    start.y = (ya ?? 0); end.y = (yb ?? 0);
+    const len = start.distanceTo(end);
+    if (len < 1) continue;
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(6, 0.6, len), plankMat);
+    plank.position.copy(start).add(end).multiplyScalar(0.5);
+    plank.lookAt(end); // BoxGeometry length runs along +Z, which lookAt points at `end`
+    plank.castShadow = true; plank.receiveShadow = true;
+    planksRoot.add(plank);
+    walkMeshes.push({ mesh: plank, box: new THREE.Box3().setFromObject(plank) });
+    // Rail posts, so the plank reads as built rather than floating.
+    for (const t of [0.15, 0.5, 0.85]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, 0.4), plankMat);
+      post.position.lerpVectors(start, end, t).add(new THREE.Vector3(-dir.z, 0.9, dir.x).multiplyScalar(2.8));
+      planksRoot.add(post);
+    }
+  }
+}
+
+function rebuildPlaques() {
+  plaquesRoot.clear();
+  for (const p of placed) {
+    // The plaque stands at the near (+Z) edge of the world, above the local ground there.
+    const x = p.group.position.x, z = p.group.position.z + Math.max(4, p.radius - 4);
+    const y = (groundAt(x, z) ?? 0) + 5;
+    p.plaque = makePlaque(p.w, !p.ok);
+    p.plaque.position.set(x, y, z);
+    plaquesRoot.add(p.plaque);
+  }
+}
+
+function frameRealm() {
+  worldsRoot.updateMatrixWorld(true);
+  const box = new THREE.Box3(); let any = false;
+  worldsRoot.traverse(o => { if (o.isMesh && !o.userData.__liquid) { box.expandByObject(o); any = true; } });
+  if (!any || box.isEmpty()) return;
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const radius = Math.max(size.x, size.y, size.z) * 0.5 || 10;
+  orbit.target.copy(center);
+  const dist = radius / Math.sin(THREE.MathUtils.degToRad(camera.fov * 0.5));
+  camera.position.set(center.x + dist * 0.7, center.y + dist * 0.5, center.z + dist * 0.7);
+  camera.near = Math.max(0.05, radius / 2000);
+  camera.far = Math.max(dist * 8, 20000);
+  camera.updateProjectionMatrix();
+  orbit.update();
+}
+
+// ── Loading (sequential, per-world progress, per-world failure) ─────────────
+function rowFor(w) {
+  let li = document.querySelector(`#worlds li[data-slot="${w.slot}"]`);
+  if (li) return li;
+  li = document.createElement('li'); li.dataset.slot = w.slot;
+  const name = document.createElement('div'); name.className = 'name'; name.textContent = `${w.slot + 1}. ${w.name}`;
+  const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = w.creator ? ('by ' + w.creator) : '';
+  const codeRow = document.createElement('div'); codeRow.className = 'row';
+  const code = document.createElement('span'); code.className = 'code'; code.textContent = w.code || '';
+  codeRow.appendChild(code);
+  if (w.code) { const b = document.createElement('button'); b.className = 'mini'; b.textContent = 'Copy'; b.onclick = () => copyText(w.code, 'Code copied'); codeRow.appendChild(b); }
+  const bar = document.createElement('div'); bar.className = 'bar'; bar.appendChild(document.createElement('i'));
+  const st = document.createElement('div'); st.className = 'st'; st.textContent = 'queued';
+  li.append(name, meta, codeRow, bar, st);
+  $('worlds').appendChild(li);
+  return li;
+}
+function setRow(li, pct, text, cls) {
+  li.querySelector('.bar > i').style.width = Math.round(pct * 100) + '%';
+  li.querySelector('.st').textContent = text;
+  if (cls) li.classList.add(cls);
+}
+function updateCounts() { $('s-worlds').textContent = `${loadedCount} / ${realm.worlds.length}`; }
+
+function loadWorld(w) {
+  const li = rowFor(w);
+  const url = safeURL(w.url);
+  if (!url) { placeFailed(w, li, 'not an https link'); return Promise.resolve(); }
+  setRow(li, 0, 'loading…');
+  return new Promise(res => {
+    loader.load(url,
+      gltf => {
+        const r = ingest(gltf, w);
+        placed.push({ w, group: r.group, radius: r.radius, ok: true });
+        worldsRoot.add(r.group);
+        loadedCount++; updateCounts();
+        setRow(li, 1, `loaded · ${Math.round(r.radius * 2)} m across`, 'ok');
+        layout(); if (!userMoved) frameRealm();
+        $('empty').style.display = 'none';
+        res();
+      },
+      ev => { if (ev && ev.lengthComputable && ev.total) setRow(li, ev.loaded / ev.total, `${(ev.loaded / 1048576).toFixed(1)} / ${(ev.total / 1048576).toFixed(1)} MB`);
+              else if (ev && ev.loaded) setRow(li, 0.5, `${(ev.loaded / 1048576).toFixed(1)} MB…`); },
+      err => { console.warn('[commons] world failed', w.url, err); placeFailed(w, li, 'could not be loaded (missing, or the host sends no CORS header)'); res(); });
+  });
+}
+function placeFailed(w, li, why) {
+  const r = makePlinth(w);
+  placed.push({ w, group: r.group, radius: r.radius, ok: false });
+  worldsRoot.add(r.group);
+  setRow(li, 1, why, 'fail');
+  layout(); if (!userMoved) frameRealm();
+  $('empty').style.display = 'none';
+}
+let queue = Promise.resolve();
+function enqueue(w) { queue = queue.then(() => loadWorld(w)); return queue; }
+
+async function loadRealm(j) {
+  realm = normaliseRealm(j);
+  $('realm-name').textContent = realm.name;
+  $('realm-sub').textContent = realm.worlds.length ? `${realm.worlds.length} world${realm.worlds.length === 1 ? '' : 's'} · gap ${realm.gap} m` : 'A shared realm of exported worlds';
+  document.title = realm.name + ' · Thalyn® Commons';
+  updateCounts();
+  realm.worlds.forEach(w => rowFor(w));
+  for (const w of realm.worlds) await enqueue(w);
+  if (placed.length) toast(`${loadedCount} of ${realm.worlds.length} worlds loaded`);
+}
+
+// ── Add a world (client-side only; the link IS the realm) ───────────────────
+$('b-add').onclick = () => {
+  const url = safeURL($('a-url').value.trim());
+  if (!url) { toast('Paste an https:// link to a .glb'); return; }
+  const used = new Set(realm.worlds.map(w => w.slot)); let slot = 0; while (used.has(slot)) slot++;
+  const w = { url, slot, name: clip($('a-name').value, 60) || ('World ' + (slot + 1)), creator: clip($('a-creator').value, 60), code: clip($('a-code').value, 40) };
+  realm.worlds.push(w);
+  realm.worlds.sort((a, b) => a.slot - b.slot);
+  writeRealmToURL();
+  $('a-url').value = ''; $('a-name').value = ''; $('a-creator').value = ''; $('a-code').value = '';
+  $('realm-sub').textContent = `${realm.worlds.length} world${realm.worlds.length === 1 ? '' : 's'} · gap ${realm.gap} m`;
+  updateCounts();
+  toast('Added — the link in your address bar now carries this realm');
+  enqueue(w);
+};
+$('b-share').onclick = () => {
+  if (!realm.worlds.length) { toast('Add a world first'); return; }
+  writeRealmToURL();
+  copyText(location.href, 'Realm link copied');
+};
+async function copyText(text, okMsg) {
+  try { await navigator.clipboard.writeText(text); toast(okMsg); }
+  catch (e) { toast('Copy failed — select it by hand: ' + text.slice(0, 40)); }
+}
+
+// ── Walk mode (WASD + mouse look, ground follow) ────────────────────────────
+const EYE = 1.7;
+const walk = new PointerLockControls(camera, document.body);
+const keys = new Set();
+let walking = false;
+let walkY = 0;
+const walkBtn = $('b-walk');
+if (coarsePointer) { walkBtn.style.display = 'none'; $('walk-hint').textContent = 'Drag to orbit · pinch to zoom · tap a plaque to copy its code.'; }
+
+function enterWalk() {
+  if (coarsePointer || walking || !placed.length) { if (!placed.length) toast('Nothing to walk yet'); return; }
+  // Start just in front of where the orbit camera is looking, at ground + eye height.
+  const t = orbit.target.clone();
+  const g = groundAt(t.x, t.z);
+  walkY = (g ?? 0) + EYE;
+  camera.position.set(t.x, walkY, t.z + 6);
+  camera.lookAt(t.x, walkY, t.z - 20);
+  orbit.enabled = false;
+  userMoved = true;
+  walk.lock();
+}
+function exitWalk() {
+  if (!walking) return;
+  walk.unlock();
+}
+walk.addEventListener('lock', () => { walking = true; document.body.classList.add('walking'); walkBtn.textContent = 'Orbit (V)'; toast('WASD to walk · Shift to run · Esc or V to leave'); });
+walk.addEventListener('unlock', () => {
+  walking = false; keys.clear(); document.body.classList.remove('walking'); walkBtn.textContent = 'Walk (V)';
+  // Hand the orbit a target a little ahead of where you stood.
+  const fwd = new THREE.Vector3(); camera.getWorldDirection(fwd);
+  orbit.target.copy(camera.position).addScaledVector(fwd, 30);
+  orbit.enabled = true; orbit.update();
+});
+walkBtn.onclick = () => walking ? exitWalk() : enterWalk();
+addEventListener('keydown', e => {
+  if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  if (e.code === 'KeyV') { walking ? exitWalk() : enterWalk(); return; }
+  keys.add(e.code);
+});
+addEventListener('keyup', e => keys.delete(e.code));
+function stepWalk(dt) {
+  const speed = (keys.has('ShiftLeft') || keys.has('ShiftRight')) ? 12 : 5;
+  let f = 0, r = 0;
+  if (keys.has('KeyW') || keys.has('ArrowUp')) f += 1;
+  if (keys.has('KeyS') || keys.has('ArrowDown')) f -= 1;
+  if (keys.has('KeyD') || keys.has('ArrowRight')) r += 1;
+  if (keys.has('KeyA') || keys.has('ArrowLeft')) r -= 1;
+  if (f || r) { const n = Math.hypot(f, r); walk.moveForward(f / n * speed * dt); walk.moveRight(r / n * speed * dt); }
+  // Ground follow: cast down from just above the eye so a step up is caught; with nothing below
+  // (the gap between worlds, or off an edge) hold the current height rather than falling forever.
+  const g = groundAt(camera.position.x, camera.position.z, camera.position.y + 3);
+  if (g !== null) walkY = g + EYE;
+  camera.position.y += (walkY - camera.position.y) * Math.min(1, dt * 12);
+}
+
+// ── Plaque click → copy code ────────────────────────────────────────────────
+let downAt = null;
+canvas.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+canvas.addEventListener('pointerup', e => {
+  if (walking || !downAt) return;
+  const moved = Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]); downAt = null;
+  if (moved > 6) return; // a drag, not a click
+  const ndc = new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  _ray.setFromCamera(ndc, camera); _ray.far = Infinity;
+  const hit = _ray.intersectObjects(plaquesRoot.children, false)[0];
+  if (hit && hit.object.userData.world) {
+    const w = hit.object.userData.world;
+    if (w.code) copyText(w.code, `${w.name} — code copied`); else toast(w.name + (w.creator ? ' · by ' + w.creator : ''));
+  }
+});
+
+// ── HUD wiring ──────────────────────────────────────────────────────────────
+$('b-reset').onclick = () => { exitWalk(); userMoved = false; frameRealm(); };
+$('t-wind').onchange = e => { uWindStrength.value = e.target.checked ? parseFloat($('r-wind').value) : 0; };
+$('r-wind').oninput = e => { if ($('t-wind').checked) uWindStrength.value = parseFloat(e.target.value); };
+$('t-fog').onchange = refreshFog;
+$('r-fog').oninput = refreshFog;
+$('r-sun').oninput = e => applySky(parseFloat(e.target.value));
+$('r-exp').oninput = e => { renderer.toneMappingExposure = parseFloat(e.target.value); };
+let toastT;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3000); }
+function resizeToViewport() { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); }
+addEventListener('resize', resizeToViewport);
+renderer.setSize(innerWidth, innerHeight);
+$('b-fs').addEventListener('click', () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else (document.documentElement.requestFullscreen ? document.documentElement.requestFullscreen() : Promise.reject()).catch(() => toast('Fullscreen is not available here.'));
+});
+document.addEventListener('fullscreenchange', () => requestAnimationFrame(resizeToViewport));
+
+// ── Entry: ?realm=URL (fetched) or ?r=<base64url JSON> (the link is the realm) ──
+(async () => {
+  const params = new URLSearchParams(location.search);
+  const packed = params.get('r');
+  const realmUrl = params.get('realm');
+  if (packed) {
+    try { await loadRealm(JSON.parse(b64urlDecode(packed))); }
+    catch (e) { console.warn('[commons] bad ?r=', e); toast('That realm link could not be read.'); }
+  } else if (realmUrl) {
+    const s = safeURL(realmUrl);
+    if (!s) { toast('That realm link is not allowed.'); return; }
+    try { const res = await fetch(s); if (!res.ok) throw new Error('HTTP ' + res.status); await loadRealm(await res.json()); }
+    catch (e) { console.warn('[commons] realm fetch failed', e); toast('The realm manifest could not be fetched (missing, or no CORS header).'); }
+  }
+})();
+
+// ── Render loop ─────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(0.1, clock.getDelta());
+  if (!reduceMotion.matches) {
+    uWindTime.value += dt;
+    const t = uWindTime.value;
+    for (let i = 0; i < liquidLavaMats.length; i++) liquidLavaMats[i].emissiveIntensity = 1.3 + Math.sin(t * 0.8 + i) * 0.5;
+  }
+  if (walking) stepWalk(dt); else orbit.update();
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
