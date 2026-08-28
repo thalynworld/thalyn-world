@@ -458,7 +458,7 @@ function groundAt(x, z, fromY = 5000) {
 }
 
 function rebuildPlanks(spacing) {
-  planksRoot.clear();
+  disposeGroup(planksRoot);
   for (let i = 0; i < placed.length; i++) for (let j = i + 1; j < placed.length; j++) {
     const a = placed[i], b = placed[j];
     if (!areNeighbours(a.hex, b.hex)) continue;
@@ -486,8 +486,16 @@ function rebuildPlanks(spacing) {
   }
 }
 
+function disposeGroup(root) {
+  root.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+    for (const m of mats) { if (m.map && m.map.isCanvasTexture) m.map.dispose(); if (m.isSpriteMaterial) m.dispose(); }
+  });
+  root.clear();
+}
 function rebuildPlaques() {
-  plaquesRoot.clear();
+  disposeGroup(plaquesRoot);
   for (const p of placed) {
     // The plaque stands at the near (+Z) edge of the world, above the local ground there.
     const x = p.group.position.x, z = p.group.position.z + Math.max(4, p.radius - 4);
@@ -625,15 +633,15 @@ function enterWalk() {
   walkY = (g ?? 0) + EYE;
   camera.position.set(t.x, walkY, t.z + 6);
   camera.lookAt(t.x, walkY, t.z - 20);
-  orbit.enabled = false;
   userMoved = true;
-  walk.lock();
+  walk.lock();   // orbit is disabled only once the lock is CONFIRMED (a refused lock must not strand the camera)
 }
+document.addEventListener('pointerlockerror', () => { orbit.enabled = true; walking = false; toast('Pointer lock refused — try V again in a second'); });
 function exitWalk() {
   if (!walking) return;
   walk.unlock();
 }
-walk.addEventListener('lock', () => { walking = true; document.body.classList.add('walking'); walkBtn.textContent = 'Orbit (V)'; toast('WASD to walk · Shift to run · Esc or V to leave'); });
+walk.addEventListener('lock', () => { walking = true; orbit.enabled = false; document.body.classList.add('walking'); walkBtn.textContent = 'Orbit (V)'; toast('WASD to walk · Shift to run · Esc or V to leave'); });
 walk.addEventListener('unlock', () => {
   walking = false; keys.clear(); document.body.classList.remove('walking'); walkBtn.textContent = 'Walk (V)';
   // Hand the orbit a target a little ahead of where you stood.
