@@ -524,6 +524,107 @@ function frameRealm() {
 }
 
 // ── Loading (sequential, per-world progress, per-world failure) ─────────────
+
+// ── W9: the Thalyn atmosphere block, per world ──────────────────────────────
+// Root `extras.thalyn` written by GltfAtmosphereExtras.cs, read via gltf.parser.json.extras (same source the
+// World Viewer uses). Each world keeps its own anchors + water tint (parented under its own gltf.scene, so
+// they ride the recentre/slot offset); the FIRST world that carries a block sets the shared sky + fog.
+let skyClaimedBy = null;
+const rgbOf = a => (Array.isArray(a) && a.length >= 3) ? new THREE.Color().setRGB(a[0], a[1], a[2], THREE.SRGBColorSpace) : null;
+let glowTex = null;
+function glowTexture() {
+  if (glowTex) return glowTex;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+  const g = cv.getContext('2d'); const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, 'rgba(255,220,160,1)'); grd.addColorStop(0.35, 'rgba(255,160,70,0.55)'); grd.addColorStop(1, 'rgba(255,120,40,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+  glowTex = new THREE.CanvasTexture(cv); glowTex.colorSpace = THREE.SRGBColorSpace;
+  return glowTex;
+}
+function buildAnchors(list, parent) {
+  let n = 0;
+  for (const a of (Array.isArray(list) ? list : []).slice(0, 48)) {
+    const p = a && a.position; if (!Array.isArray(p) || p.length < 3) continue;
+    const kind = String(a.builder || '').toLowerCase();
+    const torch = kind.includes('torch'), hearth = kind.includes('hearth') || kind.includes('fire') || kind.includes('camp');
+    if (!torch && !hearth) continue;
+    const colour = torch ? 0xffb050 : 0xff8a38;
+    const light = new THREE.PointLight(colour, torch ? 14 : 28, torch ? 12 : 22, 2);
+    light.position.set(p[0], p[1] + (torch ? 1.6 : 0.9), p[2]);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: colour, transparent: true,
+      blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.85 }));
+    sprite.scale.setScalar(torch ? 1.4 : 3.2);
+    sprite.position.set(p[0], p[1] + (torch ? 1.5 : 0.7), p[2]);
+    parent.add(light, sprite); n++;
+  }
+  return n;
+}
+function tintWater(water, root) {
+  const deep = rgbOf(water && water.deep), shallow = rgbOf(water && water.shallow);
+  if (!deep) return;
+  const tint = shallow ? deep.clone().lerp(shallow, 0.35) : deep;
+  const clarity = (typeof water.clarity === 'number' && water.clarity > 0) ? water.clarity : 1;
+  const opacity = Math.min(0.95, Math.max(0.55, 0.95 - 0.1 * clarity));
+  root.traverse(o => {
+    if (!o.isMesh || (!o.userData.__liquid && !/^Thalyn_Water/i.test(o.name || ''))) return;
+    (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+      if (!m || !m.color || liquidLavaMats.includes(m)) return;
+      m.color.copy(tint); if (m.transparent) m.opacity = opacity; m.needsUpdate = true;
+    });
+  });
+}
+function applyWorldBlock(gltf, w, li) {
+  const tx = gltf && gltf.parser && gltf.parser.json && gltf.parser.json.extras && gltf.parser.json.extras.thalyn;
+  if (!tx || typeof tx !== 'object' || typeof tx.version !== 'string') return;
+  try {
+    if (tx.water && tx.water.present) tintWater(tx.water, gltf.scene);
+    buildAnchors(tx.anchors, gltf.scene);
+    // Shared sky + fog: first block wins for the whole realm.
+    if (skyClaimedBy === null) {
+      skyClaimedBy = w.slot;
+      const sk = tx.sky || {};
+      if (Array.isArray(sk.sunDirection) && sk.sunDirection.length === 3) {
+        const d = new THREE.Vector3(sk.sunDirection[0], sk.sunDirection[1], sk.sunDirection[2]);
+        if (d.lengthSq() > 1e-6) {
+          d.normalize();
+          sky.material.uniforms['sunPosition'].value.copy(d);
+          sun.position.copy(d).multiplyScalar(8000);
+          $('r-sun').value = Math.min(0.95, Math.max(0.05, d.y));
+          sun.intensity = d.y < 0.02 ? 0.12 : Math.min(4, Math.max(0.15, sk.sunIntensity > 0 ? sk.sunIntensity : 0.4 + d.y * 2.4));
+        }
+      }
+      const sc = rgbOf(sk.sunColor); if (sc) sun.color.copy(sc);
+      const amb = rgbOf(sk.ambient);
+      if (amb && (sk.ambient[0] + sk.ambient[1] + sk.ambient[2]) > 0.15) hemi.color.copy(amb);
+      if (typeof sk.exposure === 'number' && sk.exposure > 0) { renderer.toneMappingExposure = Math.min(2.5, Math.max(0.3, sk.exposure)); $('r-exp').value = renderer.toneMappingExposure; }
+      const ns = tx.nightSky;
+      if (ns && ns.enabled) { const z = rgbOf(ns.zenith), h = rgbOf(ns.horizon); if (z) hemi.color.copy(z).multiplyScalar(4); if (h) hemi.groundColor.copy(h); hemi.intensity = Math.max(hemi.intensity, 0.35); }
+      const fg = tx.fog || {}; const hf = fg.heightFog;
+      const fc = fg.enabled ? rgbOf(fg.color) : null, hc = hf && hf.armed ? rgbOf(hf.hazeColor) : null;
+      if (fc || hc) {
+        fogColor.copy(fc || hc);
+        $('t-fog').checked = true;
+        // The realm spans many worlds, so a world's LINEAR range is folded into an exponential density.
+        let d = fc ? (String(fg.mode || '').toLowerCase().includes('linear') && fg.end > 0 ? 3 / fg.end : fg.density) : hf.hazeDensity;
+        if (!(d > 0)) d = 1.2 / Math.max(1, realmRadius);
+        scene.fog = new THREE.FogExp2(fogColor.getHex(), Math.min(d, 0.05));
+        $('r-fog').value = Math.min(1, Math.max(0.02, d * Math.max(1, realmRadius) / 3));
+      }
+    }
+    // Per-world HUD line: tone · clock · weather (+ the postcard code when the realm entry has none).
+    if (li) {
+      const meta = li.querySelector('.meta');
+      const bits = [tx.tone, tx.clock, tx.weather].filter(Boolean).join(' · ');
+      if (meta && bits) meta.textContent = (meta.textContent ? meta.textContent + ' · ' : '') + bits;
+      const code = typeof tx.postcard === 'string' ? tx.postcard.trim() : '';
+      if (code && !w.code) {
+        const span = li.querySelector('.code'); if (span) span.textContent = code;
+        const row = li.querySelector('.row');
+        if (row && !row.querySelector('button')) { const b = document.createElement('button'); b.className = 'mini'; b.textContent = 'Copy'; b.onclick = () => copyText(code, 'Code copied'); row.appendChild(b); }
+      }
+    }
+  } catch (e) { console.warn('[commons] extras.thalyn apply failed (ignored)', e); }
+}
 function rowFor(w) {
   let li = document.querySelector(`#worlds li[data-slot="${w.slot}"]`);
   if (li) return li;
@@ -556,6 +657,7 @@ function loadWorld(w) {
     loader.load(url,
       gltf => {
         const r = ingest(gltf, w);
+        applyWorldBlock(gltf, w, li); // W9: per-world anchors + water tint; first block sets the realm sky/fog
         placed.push({ w, group: r.group, radius: r.radius, ok: true });
         worldsRoot.add(r.group);
         loadedCount++; updateCounts();

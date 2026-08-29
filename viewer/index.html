@@ -67,6 +67,8 @@
   <h1>Thalyn&reg; World Viewer</h1>
   <div class="row"><label>Meshes</label><span class="stat" id="s-meshes">0</span></div>
   <div class="row"><label>Triangles</label><span class="stat" id="s-tris">0</span></div>
+  <div class="row" id="w-row" style="display:none"><label id="w-name" title="World name">World</label><span class="stat" id="w-tone"></span></div>
+  <button id="b-postcard" style="display:none" title="Copy the postcard code — paste it into Thalyn to regrow this world">Copy postcard code</button>
   <div class="row"><label><input type="checkbox" id="t-wind" /> Wind</label>
     <input type="range" id="r-wind" min="0" max="2" step="0.05" value="1" /></div>
   <div class="row"><label><input type="checkbox" id="t-sky" checked /> Sky &amp; sun</label></div>
@@ -218,6 +220,134 @@ async function fetchAtmos(url) {
   catch (e) { console.warn('[atmos] fetch failed', e); toast('Atmosphere load failed (CORS?)'); }
 }
 
+// ── W9: the Thalyn atmosphere block ─────────────────────────────────────────
+// Written by GltfAtmosphereExtras.cs into the .glb ROOT `extras.thalyn` (beside the older `atmosphere`
+// sub-block). Read via gltf.parser.json.extras — GLTFLoader keeps the raw glTF JSON on parser.json (it also
+// copies root extras onto gltf.userData; parser.json is the one this page already uses). Positions and the
+// sun direction are already in the glTF (right-handed) frame the meshes land in. Degrades silently: every
+// sub-block carries its own present/armed/enabled flag and nothing here throws on a missing field.
+let pendingThalyn = null;
+let anchorRoot = null;
+const rgbOf = a => (Array.isArray(a) && a.length >= 3) ? new THREE.Color().setRGB(a[0], a[1], a[2], THREE.SRGBColorSpace) : null;
+let glowTex = null;
+function glowTexture() {
+  if (glowTex) return glowTex;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+  const g = cv.getContext('2d'); const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, 'rgba(255,220,160,1)'); grd.addColorStop(0.35, 'rgba(255,160,70,0.55)'); grd.addColorStop(1, 'rgba(255,120,40,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+  glowTex = new THREE.CanvasTexture(cv); glowTex.colorSpace = THREE.SRGBColorSpace;
+  return glowTex;
+}
+// Hearth / torch anchors → a warm point light + additive glow sprite each (benches carry no light).
+function buildAnchors(list, parent) {
+  const root = new THREE.Group(); root.name = 'Thalyn_Anchors';
+  for (const a of (Array.isArray(list) ? list : []).slice(0, 48)) {
+    const p = a && a.position; if (!Array.isArray(p) || p.length < 3) continue;
+    const kind = String(a.builder || '').toLowerCase();
+    const torch = kind.includes('torch'), hearth = kind.includes('hearth') || kind.includes('fire') || kind.includes('camp');
+    if (!torch && !hearth) continue;
+    const colour = torch ? 0xffb050 : 0xff8a38;
+    const light = new THREE.PointLight(colour, torch ? 14 : 28, torch ? 12 : 22, 2);
+    light.position.set(p[0], p[1] + (torch ? 1.6 : 0.9), p[2]);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: colour, transparent: true,
+      blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.85 }));
+    sprite.scale.setScalar(torch ? 1.4 : 3.2);
+    sprite.position.set(p[0], p[1] + (torch ? 1.5 : 0.7), p[2]);
+    root.add(light, sprite);
+  }
+  parent.add(root);
+  return root;
+}
+// Tint every water surface toward the tone's deep colour; clearer water reads more transparent.
+function tintWater(water, root) {
+  const deep = rgbOf(water && water.deep), shallow = rgbOf(water && water.shallow);
+  if (!deep) return 0;
+  const tint = shallow ? deep.clone().lerp(shallow, 0.35) : deep;
+  const clarity = (typeof water.clarity === 'number' && water.clarity > 0) ? water.clarity : 1;
+  const opacity = Math.min(0.95, Math.max(0.55, 0.95 - 0.1 * clarity));
+  let n = 0;
+  root.traverse(o => {
+    if (!o.isMesh) return;
+    const byName = /^Thalyn_Water/i.test(o.name || '');
+    if (!o.userData.__liquid && !byName) return;
+    (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+      if (!m || !m.color || liquidLavaMats.includes(m)) return;
+      m.color.copy(tint); if (m.transparent) m.opacity = opacity; m.needsUpdate = true; n++;
+    });
+  });
+  return n;
+}
+function applyThalynBlock(tx) {
+  if (!tx || typeof tx !== 'object' || typeof tx.version !== 'string') return; // `version` = the W9 block is present
+  pendingThalyn = tx;
+  try {
+    const sk = tx.sky || {};
+    const belowHorizon = Array.isArray(sk.sunDirection) && sk.sunDirection.length === 3 && sk.sunDirection[1] < 0.02;
+    // Sun: the real direction the app lit the world from (unit vector TOWARD the sun).
+    if (Array.isArray(sk.sunDirection) && sk.sunDirection.length === 3) {
+      const d = new THREE.Vector3(sk.sunDirection[0], sk.sunDirection[1], sk.sunDirection[2]);
+      if (d.lengthSq() > 1e-6) {
+        d.normalize();
+        sky.material.uniforms['sunPosition'].value.copy(d);
+        sun.position.copy(d).multiplyScalar(8000);
+        const sunSlider = document.getElementById('r-sun'); if (sunSlider) sunSlider.value = Math.min(0.95, Math.max(0.05, d.y));
+      }
+    }
+    const sc = rgbOf(sk.sunColor); if (sc) sun.color.copy(sc);
+    if (belowHorizon) sun.intensity = 0.12; // the Sky shader goes dark below the horizon — keep a moon-grade key
+    else if (typeof sk.sunIntensity === 'number' && sk.sunIntensity > 0) sun.intensity = Math.min(4, Math.max(0.15, sk.sunIntensity));
+    const amb = rgbOf(sk.ambient);
+    if (amb && (sk.ambient[0] + sk.ambient[1] + sk.ambient[2]) > 0.15) hemi.color.copy(amb);
+    if (typeof sk.ambientIntensity === 'number' && sk.ambientIntensity > 0) hemi.intensity = Math.min(2, Math.max(0.05, sk.ambientIntensity));
+    if (typeof sk.exposure === 'number' && sk.exposure > 0) {
+      renderer.toneMappingExposure = Math.min(2.5, Math.max(0.3, sk.exposure));
+      const expSlider = document.getElementById('r-exp'); if (expSlider) expSlider.value = renderer.toneMappingExposure;
+    }
+    // Night sky: hemisphere takes the zenith/horizon pair so an exported night is not lit like noon.
+    const ns = tx.nightSky;
+    if (ns && ns.enabled) {
+      const z = rgbOf(ns.zenith), h = rgbOf(ns.horizon);
+      if (z) hemi.color.copy(z).multiplyScalar(4);
+      if (h) hemi.groundColor.copy(h);
+      hemi.intensity = Math.max(hemi.intensity, 0.35);
+    }
+    // Fog: the app's RenderSettings fog verbatim; else the armed height-fog haze band as exponential haze.
+    const fg = tx.fog || {}; const hf = fg.heightFog;
+    const fc = rgbOf(fg.color), hc = hf && hf.armed ? rgbOf(hf.hazeColor) : null;
+    if (fg.enabled && fc) {
+      fogColor.copy(fc);
+      const fogChk = document.getElementById('t-fog'); if (fogChk) fogChk.checked = true;
+      const mode = String(fg.mode || '').toLowerCase();
+      if (mode.includes('linear') && fg.end > fg.start) scene.fog = new THREE.Fog(fogColor.getHex(), fg.start, fg.end);
+      else scene.fog = new THREE.FogExp2(fogColor.getHex(), fg.density > 0 ? fg.density : 1.2 / Math.max(1, worldRadius));
+    } else if (hc) {
+      fogColor.copy(hc);
+      const fogChk = document.getElementById('t-fog'); if (fogChk) fogChk.checked = true;
+      scene.fog = new THREE.FogExp2(fogColor.getHex(), hf.hazeDensity > 0 ? Math.min(hf.hazeDensity, 0.05) : 1.2 / Math.max(1, worldRadius));
+    }
+    // Water + anchors live under the world root (rebuilt on every apply — clearWorld disposes them with it).
+    if (tx.water && tx.water.present) tintWater(tx.water, worldRoot);
+    if (anchorRoot && anchorRoot.parent) anchorRoot.parent.remove(anchorRoot);
+    anchorRoot = buildAnchors(tx.anchors, worldRoot);
+    // HUD: world name · tone · clock · weather, and the postcard code (copy button).
+    const row = document.getElementById('w-row');
+    if (row) {
+      row.style.display = '';
+      document.getElementById('w-name').textContent = String(tx.worldName || tx.sceneName || 'Thalyn world').slice(0, 40);
+      document.getElementById('w-tone').textContent = [tx.tone, tx.clock, tx.weather].filter(Boolean).join(' · ');
+    }
+    const pc = document.getElementById('b-postcard');
+    if (pc) {
+      const code = typeof tx.postcard === 'string' ? tx.postcard.trim() : '';
+      pc.style.display = code ? '' : 'none';
+      pc.onclick = async () => { try { await navigator.clipboard.writeText(code); toast('Postcard code copied: ' + code); }
+                                 catch (e) { toast('Copy failed — ' + code); } };
+    }
+    console.info('[thalyn] extras.thalyn applied', { tone: tx.tone, clock: tx.clock, weather: tx.weather, anchors: (tx.anchors || []).length });
+  } catch (e) { console.warn('[thalyn] extras block apply failed (ignored)', e); }
+}
+
 function applySky(elevationDeg) {
   const u = sky.material.uniforms;
   u['turbidity'].value = 8;
@@ -279,6 +409,10 @@ function resetWorld() {
 // (or fewer fields) does not inherit the previous world's atmosphere when switching.
 function resetAtmosphere() {
   pendingAtmos = null;
+  pendingThalyn = null; anchorRoot = null; // anchors live under worldRoot — clearWorld disposes them
+  hemi.groundColor.set(0x4a3f33);
+  const wr = document.getElementById('w-row'); if (wr) wr.style.display = 'none';
+  const pb = document.getElementById('b-postcard'); if (pb) pb.style.display = 'none';
   scene.fog = null;
   sun.color.set(0xfff4e0);
   hemi.color.set(0xbfd8ff); hemi.intensity = 0.6;
@@ -394,6 +528,7 @@ function ingest(gltf) {
   const tx = gltf.parser && gltf.parser.json && gltf.parser.json.extras && gltf.parser.json.extras.thalyn;
   if (tx && tx.atmosphere && !pendingAtmos) applyAtmosphere(tx.atmosphere);
   worldRoot.add(gltf.scene);
+  if (tx) applyThalynBlock(tx); // W9 block (sun direction / fog / water tint / anchors / HUD) — after the meshes are under worldRoot
   document.getElementById('s-meshes').textContent = meshCount.toLocaleString();
   document.getElementById('s-tris').textContent = Math.round(triCount).toLocaleString();
 }
@@ -419,6 +554,7 @@ function frameWorld() {
   worldRadius = radius;
   refreshFog();
   if (pendingAtmos) applyAtmosphere(pendingAtmos); // re-apply now that worldRadius is known
+  if (pendingThalyn) applyThalynBlock(pendingThalyn); // W9 block wins (the real sun direction over the time-of-day arc)
   controls.update();
 }
 
