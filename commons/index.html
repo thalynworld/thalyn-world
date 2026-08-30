@@ -13,8 +13,10 @@
   (url, slot, name, creator, code). It arrives as ?realm=URL (fetched) or packed
   straight into the link as ?r=<base64url JSON>, so a realm is shareable as a link
   with no server and no account. Each world sits on a hex slot; planks bridge
-  neighbouring slots; a plaque names each one. Orbit, or walk it in first person.
-  Built on three.js only (KTX2 / Meshopt / Draco), sharing the World Viewer's sky.
+  neighbouring slots; a plaque names each one. Orbit, or walk it in first person —
+  and as you cross from one world to the next, its sky, light and weather follow
+  you: each world keeps the atmosphere it was made with, blended by distance.
+  Built on three.js only (KTX2 / Meshopt / Draco), sharing the World Viewer's stack.
 -->
 <style>
   :root { --gold: #E8C66A; --ink: #0d1411; --panel: rgba(13,20,17,0.84); --ash: #9DBCAC; --line: rgba(232,198,106,0.30); }
@@ -35,11 +37,12 @@
   button, .btn { padding: 7px 10px; border-radius: 8px; cursor: pointer; background: rgba(232,198,106,0.14);
     color: var(--gold); border: 1px solid rgba(232,198,106,0.45); font-size: 13px; font-family: inherit; }
   button:hover, .btn:hover { background: rgba(232,198,106,0.24); }
-  button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
   button.wide { width: 100%; margin-top: 8px; }
   button.mini { padding: 3px 8px; font-size: 12px; }
   #worlds { list-style: none; margin: 8px 0 0; padding: 0; border-top: 1px solid var(--line); }
   #worlds li { padding: 7px 0; border-bottom: 1px solid rgba(232,198,106,0.12); }
+  #worlds li.here .name::after { content: ' · here'; color: var(--gold); font-weight: 400; font-size: 12px; }
   #worlds .name { color: #e8efe9; font-weight: 600; }
   #worlds .meta { color: var(--ash); font-size: 12px; }
   #worlds .code { font-family: ui-monospace, Consolas, monospace; color: var(--gold); font-size: 12px; }
@@ -65,16 +68,28 @@
   #cross { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
     background: var(--gold); opacity: 0; pointer-events: none; box-shadow: 0 0 0 1px rgba(0,0,0,0.6); }
   body.walking #cross { opacity: 0.9; }
-  body.walking #hud { opacity: 0.25; pointer-events: none; }
+  body.walking #hud, body.walking #cta { opacity: 0.25; pointer-events: none; }
+  body.clean #hud, body.clean #cta, body.clean #controls, body.clean #b-fs, body.clean #here { opacity: 0; pointer-events: none; }
   a { color: var(--gold); }
   #b-fs { position: fixed; right: 14px; bottom: 14px; z-index: 10; width: 40px; height: 40px; padding: 0;
     display: flex; align-items: center; justify-content: center; background: var(--panel); border: 1px solid var(--line);
     border-radius: 10px; color: var(--gold); backdrop-filter: blur(8px); }
   #b-fs svg { width: 20px; height: 20px; display: block; }
+  #cta { position: fixed; right: 64px; bottom: 14px; z-index: 10; padding: 9px 14px; text-decoration: none;
+    background: rgba(232,198,106,0.16); border: 1px solid rgba(232,198,106,0.5); border-radius: 10px; color: var(--gold);
+    font-size: 13px; backdrop-filter: blur(8px); }
+  #cta:hover { background: rgba(232,198,106,0.28); }
+  #here { position: fixed; left: 50%; top: 22px; transform: translateX(-50%); z-index: 6; text-align: center; pointer-events: none;
+    opacity: 0; transition: opacity 1s; }
+  #here.show { opacity: 1; }
+  #here .n { font: 600 26px/1.1 Georgia, serif; color: var(--gold); letter-spacing: 0.04em; text-shadow: 0 2px 18px rgba(0,0,0,0.7); }
+  #here .s { font-size: 13px; color: #e8efe9; opacity: 0.85; text-shadow: 0 1px 8px rgba(0,0,0,0.8); margin-top: 4px; }
   @media (max-width: 720px) {
     #hud { width: calc(100vw - 28px); max-height: 46vh; }
-    #controls { left: 14px; right: 66px; bottom: 14px; flex-wrap: wrap; }
+    #controls { left: 14px; right: 66px; bottom: 64px; flex-wrap: wrap; }
     #controls .hint { display: none; }
+    #cta { right: 14px; bottom: 14px; }
+    #b-fs { display: none; }
     input[type=range] { width: 70px; }
   }
 </style>
@@ -82,16 +97,19 @@
 <body>
 <canvas id="c"></canvas>
 <div id="cross" aria-hidden="true"></div>
+<div id="here" aria-hidden="true"><div class="n" id="here-n"></div><div class="s" id="here-s"></div></div>
 
 <div id="hud" class="panel">
   <h1 id="realm-name">Thalyn&reg; Commons</h1>
   <div class="sub" id="realm-sub">A shared realm of exported worlds</div>
   <div class="row"><label>Worlds</label><span class="stat" id="s-worlds">0 / 0</span></div>
   <div class="row"><label>Triangles</label><span class="stat" id="s-tris">0</span></div>
+  <div class="row"><label><input type="checkbox" id="t-cinema" checked /> Cinematic</label><span class="stat" id="s-grade"></span></div>
+  <div class="row"><label><input type="checkbox" id="t-follow" checked /> Sky follows you</label></div>
   <div class="row"><label><input type="checkbox" id="t-wind" /> Wind</label>
     <input type="range" id="r-wind" min="0" max="2" step="0.05" value="1" /></div>
-  <div class="row"><label><input type="checkbox" id="t-fog" /> Haze</label>
-    <input type="range" id="r-fog" min="0" max="1" step="0.02" value="0.4" /></div>
+  <div class="row"><label><input type="checkbox" id="t-fog" checked /> Haze</label>
+    <input type="range" id="r-fog" min="0" max="2" step="0.02" value="1" /></div>
   <div class="row"><label>Sun</label><input type="range" id="r-sun" min="0.05" max="0.95" step="0.01" value="0.55" /></div>
   <div class="row"><label>Exposure</label><input type="range" id="r-exp" min="0.3" max="2" step="0.05" value="1" /></div>
   <ul id="worlds"></ul>
@@ -105,11 +123,12 @@
   </details>
   <button class="wide" id="b-share">Copy realm link</button>
   <button class="wide" id="b-reset">Reset view</button>
+  <div class="sub" style="margin-top:8px">Click a plaque to visit that world · H hides the panels.</div>
 </div>
 
 <div id="controls" class="panel">
   <button id="b-walk" type="button" title="Toggle first-person walk (V)">Walk (V)</button>
-  <span class="hint" id="walk-hint">Orbit: drag · scroll · right-drag pans. Click a plaque to copy its code.</span>
+  <span class="hint" id="walk-hint">Orbit: drag · scroll · right-drag pans. Click a plaque to stand in that world.</span>
 </div>
 
 <div id="empty">
@@ -117,6 +136,7 @@
   <div>Open this page with <code>?realm=https://…/realm.json</code> or a packed <code>?r=…</code> link,<br/>or use <b>Add a world</b> to start one.</div>
 </div>
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+<a id="cta" href="https://store.steampowered.com/app/4581800/Thalyn/" target="_blank" rel="noopener">Built in Thalyn — make yours ↗</a>
 <button id="b-fs" type="button" aria-label="Enter fullscreen" title="Fullscreen">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
 </button>
@@ -133,13 +153,12 @@
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { Sky } from 'three/addons/objects/Sky.js';
+import * as TA from '../viewer/thalyn-atmos.js';
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -164,40 +183,30 @@ const orbit = new OrbitControls(camera, canvas);
 orbit.enableDamping = true;
 orbit.dampingFactor = 0.08;
 orbit.maxDistance = 60000;
-
+let userMoved = false;          // once the visitor takes the camera, arrivals stop re-framing the realm
 orbit.addEventListener('start', () => { userMoved = true; });
 
 const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+const roomEnv = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environment = roomEnv;
+const skyEnv = TA.makeSkyEnv(renderer, scene, roomEnv);
 
-// ── Shared sky + sun ────────────────────────────────────────────────────────
-const sky = new Sky();
-sky.scale.setScalar(450000);
-const sun = new THREE.DirectionalLight(0xfff4e0, 2.2);
-sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.bias = -0.0005;
-const hemi = new THREE.HemisphereLight(0xbfd8ff, 0x4a3f33, 0.6);
-function applySky(elevationDeg) {
-  const u = sky.material.uniforms;
-  u['turbidity'].value = 8; u['rayleigh'].value = 2.2;
-  u['mieCoefficient'].value = 0.005; u['mieDirectionalG'].value = 0.8;
-  const phi = THREE.MathUtils.degToRad(90 - elevationDeg * 90);
-  const theta = THREE.MathUtils.degToRad(35);
-  const sunPos = new THREE.Vector3().setFromSphericalCoords(1, phi, theta);
-  u['sunPosition'].value.copy(sunPos);
-  sun.position.copy(sunPos).multiplyScalar(8000);
-  sun.intensity = 0.4 + elevationDeg * 2.4;
-}
-applySky(0.55);
-scene.add(sky, sun, hemi);
-
+// ── Shared sky + sun (blended per world, see "atmosphere follows you") ──────
+const L = TA.makeLights();
+scene.add(L.sky, L.sun, L.hemi, L.stars);
 let realmRadius = 150;
-const fogColor = new THREE.Color(0xbcd0e0);
-function refreshFog() {
-  if (!$('t-fog').checked) { scene.fog = null; return; }
-  const s = parseFloat($('r-fog').value);
-  scene.fog = new THREE.FogExp2(fogColor.getHex(), s * 3 / Math.max(1, realmRadius));
+let post = null; // cinematic pass, created once the renderer is sized (below)
+let fogOn = true, fogScale = 1, sunOverride = null, expOverride = null;
+const baseState = TA.defaultState(realmRadius); TA.sunFromElevation(baseState, 0.55);
+const blended = TA.defaultState(realmRadius);
+function applyBlended() {
+  const s = Object.assign({}, blended);
+  if (sunOverride !== null) { TA.sunFromElevation(s, sunOverride); }
+  if (expOverride !== null) s.exposure = expOverride;
+  s.fogDensity = blended.fogDensity * fogScale;
+  TA.applyState(s, L, renderer, scene, fogOn);
+  L.sky.visible = !skyEnv.active;
+  if (post) { post.setTone(s.tone); post.setNight(s.night); $('s-grade').textContent = s.hasBlock ? s.tone : ''; }
 }
 
 // ── Loaders (KTX2 + Meshopt + Draco → gltfpack output loads) ────────────────
@@ -208,70 +217,7 @@ loader.setKTX2Loader(ktx2);
 loader.setDRACOLoader(draco);
 loader.setMeshoptDecoder(MeshoptDecoder);
 
-// ── Foliage relight + wind, liquids (as the World Viewer) ───────────────────
-const windMaterials = [];
-const liquidLavaMats = [];
-const uWindTime = { value: 0 };
-const uWindStrength = { value: 0 };
-const FOLIAGE = /(^|[^a-z])(leaf|foliage|flower|petal|grass|shrub|frond|canopy|billboard|bush|fern|vine)/i;
-const FOLIAGE_AMBIENT_FLOOR = 0.40;
-function patchFoliageMaterial(mat, ownerName) {
-  if (!mat || mat.userData.__foliage) return;
-  if (!FOLIAGE.test((mat.name || '') + '|' + (ownerName || ''))) return;
-  mat.userData.__foliage = true;
-  if (mat.map || mat.emissiveMap) {
-    if (!mat.emissiveMap && mat.map) mat.emissiveMap = mat.map;
-    const cur = mat.emissive ? Math.max(mat.emissive.r, mat.emissive.g, mat.emissive.b) : 0;
-    if (cur < FOLIAGE_AMBIENT_FLOOR) mat.emissive = new THREE.Color().setScalar(FOLIAGE_AMBIENT_FLOOR);
-  } else if (mat.color) {
-    mat.emissive = mat.color.clone().multiplyScalar(FOLIAGE_AMBIENT_FLOOR);
-  }
-  mat.emissiveIntensity = 1.0;
-  mat.alphaToCoverage = true;
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uWindTime = uWindTime;
-    shader.uniforms.uWindStrength = uWindStrength;
-    shader.vertexShader = 'uniform float uWindTime;\nuniform float uWindStrength;\n' + shader.vertexShader;
-    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>',
-      `#include <begin_vertex>
-       float _wph = transformed.x * 0.35 + transformed.z * 0.35;
-       float _h = max(transformed.y, 0.0);
-       transformed.x += sin(uWindTime * 1.6 + _wph) * uWindStrength * _h * 0.06;
-       transformed.z += cos(uWindTime * 1.3 + _wph) * uWindStrength * _h * 0.045;`);
-  };
-  mat.needsUpdate = true;
-  windMaterials.push(mat);
-}
-const LIQUID = /^Thalyn_(Water|Lava)_Baked/i;
-function upgradeLiquid(mesh) {
-  const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-  if (!mats.some(m => m && LIQUID.test(m.name || ''))) return false;
-  const isLava = mats.some(m => m && /Lava/i.test(m.name || '')) || /lava/i.test(mesh.name || '');
-  let mat;
-  if (isLava) {
-    mat = new THREE.MeshStandardMaterial({ color: 0x3a0c03, emissive: new THREE.Color(1.0, 0.42, 0.10),
-      emissiveIntensity: 1.5, roughness: 0.55, metalness: 0.0 });
-    liquidLavaMats.push(mat);
-  } else {
-    mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(0.02, 0.13, 0.28), roughness: 0.04,
-      metalness: 0.0, transparent: true, opacity: 0.82, depthWrite: true, envMapIntensity: 1.4 });
-  }
-  const amp = isLava ? 0.22 : 0.12, freq = isLava ? 0.55 : 1.1;
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uWindTime = uWindTime;
-    shader.vertexShader = 'uniform float uWindTime;\n' + shader.vertexShader;
-    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>',
-      `#include <begin_vertex>
-       transformed.y += sin(uWindTime*${freq.toFixed(2)} + transformed.x*0.12 + transformed.z*0.12)*${amp.toFixed(2)}
-                      + cos(uWindTime*${(freq * 0.6).toFixed(2)} + transformed.x*0.05)*${(amp * 0.6).toFixed(2)};`);
-  };
-  mat.needsUpdate = true;
-  mesh.castShadow = false; mesh.receiveShadow = false;
-  mesh.userData.__liquid = true;
-  if (Array.isArray(mesh.material)) mesh.material = mesh.material.map(m => (m && LIQUID.test(m.name || '')) ? (m.dispose(), mat) : m);
-  else { mesh.material.dispose(); mesh.material = mat; }
-  return true;
-}
+const kit = TA.makeMaterialKit();
 
 // ── Realm manifest ──────────────────────────────────────────────────────────
 // { name, gap, worlds:[{ url, slot, name, creator, code }] }
@@ -338,21 +284,21 @@ const areNeighbours = (a, b) => HEX_DIRS.some(d => a[0] + d[0] === b[0] && a[1] 
 
 // ── Realm state ─────────────────────────────────────────────────────────────
 let realm = { name: 'Thalyn Commons', gap: 12, worlds: [] };
-const placed = [];              // { w, group, radius, groundY, ok, plaque, box }
+const placed = [];              // { w, group, radius, ok, plaque, hex, state, dome, anchors, pose, shift }
 const worldsRoot = new THREE.Group();
 const planksRoot = new THREE.Group();
 const plaquesRoot = new THREE.Group();
 scene.add(worldsRoot, planksRoot, plaquesRoot);
 const walkMeshes = [];          // meshes the walk mode stands on (+ their world boxes)
+const groundAt = TA.makeGroundProbe(walkMeshes);
 const PLINTH_RADIUS = 24;       // placeholder footprint for a world that failed to load
 let triCount = 0;
 let loadedCount = 0;
-let userMoved = false;          // once the visitor takes the camera, arrivals stop re-framing the realm
 
 const plankMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.85, metalness: 0.0 });
 const plinthMat = new THREE.MeshStandardMaterial({ color: 0x3b4a44, roughness: 0.9, metalness: 0.05 });
 
-function makePlaqueTexture(w, failed) {
+function makePlaqueTexture(w, failed, tone) {
   const cv = document.createElement('canvas'); cv.width = 512; cv.height = 256;
   const g = cv.getContext('2d');
   g.fillStyle = 'rgba(13,20,17,0.92)'; g.fillRect(0, 0, 512, 256);
@@ -361,18 +307,18 @@ function makePlaqueTexture(w, failed) {
   g.font = '600 40px Georgia, serif';
   g.fillText(w.name.slice(0, 26), 256, 82, 460);
   g.fillStyle = '#cfe0d7'; g.font = '28px Georgia, serif';
-  g.fillText(w.creator ? ('by ' + w.creator.slice(0, 30)) : ' ', 256, 132, 460);
+  g.fillText((w.creator ? ('by ' + w.creator.slice(0, 30)) : '') + (tone ? ('  ·  ' + tone) : ''), 256, 132, 460);
   g.fillStyle = failed ? '#c25b4a' : '#E8C66A'; g.font = '26px Consolas, monospace';
   g.fillText(failed ? 'could not be loaded' : (w.code || ''), 256, 190, 460);
   g.fillStyle = '#9DBCAC'; g.font = '18px sans-serif';
-  if (!failed && w.code) g.fillText('click to copy the code', 256, 228, 460);
+  if (!failed) g.fillText('click to stand in this world', 256, 228, 460);
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
-function makePlaque(w, failed) {
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: makePlaqueTexture(w, failed), depthTest: true, transparent: true }));
+function makePlaque(p) {
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: makePlaqueTexture(p.w, !p.ok, p.state && p.state.hasBlock ? p.state.tone : ''), depthTest: true, transparent: true }));
   sp.scale.set(12, 6, 1);
-  sp.userData.world = w;
+  sp.userData.placed = p;
   return sp;
 }
 
@@ -385,14 +331,15 @@ function worldBox(obj) {
 }
 
 function ingest(gltf, w) {
+  const dome = TA.extractSkyDome(gltf.scene);
   gltf.scene.traverse(o => {
     if (o.isMesh) {
       o.castShadow = true; o.receiveShadow = true;
       const g = o.geometry;
       if (g && g.index) triCount += g.index.count / 3;
       else if (g && g.attributes.position) triCount += g.attributes.position.count / 3;
-      if (upgradeLiquid(o)) return;
-      (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => patchFoliageMaterial(m, o.name));
+      if (kit.upgradeLiquid(o)) return;
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => kit.patchFoliage(m, o.name));
     }
   });
   const baked = []; gltf.scene.traverse(o => { if (o.isLight) baked.push(o); });
@@ -401,12 +348,13 @@ function ingest(gltf, w) {
   const box = worldBox(gltf.scene);
   const c = box.getCenter(new THREE.Vector3());
   const group = new THREE.Group();
-  gltf.scene.position.set(-c.x, -box.min.y, -c.z);
+  const shift = new THREE.Vector3(-c.x, -box.min.y, -c.z);
+  gltf.scene.position.copy(shift);
   group.add(gltf.scene);
   const size = box.getSize(new THREE.Vector3());
   const radius = Math.max(size.x, size.z) * 0.5 || PLINTH_RADIUS;
   $('s-tris').textContent = Math.round(triCount).toLocaleString();
-  return { group, radius, height: size.y };
+  return { group, radius, height: size.y, dome, shift, inner: gltf.scene };
 }
 
 function makePlinth(w) {
@@ -415,7 +363,7 @@ function makePlinth(w) {
   m.position.y = 1; m.receiveShadow = true; m.castShadow = true;
   m.userData.__plinth = true;
   group.add(m);
-  return { group, radius: PLINTH_RADIUS, height: 2 };
+  return { group, radius: PLINTH_RADIUS, height: 2, dome: null, shift: new THREE.Vector3(), inner: group };
 }
 
 // Re-lay every placed world on the hex grid. Cell spacing = 2 × the largest footprint + gap, so the
@@ -440,21 +388,7 @@ function layout() {
   rebuildPlanks(spacing);
   rebuildPlaques();
   realmRadius = spacing * (1 + Math.sqrt(Math.max(0, placed.length - 1))) * 0.5 + maxR;
-  refreshFog();
-}
-
-const _ray = new THREE.Raycaster();
-const _down = new THREE.Vector3(0, -1, 0);
-function groundAt(x, z, fromY = 5000) {
-  _ray.set(new THREE.Vector3(x, fromY, z), _down);
-  _ray.far = fromY + 1000;
-  let best = null;
-  for (const e of walkMeshes) {
-    if (x < e.box.min.x || x > e.box.max.x || z < e.box.min.z || z > e.box.max.z) continue;
-    const hits = _ray.intersectObject(e.mesh, false);
-    if (hits.length && (best === null || hits[0].point.y > best)) best = hits[0].point.y;
-  }
-  return best;
+  atmosDirty = true;
 }
 
 function rebuildPlanks(spacing) {
@@ -500,7 +434,7 @@ function rebuildPlaques() {
     // The plaque stands at the near (+Z) edge of the world, above the local ground there.
     const x = p.group.position.x, z = p.group.position.z + Math.max(4, p.radius - 4);
     const y = (groundAt(x, z) ?? 0) + 5;
-    p.plaque = makePlaque(p.w, !p.ok);
+    p.plaque = makePlaque(p);
     p.plaque.position.set(x, y, z);
     plaquesRoot.add(p.plaque);
   }
@@ -523,94 +457,69 @@ function frameRealm() {
   orbit.update();
 }
 
-// ── Loading (sequential, per-world progress, per-world failure) ─────────────
-
-// ── W9: the Thalyn atmosphere block, per world ──────────────────────────────
-// Root `extras.thalyn` written by GltfAtmosphereExtras.cs, read via gltf.parser.json.extras (same source the
-// World Viewer uses). Each world keeps its own anchors + water tint (parented under its own gltf.scene, so
-// they ride the recentre/slot offset); the FIRST world that carries a block sets the shared sky + fog.
-let skyClaimedBy = null;
-const rgbOf = a => (Array.isArray(a) && a.length >= 3) ? new THREE.Color().setRGB(a[0], a[1], a[2], THREE.SRGBColorSpace) : null;
-let glowTex = null;
-function glowTexture() {
-  if (glowTex) return glowTex;
-  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
-  const g = cv.getContext('2d'); const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  grd.addColorStop(0, 'rgba(255,220,160,1)'); grd.addColorStop(0.35, 'rgba(255,160,70,0.55)'); grd.addColorStop(1, 'rgba(255,120,40,0)');
-  g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
-  glowTex = new THREE.CanvasTexture(cv); glowTex.colorSpace = THREE.SRGBColorSpace;
-  return glowTex;
-}
-function buildAnchors(list, parent) {
-  let n = 0;
-  for (const a of (Array.isArray(list) ? list : []).slice(0, 48)) {
-    const p = a && a.position; if (!Array.isArray(p) || p.length < 3) continue;
-    const kind = String(a.builder || '').toLowerCase();
-    const torch = kind.includes('torch'), hearth = kind.includes('hearth') || kind.includes('fire') || kind.includes('camp');
-    if (!torch && !hearth) continue;
-    const colour = torch ? 0xffb050 : 0xff8a38;
-    const light = new THREE.PointLight(colour, torch ? 14 : 28, torch ? 12 : 22, 2);
-    light.position.set(p[0], p[1] + (torch ? 1.6 : 0.9), p[2]);
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: colour, transparent: true,
-      blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.85 }));
-    sprite.scale.setScalar(torch ? 1.4 : 3.2);
-    sprite.position.set(p[0], p[1] + (torch ? 1.5 : 0.7), p[2]);
-    parent.add(light, sprite); n++;
+// ── The atmosphere follows you ──────────────────────────────────────────────
+// Every world keeps the block it was exported with (its own sky, sun, fog, night, hearths, water tone).
+// The realm's lighting is a distance-weighted blend of the nearest worlds' states, re-solved as the
+// camera moves; the baked sky of the world you are closest to becomes the background + light.
+let atmosDirty = true, hereSlot = -1;
+const _tmpA = TA.defaultState(), _lastCam = new THREE.Vector3(1e9, 0, 0);
+function weightsAt(pos) {
+  // Weight = 1 / (distance-from-footprint + soft)², so inside a world its own atmosphere dominates.
+  let total = 0; const ws = [];
+  const anyOk = placed.some(p => p.ok);
+  for (const p of placed) {
+    if (anyOk && !p.ok) { ws.push(0); continue; } // a placeholder plinth carries no sky of its own
+    const dx = pos.x - p.group.position.x, dz = pos.z - p.group.position.z;
+    const d = Math.max(0, Math.hypot(dx, dz) - p.radius * 0.85);
+    const w = 1 / ((d + 6) * (d + 6));
+    ws.push(w); total += w;
   }
-  return n;
+  return ws.map(w => w / (total || 1));
 }
-function tintWater(water, root) {
-  const deep = rgbOf(water && water.deep), shallow = rgbOf(water && water.shallow);
-  if (!deep) return;
-  const tint = shallow ? deep.clone().lerp(shallow, 0.35) : deep;
-  const clarity = (typeof water.clarity === 'number' && water.clarity > 0) ? water.clarity : 1;
-  const opacity = Math.min(0.95, Math.max(0.55, 0.95 - 0.1 * clarity));
-  root.traverse(o => {
-    if (!o.isMesh || (!o.userData.__liquid && !/^Thalyn_Water/i.test(o.name || ''))) return;
-    (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
-      if (!m || !m.color || liquidLavaMats.includes(m)) return;
-      m.color.copy(tint); if (m.transparent) m.opacity = opacity; m.needsUpdate = true;
-    });
-  });
+function solveAtmosphere(force) {
+  if (!placed.length) return;
+  const follow = $('t-follow').checked;
+  const pos = camera.position;
+  if (!force && !atmosDirty && pos.distanceToSquared(_lastCam) < 1) return;
+  _lastCam.copy(pos); atmosDirty = false;
+  const ws = follow ? weightsAt(pos) : placed.map((p, i) => i === 0 ? 1 : 0);
+  // Blend pairwise in weight order (the two heaviest dominate; the rest nudge).
+  const order = ws.map((w, i) => [w, i]).sort((a, b) => b[0] - a[0]);
+  let acc = null, accW = 0;
+  for (const [w, i] of order) {
+    const st = placed[i].state || baseState;
+    if (!acc) { acc = TA.lerpState(st, st, 0, TA.defaultState()); accW = w; continue; }
+    if (w < 0.02) break;
+    TA.lerpState(acc, st, w / (accW + w), _tmpA); TA.lerpState(_tmpA, _tmpA, 0, acc); accW += w;
+  }
+  TA.lerpState(acc, acc, 0, blended);
+  // Nearest world's baked sky becomes the dome (swapped, not blended — a texture can't be lerped cheaply).
+  const top = placed[order[0][1]];
+  skyEnv.useDome(top.dome || null);
+  if (top.w.slot !== hereSlot) {
+    hereSlot = top.w.slot;
+    document.querySelectorAll('#worlds li').forEach(li => li.classList.toggle('here', +li.dataset.slot === hereSlot));
+    if (walk.active) showHere(top);
+  }
+  applyBlended();
 }
-function applyWorldBlock(gltf, w, li) {
-  const tx = gltf && gltf.parser && gltf.parser.json && gltf.parser.json.extras && gltf.parser.json.extras.thalyn;
-  if (!tx || typeof tx !== 'object' || typeof tx.version !== 'string') return;
+let hereT;
+function showHere(p) {
+  $('here-n').textContent = p.w.name;
+  $('here-s').textContent = [p.w.creator ? 'by ' + p.w.creator : '', p.state && p.state.hasBlock ? [p.tx.tone, p.tx.clock, p.tx.weather].filter(Boolean).join(' · ') : ''].filter(Boolean).join('  ·  ');
+  const el = $('here'); el.classList.add('show'); clearTimeout(hereT); hereT = setTimeout(() => el.classList.remove('show'), 4200);
+}
+
+function applyWorldBlock(gltf, r, w, li) {
+  const tx = TA.readBlock(gltf);
+  const p = { w, group: r.group, radius: r.radius, ok: true, dome: r.dome, shift: r.shift, state: baseState, tx: null, pose: null, anchors: null };
+  if (!TA.hasBlock(tx)) return p;
   try {
-    if (tx.water && tx.water.present) tintWater(tx.water, gltf.scene);
-    buildAnchors(tx.anchors, gltf.scene);
-    // Shared sky + fog: first block wins for the whole realm.
-    if (skyClaimedBy === null) {
-      skyClaimedBy = w.slot;
-      const sk = tx.sky || {};
-      if (Array.isArray(sk.sunDirection) && sk.sunDirection.length === 3) {
-        const d = new THREE.Vector3(sk.sunDirection[0], sk.sunDirection[1], sk.sunDirection[2]);
-        if (d.lengthSq() > 1e-6) {
-          d.normalize();
-          sky.material.uniforms['sunPosition'].value.copy(d);
-          sun.position.copy(d).multiplyScalar(8000);
-          $('r-sun').value = Math.min(0.95, Math.max(0.05, d.y));
-          sun.intensity = d.y < 0.02 ? 0.12 : Math.min(4, Math.max(0.15, sk.sunIntensity > 0 ? sk.sunIntensity : 0.4 + d.y * 2.4));
-        }
-      }
-      const sc = rgbOf(sk.sunColor); if (sc) sun.color.copy(sc);
-      const amb = rgbOf(sk.ambient);
-      if (amb && (sk.ambient[0] + sk.ambient[1] + sk.ambient[2]) > 0.15) hemi.color.copy(amb);
-      if (typeof sk.exposure === 'number' && sk.exposure > 0) { renderer.toneMappingExposure = Math.min(2.5, Math.max(0.3, sk.exposure)); $('r-exp').value = renderer.toneMappingExposure; }
-      const ns = tx.nightSky;
-      if (ns && ns.enabled) { const z = rgbOf(ns.zenith), h = rgbOf(ns.horizon); if (z) hemi.color.copy(z).multiplyScalar(4); if (h) hemi.groundColor.copy(h); hemi.intensity = Math.max(hemi.intensity, 0.35); }
-      const fg = tx.fog || {}; const hf = fg.heightFog;
-      const fc = fg.enabled ? rgbOf(fg.color) : null, hc = hf && hf.armed ? rgbOf(hf.hazeColor) : null;
-      if (fc || hc) {
-        fogColor.copy(fc || hc);
-        $('t-fog').checked = true;
-        // The realm spans many worlds, so a world's LINEAR range is folded into an exponential density.
-        let d = fc ? (String(fg.mode || '').toLowerCase().includes('linear') && fg.end > 0 ? 3 / fg.end : fg.density) : hf.hazeDensity;
-        if (!(d > 0)) d = 1.2 / Math.max(1, realmRadius);
-        scene.fog = new THREE.FogExp2(fogColor.getHex(), Math.min(d, 0.05));
-        $('r-fog').value = Math.min(1, Math.max(0.02, d * Math.max(1, realmRadius) / 3));
-      }
-    }
+    p.tx = tx;
+    p.state = TA.stateFromBlock(tx, r.radius);
+    if (tx.water && tx.water.present) TA.tintWater(tx.water, r.inner, kit.lavaMats);
+    p.anchors = TA.buildAnchors(tx.anchors, r.inner);   // parented under the world → rides its recentre + slot
+    p.pose = TA.cameraPose(tx);                          // in the world's own frame; shifted at teleport time
     // Per-world HUD line: tone · clock · weather (+ the postcard code when the realm entry has none).
     if (li) {
       const meta = li.querySelector('.meta');
@@ -624,6 +533,7 @@ function applyWorldBlock(gltf, w, li) {
       }
     }
   } catch (e) { console.warn('[commons] extras.thalyn apply failed (ignored)', e); }
+  return p;
 }
 function rowFor(w) {
   let li = document.querySelector(`#worlds li[data-slot="${w.slot}"]`);
@@ -635,6 +545,9 @@ function rowFor(w) {
   const code = document.createElement('span'); code.className = 'code'; code.textContent = w.code || '';
   codeRow.appendChild(code);
   if (w.code) { const b = document.createElement('button'); b.className = 'mini'; b.textContent = 'Copy'; b.onclick = () => copyText(w.code, 'Code copied'); codeRow.appendChild(b); }
+  const visit = document.createElement('button'); visit.className = 'mini'; visit.textContent = 'Visit'; visit.title = 'Stand in this world';
+  visit.onclick = () => { const p = placed.find(q => q.w.slot === w.slot); if (p) visitWorld(p); };
+  codeRow.appendChild(visit);
   const bar = document.createElement('div'); bar.className = 'bar'; bar.appendChild(document.createElement('i'));
   const st = document.createElement('div'); st.className = 'st'; st.textContent = 'queued';
   li.append(name, meta, codeRow, bar, st);
@@ -657,12 +570,13 @@ function loadWorld(w) {
     loader.load(url,
       gltf => {
         const r = ingest(gltf, w);
-        applyWorldBlock(gltf, w, li); // W9: per-world anchors + water tint; first block sets the realm sky/fog
-        placed.push({ w, group: r.group, radius: r.radius, ok: true });
+        const p = applyWorldBlock(gltf, r, w, li);
+        placed.push(p);
         worldsRoot.add(r.group);
         loadedCount++; updateCounts();
-        setRow(li, 1, `loaded · ${Math.round(r.radius * 2)} m across`, 'ok');
+        setRow(li, 1, `loaded · ${Math.round(r.radius * 2)} m across` + (r.dome ? ' · own sky' : ''), 'ok');
         layout(); if (!userMoved) frameRealm();
+        solveAtmosphere(true);
         $('empty').style.display = 'none';
         res();
       },
@@ -673,7 +587,7 @@ function loadWorld(w) {
 }
 function placeFailed(w, li, why) {
   const r = makePlinth(w);
-  placed.push({ w, group: r.group, radius: r.radius, ok: false });
+  placed.push({ w, group: r.group, radius: r.radius, ok: false, dome: null, shift: r.shift, state: baseState, tx: null, pose: null, anchors: null });
   worldsRoot.add(r.group);
   setRow(li, 1, why, 'fail');
   layout(); if (!userMoved) frameRealm();
@@ -719,94 +633,88 @@ async function copyText(text, okMsg) {
 }
 
 // ── Walk mode (WASD + mouse look, ground follow) ────────────────────────────
-const EYE = 1.7;
-const walk = new PointerLockControls(camera, document.body);
-const keys = new Set();
-let walking = false;
-let walkY = 0;
 const walkBtn = $('b-walk');
+const walk = TA.makeWalk(camera, document.body, groundAt, (on, why) => {
+  document.body.classList.toggle('walking', on);
+  orbit.enabled = !on;
+  walkBtn.textContent = on ? 'Orbit (V)' : 'Walk (V)';
+  if (on) { userMoved = true; toast('WASD to walk · Shift to run · Esc or V to leave'); }
+  else if (why === 'refused') toast('Pointer lock refused — try V again in a second');
+  else { const fwd = new THREE.Vector3(); camera.getWorldDirection(fwd); orbit.target.copy(camera.position).addScaledVector(fwd, 30); orbit.update(); }
+});
 if (coarsePointer) { walkBtn.style.display = 'none'; $('walk-hint').textContent = 'Drag to orbit · pinch to zoom · tap a plaque to copy its code.'; }
-
 function enterWalk() {
-  if (coarsePointer || walking || !placed.length) { if (!placed.length) toast('Nothing to walk yet'); return; }
-  // Start just in front of where the orbit camera is looking, at ground + eye height.
+  if (coarsePointer || walk.active) return;
+  if (!placed.length) { toast('Nothing to walk yet'); return; }
   const t = orbit.target.clone();
-  const g = groundAt(t.x, t.z);
-  walkY = (g ?? 0) + EYE;
-  camera.position.set(t.x, walkY, t.z + 6);
-  camera.lookAt(t.x, walkY, t.z - 20);
+  walk.enterAt(new THREE.Vector3(t.x, t.y, t.z + 6), new THREE.Vector3(t.x, t.y, t.z - 20));
+}
+// Stand in a world: at the spot its picture was taken from when the export carried it, else at its plaque.
+function visitWorld(p) {
   userMoved = true;
-  walk.lock();   // orbit is disabled only once the lock is CONFIRMED (a refused lock must not strand the camera)
+  if (coarsePointer) { // orbit only: swing the camera to that world
+    orbit.target.copy(p.group.position).setY(p.group.position.y + 5);
+    camera.position.copy(orbit.target).add(new THREE.Vector3(p.radius * 1.2, p.radius * 0.8, p.radius * 1.2));
+    orbit.update(); showHere(p); return;
+  }
+  if (p.pose) {
+    const pos = p.pose.position.clone().add(p.shift).add(p.group.position);
+    walk.enterPose({ position: pos, forward: p.pose.forward, fov: null });
+  } else {
+    const at = p.plaque ? p.plaque.position.clone() : p.group.position.clone();
+    walk.enterAt(new THREE.Vector3(at.x, at.y, at.z + 4), new THREE.Vector3(p.group.position.x, at.y, p.group.position.z));
+  }
+  showHere(p);
 }
-document.addEventListener('pointerlockerror', () => { orbit.enabled = true; walking = false; toast('Pointer lock refused — try V again in a second'); });
-function exitWalk() {
-  if (!walking) return;
-  walk.unlock();
-}
-walk.addEventListener('lock', () => { walking = true; orbit.enabled = false; document.body.classList.add('walking'); walkBtn.textContent = 'Orbit (V)'; toast('WASD to walk · Shift to run · Esc or V to leave'); });
-walk.addEventListener('unlock', () => {
-  walking = false; keys.clear(); document.body.classList.remove('walking'); walkBtn.textContent = 'Walk (V)';
-  // Hand the orbit a target a little ahead of where you stood.
-  const fwd = new THREE.Vector3(); camera.getWorldDirection(fwd);
-  orbit.target.copy(camera.position).addScaledVector(fwd, 30);
-  orbit.enabled = true; orbit.update();
-});
-walkBtn.onclick = () => walking ? exitWalk() : enterWalk();
+walkBtn.onclick = () => walk.active ? walk.exit() : enterWalk();
 addEventListener('keydown', e => {
-  if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
-  if (e.code === 'KeyV') { walking ? exitWalk() : enterWalk(); return; }
-  keys.add(e.code);
+  if (!walk.onKey(e, true)) return;
+  if (e.code === 'KeyV') { walk.active ? walk.exit() : enterWalk(); }
+  else if (e.code === 'KeyH') { document.body.classList.toggle('clean'); }
 });
-addEventListener('keyup', e => keys.delete(e.code));
-function stepWalk(dt) {
-  const speed = (keys.has('ShiftLeft') || keys.has('ShiftRight')) ? 12 : 5;
-  let f = 0, r = 0;
-  if (keys.has('KeyW') || keys.has('ArrowUp')) f += 1;
-  if (keys.has('KeyS') || keys.has('ArrowDown')) f -= 1;
-  if (keys.has('KeyD') || keys.has('ArrowRight')) r += 1;
-  if (keys.has('KeyA') || keys.has('ArrowLeft')) r -= 1;
-  if (f || r) { const n = Math.hypot(f, r); walk.moveForward(f / n * speed * dt); walk.moveRight(r / n * speed * dt); }
-  // Ground follow: cast down from just above the eye so a step up is caught; with nothing below
-  // (the gap between worlds, or off an edge) hold the current height rather than falling forever.
-  const g = groundAt(camera.position.x, camera.position.z, camera.position.y + 3);
-  if (g !== null) walkY = g + EYE;
-  camera.position.y += (walkY - camera.position.y) * Math.min(1, dt * 12);
-}
+addEventListener('keyup', e => walk.onKey(e, false));
 
-// ── Plaque click → copy code ────────────────────────────────────────────────
+// ── Plaque click → visit that world ─────────────────────────────────────────
+const _ray = new THREE.Raycaster();
 let downAt = null;
 canvas.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
 canvas.addEventListener('pointerup', e => {
-  if (walking || !downAt) return;
+  if (walk.active || !downAt) return;
   const moved = Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]); downAt = null;
   if (moved > 6) return; // a drag, not a click
   const ndc = new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
   _ray.setFromCamera(ndc, camera); _ray.far = Infinity;
   const hit = _ray.intersectObjects(plaquesRoot.children, false)[0];
-  if (hit && hit.object.userData.world) {
-    const w = hit.object.userData.world;
-    if (w.code) copyText(w.code, `${w.name} — code copied`); else toast(w.name + (w.creator ? ' · by ' + w.creator : ''));
+  if (hit && hit.object.userData.placed) {
+    const p = hit.object.userData.placed;
+    if (!p.ok) { toast(p.w.name + ' could not be loaded'); return; }
+    visitWorld(p);
   }
 });
 
 // ── HUD wiring ──────────────────────────────────────────────────────────────
-$('b-reset').onclick = () => { exitWalk(); userMoved = false; frameRealm(); };
-$('t-wind').onchange = e => { uWindStrength.value = e.target.checked ? parseFloat($('r-wind').value) : 0; };
-$('r-wind').oninput = e => { if ($('t-wind').checked) uWindStrength.value = parseFloat(e.target.value); };
-$('t-fog').onchange = refreshFog;
-$('r-fog').oninput = refreshFog;
-$('r-sun').oninput = e => applySky(parseFloat(e.target.value));
-$('r-exp').oninput = e => { renderer.toneMappingExposure = parseFloat(e.target.value); };
+$('b-reset').onclick = () => { walk.exit(); userMoved = false; sunOverride = null; expOverride = null; frameRealm(); solveAtmosphere(true); };
+$('t-wind').onchange = e => { kit.uWindStrength.value = e.target.checked ? parseFloat($('r-wind').value) : 0; };
+$('r-wind').oninput = e => { if ($('t-wind').checked) kit.uWindStrength.value = parseFloat(e.target.value); };
+$('t-fog').onchange = e => { fogOn = e.target.checked; applyBlended(); };
+$('r-fog').oninput = e => { fogScale = parseFloat(e.target.value); applyBlended(); };
+$('r-sun').oninput = e => { sunOverride = parseFloat(e.target.value); applyBlended(); };
+$('r-exp').oninput = e => { expOverride = parseFloat(e.target.value); applyBlended(); };
+$('t-follow').onchange = () => solveAtmosphere(true);
+$('t-cinema').onchange = e => post.setEnabled(e.target.checked);
+$('cta').href = TA.steamLink('commons');
 let toastT;
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3000); }
-function resizeToViewport() { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); }
+post = TA.makePost(renderer, scene, camera);
+function resizeToViewport() { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); post.resize(innerWidth, innerHeight); }
 addEventListener('resize', resizeToViewport);
-renderer.setSize(innerWidth, innerHeight);
+resizeToViewport();
 $('b-fs').addEventListener('click', () => {
   if (document.fullscreenElement) document.exitFullscreen();
   else (document.documentElement.requestFullscreen ? document.documentElement.requestFullscreen() : Promise.reject()).catch(() => toast('Fullscreen is not available here.'));
 });
 document.addEventListener('fullscreenchange', () => requestAnimationFrame(resizeToViewport));
+applyBlended();
 
 // ── Entry: ?realm=URL (fetched) or ?r=<base64url JSON> (the link is the realm) ──
 (async () => {
@@ -829,12 +737,12 @@ const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = Math.min(0.1, clock.getDelta());
   if (!reduceMotion.matches) {
-    uWindTime.value += dt;
-    const t = uWindTime.value;
-    for (let i = 0; i < liquidLavaMats.length; i++) liquidLavaMats[i].emissiveIntensity = 1.3 + Math.sin(t * 0.8 + i) * 0.5;
+    kit.tick(dt);
+    for (const p of placed) if (p.anchors) TA.tickAnchors(p.anchors, kit.uWindTime.value);
   }
-  if (walking) stepWalk(dt); else orbit.update();
-  renderer.render(scene, camera);
+  if (walk.active) walk.step(dt); else orbit.update();
+  solveAtmosphere(false);
+  post.render();
 });
 </script>
 </body>
