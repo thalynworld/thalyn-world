@@ -388,7 +388,7 @@ function layout() {
   // Walkable meshes + their world-space boxes (used to prune the ground raycast).
   walkMeshes.length = 0;
   for (const p of placed) p.group.traverse(o => {
-    if (o.isMesh && !o.userData.__liquid) { walkMeshes.push({ mesh: o, box: new THREE.Box3().setFromObject(o) }); }
+    if (o.isMesh && !o.userData.__liquid && TA.isGroundMesh(o)) { walkMeshes.push({ mesh: o, box: new THREE.Box3().setFromObject(o) }); }
   });
   rebuildPlanks(spacing);
   rebuildPlaques();

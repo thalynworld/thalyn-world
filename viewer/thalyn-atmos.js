@@ -14,6 +14,13 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+// BVH-accelerated raycasting: an optimised single-file world merges into a handful of huge meshes
+// (a 13M-triangle ground-cover mesh was measured), and a per-frame linear raycast against that is
+// seconds per step. Trees are built lazily, only for meshes the ground probe actually touches.
+import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.6/build/index.module.js';
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
 export const SKY_MATERIAL = /^Thalyn_Sky_Baked/i;
 export const LIQUID = /^Thalyn_(Water|Lava)_Baked/i;
@@ -388,14 +395,36 @@ export function makeWalk(camera, dom, groundAt, onState) {
   return { enterAt, enterPose, exit, step, onKey, get active() { return walking; }, get flying() { return fly; }, ctl };
 }
 
-// A ground probe over a list of {mesh, box} entries (walk mode stands on these).
+// You stand on terrain, rock and built things — never on blades and petals. A mesh whose every
+// material is foliage is scenery for the eyes, not ground for the feet (and in an optimised world
+// it can be one enormous merged mesh that would make each step a full-mesh raycast).
+export function isGroundMesh(mesh) {
+  if (!mesh || !mesh.isMesh) return false;
+  const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  let any = false;
+  for (const m of mats) {
+    if (!m) continue;
+    any = true;
+    if (!FOLIAGE.test((m.name || '') + '|' + (mesh.name || ''))) return true; // one non-foliage material = walkable
+  }
+  return !any; // material-less mesh: keep (planks, plinths)
+}
+
+// A ground probe over a list of {mesh, box} entries (walk mode stands on these). Each touched mesh
+// gets a lazily-built BVH the first time a step lands on its footprint; the downward ray then takes
+// the first (= highest) hit instead of testing every triangle.
 export function makeGroundProbe(entries) {
   const ray = new THREE.Raycaster(); const down = new THREE.Vector3(0, -1, 0);
+  ray.firstHitOnly = true; // closest along a downward ray = the topmost surface
   return (x, z, fromY = 5000) => {
     ray.set(new THREE.Vector3(x, fromY, z), down); ray.far = fromY + 2000;
     let best = null;
     for (const e of entries) {
       if (x < e.box.min.x || x > e.box.max.x || z < e.box.min.z || z > e.box.max.z) continue;
+      const g = e.mesh.geometry;
+      if (g && !g.boundsTree && g.attributes.position && g.attributes.position.count > 3000) {
+        try { g.computeBoundsTree(); } catch (err) { /* fall back to linear */ }
+      }
       const hits = ray.intersectObject(e.mesh, false);
       if (hits.length && (best === null || hits[0].point.y > best)) best = hits[0].point.y;
     }

@@ -414,7 +414,7 @@ function ingest(gltf) {
 function rebuildWalkMeshes() {
   walkMeshes.length = 0;
   worldRoot.updateMatrixWorld(true);
-  worldRoot.traverse(o => { if (o.isMesh && !o.userData.__liquid) walkMeshes.push({ mesh: o, box: new THREE.Box3().setFromObject(o) }); });
+  worldRoot.traverse(o => { if (o.isMesh && !o.userData.__liquid && TA.isGroundMesh(o)) walkMeshes.push({ mesh: o, box: new THREE.Box3().setFromObject(o) }); });
 }
 
 function frameWorld(honourShot = true) {
