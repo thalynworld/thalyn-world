@@ -602,9 +602,14 @@ $('t-sound').onchange = e => {
   else $('s-sound').textContent = '';
 };
 // ── Share: link + QR for a URL-loaded world (a dragged local file has no address to share) ──
+// Share links go through the share service so a pasted link unfurls with THIS world's name and
+// creator (chat crawlers read tags, not JS); humans are redirected straight back to this viewer.
+const SHARE_BASE = 'https://thalyn-share.curly-disk-aea2.workers.dev/w/';
 function shareURL() {
-  const u = new URL(location.origin + location.pathname);
+  const u = new URL(SHARE_BASE);
   u.searchParams.set('model', currentModelURL);
+  const name = pendingThalyn && (pendingThalyn.worldName || pendingThalyn.sceneName);
+  if (name) u.searchParams.set('name', String(name).slice(0, 80));
   const cr = pendingThalyn && pendingThalyn.creator;
   if (cr) u.searchParams.set('by', cr);
   return u.toString();
