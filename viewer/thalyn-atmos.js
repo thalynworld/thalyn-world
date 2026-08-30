@@ -303,10 +303,12 @@ export function makePost(renderer, scene, camera) {
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.32, 0.55, 0.92);
   composer.addPass(bloom);
+  const shafts = new ShaderPass(SunShaftsShader);
+  composer.addPass(shafts);
   const grade = new ShaderPass(GradeShader);
   composer.addPass(grade);
   composer.addPass(new OutputPass());
-  let enabled = true, tone = 'serene';
+  let enabled = true, tone = 'serene', shaftStrength = 0;
   function setTone(t) {
     tone = TONE_GRADES[t] ? t : 'serene';
     const g = TONE_GRADES[tone];
@@ -316,10 +318,17 @@ export function makePost(renderer, scene, camera) {
   }
   setTone(tone);
   return {
-    composer, bloom, grade,
+    composer, bloom, grade, shafts,
     get enabled() { return enabled; }, setEnabled(v) { enabled = !!v; },
     setTone, get tone() { return tone; },
     setNight(n) { bloom.strength = TONE_GRADES[tone].bloom * (1 + 0.6 * clamp(n, 0, 1)); },
+    // Call once per frame: the sun's screen position (0..1) and a target strength (0 = off).
+    // Damped internally so shafts breathe in/out instead of popping at the frame edge.
+    setSunScreen(x, y, strength) {
+      shaftStrength += (clamp(strength, 0, 1) - shaftStrength) * 0.06;
+      shafts.uniforms.uSun.value.set(x, y);
+      shafts.uniforms.uStrength.value = enabled ? shaftStrength * 0.85 : 0;
+    },
     resize(w, h) { composer.setSize(w, h); grade.uniforms.uAspect.value = w / h; bloom.resolution.set(w, h); },
     render() { if (enabled) composer.render(); else renderer.render(scene, camera); },
   };
@@ -459,6 +468,126 @@ export function makeMaterialKit() {
   function reset() { windMaterials.length = 0; lavaMats.length = 0; }
   return { uWindTime, uWindStrength, windMaterials, lavaMats, patchFoliage, upgradeLiquid, tick, reset };
 }
+
+// ── Weather (rain / snow / storm / fog / dust / ash) ────────────────────────
+// Driven by the world's own `weather` string. Particles live in a wrap-around box that follows the
+// camera; heavy weather also dims the sun, thickens the haze and leans the wind. No lightning flashes
+// anywhere (deliberate — photosensitivity). Profiles cover every value the string can take.
+export const WEATHER_PROFILES = {
+  clear:     { rain: 0, snow: 0, dust: 0, fogMul: 1.0, sunDim: 1.0, wind: 0.0, shafts: true },
+  cloudy:    { rain: 0, snow: 0, dust: 0, fogMul: 1.3, sunDim: 0.75, wind: 0.2, shafts: true },
+  foggy:     { rain: 0, snow: 0, dust: 0, fogMul: 3.2, sunDim: 0.55, wind: 0.1, shafts: false },
+  lightrain: { rain: 500, snow: 0, dust: 0, fogMul: 1.5, sunDim: 0.7, wind: 0.35, shafts: false },
+  heavyrain: { rain: 1600, snow: 0, dust: 0, fogMul: 2.2, sunDim: 0.5, wind: 0.6, shafts: false },
+  storm:     { rain: 2600, snow: 0, dust: 0, fogMul: 2.6, sunDim: 0.38, wind: 1.0, shafts: false },
+  snow:      { rain: 0, snow: 900, dust: 0, fogMul: 1.6, sunDim: 0.8, wind: 0.25, shafts: false },
+  blizzard:  { rain: 0, snow: 2600, dust: 0, fogMul: 3.4, sunDim: 0.5, wind: 1.0, shafts: false },
+  dust:      { rain: 0, snow: 0, dust: 900, fogMul: 2.0, sunDim: 0.7, wind: 0.7, shafts: false },
+  ash:       { rain: 0, snow: 0, dust: 700, fogMul: 2.2, sunDim: 0.6, wind: 0.4, shafts: false, ash: true },
+};
+export function weatherKey(s) {
+  const k = String(s || '').toLowerCase().replace(/[^a-z]/g, '');
+  return WEATHER_PROFILES[k] ? k : 'clear';
+}
+const RAIN_MAX = 2600, FLAKE_MAX = 2600, BOX = 46, BOXY = 30;
+export function makeWeather(scene, camera) {
+  // Rain = line streaks; snow / dust = points. Buffers sized for the maximum; draw range set per profile.
+  const rainGeo = new THREE.BufferGeometry();
+  const rainPos = new Float32Array(RAIN_MAX * 6);
+  const rainSeed = new Float32Array(RAIN_MAX * 3);
+  for (let i = 0; i < RAIN_MAX; i++) { rainSeed[i * 3] = Math.random(); rainSeed[i * 3 + 1] = Math.random(); rainSeed[i * 3 + 2] = Math.random(); }
+  rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3).setUsage(THREE.DynamicDrawUsage));
+  const rain = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ color: 0x9fb4c8, transparent: true, opacity: 0.32, fog: false, depthWrite: false }));
+  rain.frustumCulled = false; rain.visible = false; rain.renderOrder = 900;
+
+  const flakeGeo = new THREE.BufferGeometry();
+  const flakePos = new Float32Array(FLAKE_MAX * 3);
+  const flakeSeed = new Float32Array(FLAKE_MAX * 3);
+  for (let i = 0; i < FLAKE_MAX; i++) { flakeSeed[i * 3] = Math.random(); flakeSeed[i * 3 + 1] = Math.random(); flakeSeed[i * 3 + 2] = Math.random(); }
+  flakeGeo.setAttribute('position', new THREE.BufferAttribute(flakePos, 3).setUsage(THREE.DynamicDrawUsage));
+  const flakes = new THREE.Points(flakeGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2.4, sizeAttenuation: false, transparent: true, opacity: 0.85, fog: false, depthWrite: false }));
+  flakes.frustumCulled = false; flakes.visible = false; flakes.renderOrder = 900;
+  scene.add(rain, flakes);
+
+  let profile = WEATHER_PROFILES.clear, key = 'clear', t = 0, level = 0, target = 0;
+  function set(weatherString) {
+    key = weatherKey(weatherString);
+    profile = WEATHER_PROFILES[key];
+    target = (profile.rain || profile.snow || profile.dust) ? 1 : 0;
+    if (profile.snow || profile.dust) {
+      flakes.material.size = profile.dust ? 1.6 : 2.4;
+      flakes.material.color.set(profile.ash ? 0x8a8a8a : (profile.dust ? 0xcbb27a : 0xffffff));
+      flakes.material.opacity = profile.dust ? 0.5 : 0.85;
+    }
+  }
+  function tick(dt, windStrength) {
+    t += dt;
+    level += (target - level) * Math.min(1, dt * 2);
+    const c = camera.position;
+    const lean = (0.35 + windStrength) * profile.wind * 10; // metres of sideways drift over a fall
+    const nRain = Math.round((profile.rain || 0) * level);
+    rain.visible = nRain > 0;
+    if (rain.visible) {
+      for (let i = 0; i < nRain; i++) {
+        const sx = rainSeed[i * 3], sy = rainSeed[i * 3 + 1], sz = rainSeed[i * 3 + 2];
+        const speed = 34 + sz * 14;
+        const y = BOXY - (((sy * BOXY * 4) + t * speed) % BOXY);
+        const x = ((sx * BOX * 2 + t * lean) % (BOX * 2)) - BOX;
+        const z = (sz * BOX * 2) - BOX;
+        const j = i * 6;
+        rainPos[j] = c.x + x; rainPos[j + 1] = c.y + y; rainPos[j + 2] = c.z + z;
+        rainPos[j + 3] = c.x + x - lean * 0.02; rainPos[j + 4] = c.y + y + 0.9 + sz * 0.5; rainPos[j + 5] = c.z + z;
+      }
+      rainGeo.setDrawRange(0, nRain * 2);
+      rainGeo.attributes.position.needsUpdate = true;
+    }
+    const nFlake = Math.round(((profile.snow || 0) + (profile.dust || 0)) * level);
+    flakes.visible = nFlake > 0;
+    if (flakes.visible) {
+      const fall = profile.dust ? 1.6 : 2.6;
+      for (let i = 0; i < nFlake; i++) {
+        const sx = flakeSeed[i * 3], sy = flakeSeed[i * 3 + 1], sz = flakeSeed[i * 3 + 2];
+        const y = BOXY - (((sy * BOXY * 4) + t * (fall + sz * 1.5)) % BOXY);
+        const sway = Math.sin(t * (0.6 + sx) + sx * 9) * (1.4 + profile.wind * 2);
+        const x = ((sx * BOX * 2 + t * lean * 0.7) % (BOX * 2)) - BOX + sway;
+        const z = ((sz * BOX * 2 + Math.cos(t * 0.5 + sz * 7) * 1.2) % (BOX * 2)) - BOX;
+        const j = i * 3;
+        flakePos[j] = c.x + x; flakePos[j + 1] = c.y + y; flakePos[j + 2] = c.z + z;
+      }
+      flakeGeo.setDrawRange(0, nFlake);
+      flakeGeo.attributes.position.needsUpdate = true;
+    }
+  }
+  return { set, tick, get key() { return key; }, get profile() { return profile; },
+           get fogMul() { return profile.fogMul; }, get sunDim() { return profile.sunDim; },
+           get windFloor() { return profile.wind; }, get shaftsOk() { return profile.shafts; } };
+}
+
+// ── Sun shafts (screen-space radial scatter toward the sun) ─────────────────
+// A light-weight god-ray approximation: the thresholded frame is smeared toward the sun's screen
+// position with exponential decay and added back. No occlusion pre-pass — the threshold keeps it to
+// the sky/bright band, and it fades as the sun leaves the frame or drops to the horizon.
+export const SunShaftsShader = {
+  uniforms: { tDiffuse: { value: null }, uSun: { value: new THREE.Vector2(0.5, 0.5) },
+              uStrength: { value: 0.0 }, uDecay: { value: 0.94 }, uThreshold: { value: 0.55 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform vec2 uSun; uniform float uStrength, uDecay, uThreshold; varying vec2 vUv;
+    void main(){
+      vec4 base = texture2D(tDiffuse, vUv);
+      if (uStrength <= 0.001) { gl_FragColor = base; return; }
+      vec2 delta = (uSun - vUv) / 32.0;
+      vec2 uv = vUv; float w = 1.0; vec3 acc = vec3(0.0);
+      for (int i = 0; i < 32; i++) {
+        uv += delta;
+        vec3 s = texture2D(tDiffuse, uv).rgb;
+        float l = dot(s, vec3(0.2126, 0.7152, 0.0722));
+        acc += s * max(0.0, l - uThreshold) * w;
+        w *= uDecay;
+      }
+      gl_FragColor = vec4(base.rgb + acc * (uStrength / 32.0) * 3.0, base.a);
+    }`
+};
 
 export const STEAM_URL = 'https://store.steampowered.com/app/4581800/Thalyn/';
 export function steamLink(source) {

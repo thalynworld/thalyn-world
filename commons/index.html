@@ -203,8 +203,11 @@ function applyBlended() {
   const s = Object.assign({}, blended);
   if (sunOverride !== null) { TA.sunFromElevation(s, sunOverride); }
   if (expOverride !== null) s.exposure = expOverride;
-  s.fogDensity = blended.fogDensity * fogScale;
-  TA.applyState(s, L, renderer, scene, fogOn);
+  s.fogDensity = blended.fogDensity * fogScale * weather.fogMul;   // the nearest world's weather thickens the haze
+  s.sunIntensity = s.sunIntensity * weather.sunDim;                // …and dims the sun
+  if (weather.fogMul > 1.05 && !(blended.fogDensity > 0)) s.fogDensity = (1.2 / Math.max(1, realmRadius)) * (weather.fogMul - 1);
+  kit.uWindStrength.value = Math.max(kit.uWindStrength.value, weather.windFloor * 1.4);
+  TA.applyState(s, L, renderer, scene, fogOn || weather.fogMul > 1.05);
   L.sky.visible = !skyEnv.active;
   if (post) { post.setTone(s.tone); post.setNight(s.night); $('s-grade').textContent = s.hasBlock ? s.tone : ''; }
 }
@@ -218,6 +221,8 @@ loader.setDRACOLoader(draco);
 loader.setMeshoptDecoder(MeshoptDecoder);
 
 const kit = TA.makeMaterialKit();
+const weather = TA.makeWeather(scene, camera);   // the world you are nearest lends its weather too
+const _sunV = new THREE.Vector3();
 
 // ── Realm manifest ──────────────────────────────────────────────────────────
 // { name, gap, worlds:[{ url, slot, name, creator, code }] }
@@ -496,6 +501,7 @@ function solveAtmosphere(force) {
   // Nearest world's baked sky becomes the dome (swapped, not blended — a texture can't be lerped cheaply).
   const top = placed[order[0][1]];
   skyEnv.useDome(top.dome || null);
+  weather.set(top.tx ? top.tx.weather : '');   // walking into a stormy world brings its storm with it
   if (top.w.slot !== hereSlot) {
     hereSlot = top.w.slot;
     document.querySelectorAll('#worlds li').forEach(li => li.classList.toggle('here', +li.dataset.slot === hereSlot));
@@ -739,9 +745,14 @@ renderer.setAnimationLoop(() => {
   if (!reduceMotion.matches) {
     kit.tick(dt);
     for (const p of placed) if (p.anchors) TA.tickAnchors(p.anchors, kit.uWindTime.value);
+    weather.tick(dt, kit.uWindStrength.value);
   }
   if (walk.active) walk.step(dt); else orbit.update();
   solveAtmosphere(false);
+  _sunV.copy(blended.sunDir).multiplyScalar(2000).add(camera.position).project(camera);
+  const shaftsOn = weather.shaftsOk && blended.sunDir.y > 0.04 && blended.night < 0.5
+    && _sunV.z < 1 && Math.abs(_sunV.x) < 1.25 && Math.abs(_sunV.y) < 1.25;
+  post.setSunScreen((_sunV.x + 1) / 2, (_sunV.y + 1) / 2, shaftsOn ? 0.55 : 0);
   post.render();
 });
 </script>

@@ -92,6 +92,22 @@
   <button id="b-shot" style="display:none" title="Walk to where the picture was taken (V leaves)">Stand where the picture was taken</button>
   <div class="row"><label><input type="checkbox" id="t-cinema" checked /> Cinematic</label>
     <span class="stat" id="s-grade"></span></div>
+  <div class="row"><label>Weather</label>
+    <select id="r-weather" title="As exported, or try another sky on this world">
+      <option value="">As exported</option>
+      <option value="Clear">Clear</option>
+      <option value="Cloudy">Cloudy</option>
+      <option value="Foggy">Foggy</option>
+      <option value="LightRain">Light rain</option>
+      <option value="HeavyRain">Heavy rain</option>
+      <option value="Storm">Storm</option>
+      <option value="Snow">Snow</option>
+      <option value="Blizzard">Blizzard</option>
+      <option value="Dust">Dust</option>
+      <option value="Ash">Ash</option>
+    </select></div>
+  <details id="w-details" style="display:none"><summary>World details</summary>
+    <div class="sub" id="w-details-body" style="white-space:pre-line; margin-top:4px"></div></details>
   <div class="row"><label><input type="checkbox" id="t-wind" /> Wind</label>
     <input type="range" id="r-wind" min="0" max="2" step="0.05" value="1" /></div>
   <div class="row"><label><input type="checkbox" id="t-sky" checked /> Sky &amp; sun</label></div>
@@ -196,8 +212,11 @@ let state = TA.defaultState(worldRadius);   // the applied state
 let fogOn = false, fogScale = 1;
 function apply() {
   const s = Object.assign({}, state);
-  s.fogDensity = state.fogDensity * fogScale;
-  TA.applyState(s, L, renderer, scene, fogOn);
+  s.fogDensity = state.fogDensity * fogScale * weather.fogMul;   // heavy weather thickens the haze
+  s.sunIntensity = state.sunIntensity * weather.sunDim;          // …and dims the sun
+  if (weather.fogMul > 1.05 && !(state.fogDensity > 0)) s.fogDensity = (1.2 / Math.max(1, worldRadius)) * (weather.fogMul - 1);
+  kit.uWindStrength.value = Math.max(kit.uWindStrength.value, weather.windFloor * 1.4); // storms lean the trees
+  TA.applyState(s, L, renderer, scene, fogOn || weather.fogMul > 1.05);
   L.sky.visible = skyOn && !skyEnv.active;
   $('r-exp').value = renderer.toneMappingExposure;
   $('r-sun').value = Math.min(0.95, Math.max(0.05, state.sunDir.y));
@@ -209,6 +228,32 @@ function apply() {
 let pendingThalyn = null, pendingAtmos = null;
 let anchorRoot = null, shotPose = null;
 const kit = TA.makeMaterialKit();
+const weather = TA.makeWeather(scene, camera);
+let fileWeather = '', weatherOverride = '';
+const _sunV = new THREE.Vector3();
+function setWeather() { weather.set(weatherOverride || fileWeather); apply(); }
+// World details: everything the file says about itself, in one flat panel.
+function fillDetails(tx) {
+  const el = $('w-details'), body = $('w-details-body');
+  if (!el || !body) return;
+  const st = tx.stats || {};
+  const rows = [];
+  const add = (k, v) => { if (v !== undefined && v !== null && v !== '' && v !== 0) rows.push(k + ': ' + v); };
+  add('Mood', tx.tone); add('Time', tx.clock); add('Weather', tx.weather);
+  if (Array.isArray(st.worldSizeMetersXZ) && st.worldSizeMetersXZ.length === 2)
+    add('Size', Math.round(st.worldSizeMetersXZ[0]) + ' × ' + Math.round(st.worldSizeMetersXZ[1]) + ' m' + (st.sizeTier ? ' (' + st.sizeTier + ')' : ''));
+  if (st.worldAreaM2 > 0) add('Ground', (st.worldAreaM2 / 10000).toFixed(1) + ' ha');
+  add('Terrain', st.topologyCategory);
+  if (st.biomeCount > 0) add('Biomes', st.biomeCount + (Array.isArray(st.biomeNames) && st.biomeNames.length ? ' — ' + st.biomeNames.slice(0, 8).join(', ') : ''));
+  if (Array.isArray(st.species))
+    for (const s of st.species.slice(0, 8)) if (s && s.count > 0) add(String(s.name || '').replace(/^Species_/, ''), s.count.toLocaleString());
+  if (st.speciesTotal > 0) add('Living things', st.speciesTotal.toLocaleString());
+  add('Seed', tx.seed || st.worldSeed);
+  if ((tx.anchors || []).length) add('Placed by hand', tx.anchors.length);
+  add('Exported', (tx.exportedAt || '').slice(0, 10));
+  el.style.display = rows.length ? '' : 'none';
+  body.textContent = rows.join('\n');
+}
 
 // Older numeric block (sun/fog/wind) — still honoured when no full block is present.
 function applyAtmosphere(a) {
@@ -248,6 +293,10 @@ function applyThalynBlock(tx) {
   try {
     state = TA.stateFromBlock(tx, worldRadius);
     fogOn = state.fogDensity > 0;
+    fileWeather = tx.weather || '';
+    const wsel = $('r-weather'); if (wsel && !weatherOverride) wsel.value = '';
+    weather.set(weatherOverride || fileWeather);
+    fillDetails(tx);
     apply();
     if (tx.water && tx.water.present) TA.tintWater(tx.water, worldRoot, kit.lavaMats);
     if (anchorRoot && anchorRoot.parent) anchorRoot.parent.remove(anchorRoot);
@@ -327,6 +376,8 @@ function resetAtmosphere() {
   $('b-postcard').style.display = 'none'; $('b-shot').style.display = 'none';
   state = TA.defaultState(worldRadius); TA.sunFromElevation(state, 0.55);
   fogOn = false; fogScale = 1; kit.uWindStrength.value = 0;
+  fileWeather = ''; weather.set(weatherOverride || '');
+  const wd = $('w-details'); if (wd) { wd.style.display = 'none'; wd.open = false; }
   $('t-wind').checked = false; $('r-wind').value = 1; $('r-fog').value = 1;
   apply();
 }
@@ -487,6 +538,7 @@ $('r-fog').oninput = e => { fogScale = parseFloat(e.target.value); apply(); };
 $('t-rotate').onchange = e => { controls.autoRotate = e.target.checked; controls.autoRotateSpeed = 0.6; };
 $('r-sun').oninput = e => { TA.sunFromElevation(state, parseFloat(e.target.value)); apply(); };
 $('t-cinema').onchange = e => { post.setEnabled(e.target.checked); };
+$('r-weather').onchange = e => { weatherOverride = e.target.value; setWeather(); toast(weatherOverride ? 'Weather: ' + e.target.options[e.target.selectedIndex].text : 'Weather: as exported'); };
 // Live colour controls — tone mapping shapes saturation/contrast; exposure = brightness.
 // (Tone mapping is compiled into each material's shader, so a change must flag loaded materials for recompile.)
 const TONEMAPS = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping, reinhard: THREE.ReinhardToneMapping, linear: THREE.LinearToneMapping, none: THREE.NoToneMapping };
@@ -570,10 +622,16 @@ if (atmosUrl) { const s = safeURL(atmosUrl); if (s) fetchAtmos(s); }
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = Math.min(0.1, clock.getDelta());
-  if (!reduceMotion.matches) {           // freeze ambient wind/water/lava motion under "reduce motion"
+  if (!reduceMotion.matches) {           // freeze ambient wind/water/lava/weather motion under "reduce motion"
     kit.tick(dt);
     TA.tickAnchors(anchorRoot, kit.uWindTime.value);
+    weather.tick(dt, kit.uWindStrength.value);
   }
+  // Sun shafts: aim the radial pass at the sun's screen position; fade out off-screen / at night / in weather.
+  _sunV.copy(state.sunDir).multiplyScalar(2000).add(camera.position).project(camera);
+  const shaftsOn = skyOn && weather.shaftsOk && state.sunDir.y > 0.04 && state.night < 0.5
+    && _sunV.z < 1 && Math.abs(_sunV.x) < 1.25 && Math.abs(_sunV.y) < 1.25;
+  post.setSunScreen((_sunV.x + 1) / 2, (_sunV.y + 1) / 2, shaftsOn ? 0.55 : 0);
   if (walk.active) walk.step(dt); else controls.update();
   post.render();
 });
