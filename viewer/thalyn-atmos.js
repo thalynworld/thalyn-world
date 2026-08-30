@@ -182,7 +182,9 @@ export function applyState(s, L, renderer, scene, fogOn = true) {
     if (scene.fog && scene.fog.isFogExp2) { scene.fog.color.copy(s.fogColor); scene.fog.density = s.fogDensity; }
     else scene.fog = new THREE.FogExp2(s.fogColor.getHex(), s.fogDensity);
   } else scene.fog = null;
-  L.stars.visible = s.night > 0.35 && !scene.background; // the baked night sky already has its stars
+  // Stars at night — including over a baked night dome (the bake carries the sky's colour, but the
+  // moon and stars are drawn objects, not the sky material, so a night bake is honestly near-black).
+  L.stars.visible = s.night > 0.35;
   if (L.stars.visible) L.stars.material.opacity = clamp((s.night - 0.35) / 0.4, 0, 1);
 }
 // Sun elevation from a slider (0..1) keeping the current azimuth — the HUD's "Sun" control.
