@@ -19,7 +19,21 @@
   Meshopt and Draco. Embedded in /demo/ via an <iframe> + postMessage bridge.
 -->
 <style>
-  :root { --gold: #E8C66A; --ink: #0d1411; --panel: rgba(13,20,17,0.82); --ash: #9DBCAC; --line: rgba(232,198,106,0.30); }
+  :root { --gold: #E8C66A; --ink: #0d1411; --panel: rgba(13,20,17,0.82); --ash: #9DBCAC; --line: rgba(232,198,106,0.30); color-scheme: dark; }
+  select { background: rgba(255,255,255,0.06); color: #e8efe9; border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+  select option { background: #101915; color: #e8efe9; }
+  #loadbar { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 30; pointer-events: none; }
+  #loadbar > i { display: block; height: 100%; width: 0; background: var(--gold); box-shadow: 0 0 8px rgba(232,198,106,0.8); transition: width .2s; }
+  #share-panel { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 40; width: 300px;
+    padding: 16px; background: var(--panel); border: 1px solid rgba(232,198,106,0.45); border-radius: 14px;
+    backdrop-filter: blur(10px); text-align: center; display: none; }
+  #share-panel.show { display: block; }
+  #share-panel h2 { margin: 0 0 10px; font: 600 15px Georgia, serif; color: var(--gold); }
+  #share-qr { background: #fff; border-radius: 8px; padding: 8px; display: inline-block; }
+  #share-link { width: 100%; margin: 10px 0 6px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line);
+    background: rgba(255,255,255,0.05); color: #e8efe9; font-size: 11px; font-family: ui-monospace, Consolas, monospace; }
+  #share-panel button { width: 48%; margin: 4px 1%; padding: 7px; border-radius: 8px; cursor: pointer;
+    background: rgba(232,198,106,0.14); color: var(--gold); border: 1px solid rgba(232,198,106,0.45); font-size: 13px; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1411; color: #e8efe9;
     font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif; }
@@ -79,6 +93,13 @@
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="loadbar" aria-hidden="true"><i></i></div>
+<div id="share-panel" role="dialog" aria-label="Share this world">
+  <h2>Share this world</h2>
+  <div id="share-qr"><canvas id="share-qr-canvas"></canvas></div>
+  <input id="share-link" type="text" readonly />
+  <div><button id="share-copy">Copy link</button><button id="share-close">Close</button></div>
+</div>
 <div id="cross" aria-hidden="true"></div>
 <div id="title" aria-hidden="true"><div class="n" id="title-n"></div><div class="s" id="title-s"></div></div>
 
@@ -90,6 +111,8 @@
   <div class="sub" id="w-sky" style="display:none"></div>
   <button id="b-postcard" style="display:none" title="Copy the postcard code — paste it into Thalyn to regrow this world">Copy postcard code</button>
   <button id="b-shot" style="display:none" title="Walk to where the picture was taken (V leaves)">Stand where the picture was taken</button>
+  <button id="b-share-w" style="display:none" title="Copy a link + QR for this world">Share this world…</button>
+  <div class="row"><label><input type="checkbox" id="t-sound" /> Sound</label><span class="stat" id="s-sound"></span></div>
   <div class="row"><label><input type="checkbox" id="t-cinema" checked /> Cinematic</label>
     <span class="stat" id="s-grade"></span></div>
   <div class="row"><label>Weather</label>
@@ -156,6 +179,7 @@
 </button>
 <input type="file" id="file" accept=".glb,.gltf" multiple style="display:none" />
 
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js" integrity="sha384-8FWZA6BGMXhsfO+BLtrJK0We6gg5o1JyO8xQm6peWDEUs17ACA5ziE/NIAkl9z2k" crossorigin="anonymous"></script>
 <script type="importmap">
 {
   "imports": {
@@ -173,6 +197,7 @@ import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { VRButton } from 'three/addons/webxr/VRButton.js';
 import * as TA from './thalyn-atmos.js';
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
@@ -196,6 +221,12 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 100000);
 camera.position.set(40, 30, 40);
+// VR rig: the camera lives in a dolly. Outside VR the dolly sits at the origin, so nothing changes;
+// in VR the dolly is the body (thumbstick locomotion) and the headset drives the camera inside it.
+renderer.xr.enabled = true;
+const dolly = new THREE.Group();
+dolly.add(camera);
+scene.add(dolly);
 
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
@@ -235,6 +266,7 @@ function apply() {
   $('r-sun').value = Math.min(0.95, Math.max(0.05, state.sunDir.y));
   $('t-fog').checked = fogOn;
   if (post) { post.setTone(state.tone); post.setNight(state.night); $('s-grade').textContent = state.tone; }
+  if (audio.enabled) audio.setScene(state.tone, state.night, weather.key, kit.uWindStrength.value);
 }
 
 // ── The Thalyn block ─────────────────────────────────────────────────────────
@@ -242,7 +274,8 @@ let pendingThalyn = null, pendingAtmos = null;
 let anchorRoot = null, shotPose = null;
 const kit = TA.makeMaterialKit();
 const weather = TA.makeWeather(scene, camera);
-let fileWeather = '', weatherOverride = '';
+const audio = TA.makeAudioBeds('audio/');
+let fileWeather = '', weatherOverride = '', currentModelURL = null;
 const _sunV = new THREE.Vector3();
 function setWeather() { weather.set(weatherOverride || fileWeather); apply(); }
 // World details: everything the file says about itself, in one flat panel.
@@ -252,6 +285,7 @@ function fillDetails(tx) {
   const st = tx.stats || {};
   const rows = [];
   const add = (k, v) => { if (v !== undefined && v !== null && v !== '' && v !== 0) rows.push(k + ': ' + v); };
+  add('Woven by', tx.creator);
   add('Mood', tx.tone); add('Time', tx.clock); add('Weather', tx.weather);
   if (Array.isArray(st.worldSizeMetersXZ) && st.worldSizeMetersXZ.length === 2)
     add('Size', Math.round(st.worldSizeMetersXZ[0]) + ' × ' + Math.round(st.worldSizeMetersXZ[1]) + ' m' + (st.sizeTier ? ' (' + st.sizeTier + ')' : ''));
@@ -329,7 +363,7 @@ function applyThalynBlock(tx) {
                                catch (e) { toast('Copy failed — ' + code); } };
     shotPose = TA.cameraPose(tx);
     $('b-shot').style.display = (shotPose && !coarsePointer) ? '' : 'none';
-    showTitle(name, [tx.tone, tx.clock, tx.weather].filter(Boolean).join(' · '));
+    showTitle(name, [tx.creator ? 'woven by ' + String(tx.creator).slice(0, 40) : '', tx.tone, tx.clock, tx.weather].filter(Boolean).join(' · '));
     $('cta').classList.add('show');
     console.info('[thalyn] extras.thalyn applied ' + JSON.stringify({ tone: tx.tone, clock: tx.clock, weather: tx.weather, anchors: (tx.anchors || []).length, dome: !!skyEnv.active, shot: !!shotPose, night: +state.night.toFixed(2) }));
   } catch (e) { console.warn('[thalyn] extras block apply failed (ignored)', e); }
@@ -465,9 +499,17 @@ function frameWorld(honourShot = true) {
 
 function loadFromURL(url, name) {
   toast('Loading ' + (name || url) + ' …');
-  loader.load(url, gltf => { ingest(gltf); frameWorld(); toast('Loaded ' + (name || '') ); $('empty').style.display = 'none';
+  const bar = document.querySelector('#loadbar > i');
+  if (bar) bar.style.width = '2%';
+  loader.load(url, gltf => {
+      if (bar) { bar.style.width = '100%'; setTimeout(() => { bar.style.width = '0'; }, 600); }
+      currentModelURL = url;
+      $('b-share-w').style.display = '';
+      ingest(gltf); frameWorld(); toast('Loaded ' + (name || '') ); $('empty').style.display = 'none';
       postUp({ type: 'thalyn:loaded', label: name || '', meshes: meshCount }); },
-    undefined, err => { console.error(err); toast('Failed: ' + (err?.message || err));
+    ev => { if (bar && ev && ev.total) bar.style.width = Math.min(96, Math.round(ev.loaded / ev.total * 100)) + '%';
+            else if (bar && ev && ev.loaded) bar.style.width = Math.min(96, Math.round(ev.loaded / 2097152)) + '%'; },
+    err => { console.error(err); if (bar) bar.style.width = '0'; toast('Failed: ' + (err?.message || err));
       postUp({ type: 'thalyn:error', message: 'This world could not be loaded.' }); });
 }
 
@@ -553,6 +595,33 @@ $('r-sun').oninput = e => { TA.sunFromElevation(state, parseFloat(e.target.value
 $('t-cinema').onchange = e => { post.setEnabled(e.target.checked); };
 $('r-weather').onchange = e => { weatherOverride = e.target.value; setWeather(); toast(weatherOverride ? 'Weather: ' + e.target.options[e.target.selectedIndex].text : 'Weather: as exported'); };
 $('r-look').onchange = e => { post.setLook(e.target.value); post.setNight(state.night); toast('Look: ' + e.target.options[e.target.selectedIndex].text); };
+// ── Sound (starts only on this gesture — browsers require it) ────────────────
+$('t-sound').onchange = e => {
+  audio.setEnabled(e.target.checked);
+  if (e.target.checked) { audio.setScene(state.tone, state.night, weather.key, kit.uWindStrength.value); $('s-sound').textContent = state.tone; toast('Sound on — the bed follows the world'); }
+  else $('s-sound').textContent = '';
+};
+// ── Share: link + QR for a URL-loaded world (a dragged local file has no address to share) ──
+function shareURL() {
+  const u = new URL(location.origin + location.pathname);
+  u.searchParams.set('model', currentModelURL);
+  const cr = pendingThalyn && pendingThalyn.creator;
+  if (cr) u.searchParams.set('by', cr);
+  return u.toString();
+}
+$('b-share-w').onclick = () => {
+  if (!currentModelURL) { toast('Load a world from a link first — a local file has no address to share'); return; }
+  const link = shareURL();
+  $('share-link').value = link;
+  try {
+    const qr = window.qrcode(0, 'M'); // qrcode-generator: auto type, medium correction
+    qr.addData(link); qr.make();
+    $('share-qr').innerHTML = qr.createImgTag(4, 8);
+  } catch (e) { console.warn('qr', e); $('share-qr').textContent = 'QR unavailable — copy the link'; }
+  $('share-panel').classList.add('show');
+};
+$('share-copy').onclick = async () => { try { await navigator.clipboard.writeText($('share-link').value); toast('Link copied'); } catch (e) { toast('Copy failed — select it by hand'); } };
+$('share-close').onclick = () => $('share-panel').classList.remove('show');
 // Live colour controls — tone mapping shapes saturation/contrast; exposure = brightness.
 // (Tone mapping is compiled into each material's shader, so a change must flag loaded materials for recompile.)
 const TONEMAPS = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping, reinhard: THREE.ReinhardToneMapping, linear: THREE.LinearToneMapping, none: THREE.NoToneMapping };
@@ -582,6 +651,47 @@ function resizeToViewport() {
 }
 addEventListener('resize', resizeToViewport);
 resizeToViewport();
+
+// ── VR (WebXR): the button appears only where a headset is reachable ─────────
+let snapCooldown = 0;
+const _xrFwd = new THREE.Vector3(), _xrRight = new THREE.Vector3();
+if (navigator.xr && navigator.xr.isSessionSupported) {
+  navigator.xr.isSessionSupported('immersive-vr').then(ok => { if (ok) document.body.appendChild(VRButton.createButton(renderer)); }).catch(() => {});
+}
+renderer.xr.addEventListener('sessionstart', () => {
+  walk.exit();
+  const t = controls.target;
+  const g = groundAt(t.x, t.z, t.y + 200);
+  dolly.position.set(t.x, g !== null ? g : t.y, t.z);
+  toast('Left stick walks · right stick snap-turns');
+});
+renderer.xr.addEventListener('sessionend', () => {
+  camera.position.set(dolly.position.x + 30, dolly.position.y + 20, dolly.position.z + 30);
+  controls.target.set(dolly.position.x, dolly.position.y + 2, dolly.position.z);
+  dolly.position.set(0, 0, 0);
+  dolly.rotation.set(0, 0, 0);
+  controls.update();
+  requestAnimationFrame(resizeToViewport);
+});
+function stepXR(dt) {
+  const session = renderer.xr.getSession(); if (!session) return;
+  snapCooldown = Math.max(0, snapCooldown - dt);
+  let mx = 0, mz = 0, turn = 0;
+  for (const src of session.inputSources) {
+    const a = src.gamepad && src.gamepad.axes; if (!a || a.length < 2) continue;
+    const x = a.length >= 4 ? a[2] : a[0], y = a.length >= 4 ? a[3] : a[1];
+    if (src.handedness === 'right') { if (Math.abs(x) > 0.6 && snapCooldown === 0) { turn = Math.sign(x); snapCooldown = 0.35; } }
+    else { mx += x; mz += y; }
+  }
+  if (turn) dolly.rotateY(-turn * Math.PI / 6);
+  if (Math.abs(mx) > 0.12 || Math.abs(mz) > 0.12) {
+    camera.getWorldDirection(_xrFwd); _xrFwd.y = 0; if (_xrFwd.lengthSq() > 0.001) _xrFwd.normalize();
+    _xrRight.set(-_xrFwd.z, 0, _xrFwd.x);
+    dolly.position.addScaledVector(_xrFwd, -mz * dt * 3.5).addScaledVector(_xrRight, mx * dt * 3.5);
+  }
+  const g = groundAt(dolly.position.x, dolly.position.z, dolly.position.y + 5);
+  if (g !== null) dolly.position.y += (g - dolly.position.y) * Math.min(1, dt * 8);
+}
 
 // ── Fullscreen toggle (bottom-right) ──────────────────────────────────────────
 // Works standalone and embedded (the parent iframe carries allow="fullscreen").
@@ -646,8 +756,13 @@ renderer.setAnimationLoop(() => {
   const shaftsOn = skyOn && weather.shaftsOk && state.sunDir.y > 0.04 && state.night < 0.5
     && _sunV.z < 1 && Math.abs(_sunV.x) < 1.25 && Math.abs(_sunV.y) < 1.25;
   post.setSunScreen((_sunV.x + 1) / 2, (_sunV.y + 1) / 2, shaftsOn ? 0.55 : 0);
-  if (walk.active) walk.step(dt); else controls.update();
-  post.render();
+  if (renderer.xr.isPresenting) {
+    stepXR(dt);
+    renderer.render(scene, camera); // the cinematic pass doesn't run in a headset — raw stereo render
+  } else {
+    if (walk.active) walk.step(dt); else controls.update();
+    post.render();
+  }
 });
 </script>
 </body>

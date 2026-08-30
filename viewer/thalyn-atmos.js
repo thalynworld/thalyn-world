@@ -585,10 +585,11 @@ export function makeWeather(scene, camera) {
       flakes.material.opacity = profile.dust ? 0.5 : 0.85;
     }
   }
+  const _camW = new THREE.Vector3();
   function tick(dt, windStrength) {
     t += dt;
     level += (target - level) * Math.min(1, dt * 2);
-    const c = camera.position;
+    const c = camera.getWorldPosition(_camW); // world position — correct in VR too, where camera sits in a rig
     const lean = (0.35 + windStrength) * profile.wind * 10; // metres of sideways drift over a fall
     const nRain = Math.round((profile.rain || 0) * level);
     rain.visible = nRain > 0;
@@ -653,6 +654,65 @@ export const SunShaftsShader = {
       gl_FragColor = vec4(base.rgb + acc * (uStrength / 32.0) * 3.0, base.a);
     }`
 };
+
+// ── Ambient audio beds ──────────────────────────────────────────────────────
+// Starts only on a user gesture (the Sound toggle). Tries a recorded bed at audio/<tone>.mp3 first
+// (drop files in later — absence is silent, not an error); until one exists, a procedural bed plays:
+// filtered noise as wind, a second band as rain when the weather calls for it. Everything is gain-
+// ramped so toggles and weather changes breathe instead of clicking.
+export function makeAudioBeds(baseUrl = 'audio/') {
+  let ctx = null, master = null, windGain = null, rainGain = null, el = null, elTone = '';
+  let enabled = false, tone = 'serene', night = 0, wkey = 'clear', wind = 0;
+  function ensure() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain(); master.gain.value = 0.0; master.connect(ctx.destination);
+    const len = ctx.sampleRate * 2;
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; } // brown-ish
+    const mk = (type, freq, q) => {
+      const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+      const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+      const g = ctx.createGain(); g.gain.value = 0;
+      src.connect(f); f.connect(g); g.connect(master); src.start();
+      return g;
+    };
+    windGain = mk('lowpass', 420, 0.6);
+    rainGain = mk('bandpass', 2400, 0.5);
+    // A slow breath on the wind so it never reads as a constant hiss.
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.07;
+    const lfoG = ctx.createGain(); lfoG.gain.value = 0.12;
+    lfo.connect(lfoG); lfoG.connect(windGain.gain); lfo.start();
+  }
+  function ramp(g, v, t = 1.2) { if (g && ctx) g.gain.setTargetAtTime(v, ctx.currentTime, t); }
+  function refresh() {
+    if (!enabled) return;
+    ensure();
+    if (ctx.state === 'suspended') ctx.resume();
+    const rain = /rain|storm/.test(wkey) ? (wkey === 'storm' ? 0.16 : (wkey === 'heavyrain' ? 0.12 : 0.07)) : 0;
+    const windLvl = 0.10 + 0.10 * Math.min(2, wind) + (/blizzard|storm|dust/.test(wkey) ? 0.10 : 0);
+    ramp(master, 0.9); ramp(windGain, windLvl); ramp(rainGain, rain);
+    // Recorded bed, when one exists for this tone — layered under the procedural weather.
+    if (el && elTone !== tone) { el.pause(); el = null; }
+    if (!el) {
+      const a = new Audio(baseUrl + tone + '.mp3');
+      a.loop = true; a.volume = 0.0;
+      a.play().then(() => { el = a; elTone = tone; const fade = setInterval(() => { a.volume = Math.min(0.5, a.volume + 0.05); if (a.volume >= 0.5) clearInterval(fade); }, 120); })
+       .catch(() => { /* no recorded bed for this tone — the procedural bed carries it */ });
+    }
+  }
+  return {
+    setEnabled(v) {
+      enabled = !!v;
+      if (enabled) refresh();
+      else { if (master && ctx) ramp(master, 0, 0.4); if (el) { el.pause(); el = null; elTone = ''; } }
+    },
+    get enabled() { return enabled; },
+    setScene(t, n, w, ws) { tone = t || 'serene'; night = n || 0; wkey = w || 'clear'; wind = ws || 0; refresh(); },
+  };
+}
 
 export const STEAM_URL = 'https://store.steampowered.com/app/4581800/Thalyn/';
 export function steamLink(source) {
