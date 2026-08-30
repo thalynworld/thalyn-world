@@ -289,19 +289,38 @@ export const TONE_GRADES = {
 };
 const GradeShader = {
   uniforms: { tDiffuse: { value: null }, uTint: { value: new THREE.Vector3(1, 1, 1) }, uSat: { value: 1 },
-              uVig: { value: 0.3 }, uLift: { value: 0 }, uAspect: { value: 1 } },
+              uVig: { value: 0.3 }, uLift: { value: 0 }, uAspect: { value: 1 }, uCon: { value: 1 },
+              uSplitS: { value: new THREE.Vector3(1, 1, 1) }, uSplitH: { value: new THREE.Vector3(1, 1, 1) } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform vec3 uTint; uniform float uSat, uVig, uLift, uAspect; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform vec3 uTint, uSplitS, uSplitH;
+    uniform float uSat, uVig, uLift, uAspect, uCon; varying vec2 vUv;
     void main(){
       vec4 c = texture2D(tDiffuse, vUv);
       float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
       vec3 col = mix(vec3(l), c.rgb, uSat) * uTint + uLift;
+      col = (col - 0.18) * uCon + 0.18;                       // contrast about mid grey (pre-tonemap)
+      float lm = clamp(dot(col, vec3(0.2126, 0.7152, 0.0722)) * 1.4, 0.0, 1.0);
+      col *= mix(uSplitS, uSplitH, lm);                       // split-tone: shadows vs highlights
       vec2 q = (vUv - 0.5) * vec2(uAspect, 1.0);
       float v = smoothstep(0.35, 1.05, length(q));
       col *= 1.0 - uVig * v;
-      gl_FragColor = vec4(col, c.a);
+      gl_FragColor = vec4(max(col, 0.0), c.a);
     }`
+};
+// Film looks — parameter-fitted grades in the spirit of the app's looks (parameters only; nothing shipped
+// as a LUT). 'auto' = the world's mood chooses (TONE_GRADES); every other look overrides it.
+export const LOOKS = {
+  auto:      null,
+  golden:    { tint: [1.08, 1.00, 0.86], sat: 1.10, con: 1.04, lift: 0.010, vig: 0.30, bloom: 0.42, splitS: [1.00, 0.97, 0.92], splitH: [1.06, 1.01, 0.90] },
+  silver:    { tint: [0.99, 1.00, 1.02], sat: 0.55, con: 1.10, lift: 0.000, vig: 0.34, bloom: 0.26, splitS: [0.96, 0.98, 1.04], splitH: [1.02, 1.02, 1.00] },
+  verdant:   { tint: [0.97, 1.04, 0.96], sat: 1.16, con: 1.02, lift: 0.008, vig: 0.24, bloom: 0.34, splitS: [0.95, 1.02, 0.97], splitH: [1.02, 1.03, 0.96] },
+  noir:      { tint: [1.00, 1.00, 1.00], sat: 0.00, con: 1.22, lift: -0.012, vig: 0.55, bloom: 0.22, splitS: [0.98, 0.99, 1.03], splitH: [1.01, 1.01, 1.00] },
+  tealamber: { tint: [1.02, 1.00, 0.99], sat: 1.06, con: 1.08, lift: 0.000, vig: 0.32, bloom: 0.36, splitS: [0.90, 1.00, 1.08], splitH: [1.10, 1.01, 0.88] },
+  bleach:    { tint: [1.00, 1.00, 1.00], sat: 0.55, con: 1.20, lift: -0.006, vig: 0.30, bloom: 0.30, splitS: [0.98, 0.99, 1.00], splitH: [1.03, 1.03, 1.01] },
+  pastel:    { tint: [1.03, 1.00, 1.02], sat: 0.85, con: 0.90, lift: 0.030, vig: 0.14, bloom: 0.45, splitS: [1.02, 0.99, 1.04], splitH: [1.03, 1.01, 1.00] },
+  ember:     { tint: [1.10, 0.96, 0.88], sat: 1.05, con: 1.10, lift: -0.006, vig: 0.42, bloom: 0.50, splitS: [1.04, 0.94, 0.88], splitH: [1.10, 1.00, 0.86] },
+  moonlit:   { tint: [0.92, 0.97, 1.10], sat: 0.80, con: 1.06, lift: -0.004, vig: 0.44, bloom: 0.55, splitS: [0.90, 0.95, 1.10], splitH: [1.00, 1.01, 1.05] },
 };
 export function makePost(renderer, scene, camera) {
   const size = renderer.getSize(new THREE.Vector2());
@@ -315,20 +334,30 @@ export function makePost(renderer, scene, camera) {
   const grade = new ShaderPass(GradeShader);
   composer.addPass(grade);
   composer.addPass(new OutputPass());
-  let enabled = true, tone = 'serene', shaftStrength = 0;
-  function setTone(t) {
-    tone = TONE_GRADES[t] ? t : 'serene';
-    const g = TONE_GRADES[tone];
+  let enabled = true, tone = 'serene', look = 'auto', shaftStrength = 0;
+  function applyGrade() {
+    const t = TONE_GRADES[tone] || TONE_GRADES.serene;
+    const g = (look !== 'auto' && LOOKS[look]) ? LOOKS[look] : t;
     grade.uniforms.uTint.value.set(g.tint[0], g.tint[1], g.tint[2]);
     grade.uniforms.uSat.value = g.sat; grade.uniforms.uVig.value = g.vig; grade.uniforms.uLift.value = g.lift;
+    grade.uniforms.uCon.value = g.con || 1;
+    const ss = g.splitS || [1, 1, 1], sh = g.splitH || [1, 1, 1];
+    grade.uniforms.uSplitS.value.set(ss[0], ss[1], ss[2]);
+    grade.uniforms.uSplitH.value.set(sh[0], sh[1], sh[2]);
     bloom.strength = g.bloom;
   }
-  setTone(tone);
+  function setTone(t) { tone = TONE_GRADES[t] ? t : 'serene'; applyGrade(); }
+  function setLook(k) { look = LOOKS.hasOwnProperty(k) ? k : 'auto'; applyGrade(); }
+  applyGrade();
   return {
     composer, bloom, grade, shafts,
     get enabled() { return enabled; }, setEnabled(v) { enabled = !!v; },
     setTone, get tone() { return tone; },
-    setNight(n) { bloom.strength = TONE_GRADES[tone].bloom * (1 + 0.6 * clamp(n, 0, 1)); },
+    setLook, get look() { return look; },
+    setNight(n) {
+      const g = (look !== 'auto' && LOOKS[look]) ? LOOKS[look] : (TONE_GRADES[tone] || TONE_GRADES.serene);
+      bloom.strength = g.bloom * (1 + 0.6 * clamp(n, 0, 1));
+    },
     // Call once per frame: the sun's screen position (0..1) and a target strength (0 = off).
     // Damped internally so shafts breathe in/out instead of popping at the frame edge.
     setSunScreen(x, y, strength) {
@@ -451,12 +480,17 @@ export function makeMaterialKit() {
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uWindTime = uWindTime; shader.uniforms.uWindStrength = uWindStrength;
       shader.vertexShader = 'uniform float uWindTime;\nuniform float uWindStrength;\n' + shader.vertexShader;
+      // An optimised world merges foliage into big world-space meshes, so vertex height is height above
+      // the ORIGIN, not above a tree's root — an uncapped height factor swung whole canopies metres wide
+      // ("twirling"). Cap the lever arm and ripple the phase at leaf scale so the canopy shimmers in
+      // patches instead of moving as one body.
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>',
         `#include <begin_vertex>
-         float _wph = transformed.x * 0.35 + transformed.z * 0.35;
-         float _h = max(transformed.y, 0.0);
-         transformed.x += sin(uWindTime * 1.6 + _wph) * uWindStrength * _h * 0.06;
-         transformed.z += cos(uWindTime * 1.3 + _wph) * uWindStrength * _h * 0.045;`);
+         float _wph = transformed.x * 1.9 + transformed.z * 1.5;
+         float _h = clamp(transformed.y, 0.0, 2.5);
+         float _wamp = uWindStrength * _h;
+         transformed.x += (sin(uWindTime * 1.6 + _wph) + 0.5 * sin(uWindTime * 3.1 + _wph * 2.7)) * _wamp * 0.035;
+         transformed.z += (cos(uWindTime * 1.3 + _wph) + 0.5 * cos(uWindTime * 2.6 + _wph * 2.3)) * _wamp * 0.028;`);
     };
     mat.needsUpdate = true;
     windMaterials.push(mat);

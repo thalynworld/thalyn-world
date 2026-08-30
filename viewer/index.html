@@ -115,6 +115,19 @@
     <input type="range" id="r-fog" min="0" max="2" step="0.02" value="1" /></div>
   <div class="row"><label><input type="checkbox" id="t-rotate" /> Auto-rotate</label></div>
   <div class="row"><label>Sun</label><input type="range" id="r-sun" min="0.05" max="0.95" step="0.01" value="0.55" /></div>
+  <div class="row"><label>Look</label>
+    <select id="r-look" title="Film look — Auto lets the world's mood choose">
+      <option value="auto">Auto (mood)</option>
+      <option value="golden">Golden Hour</option>
+      <option value="silver">Silver Halide</option>
+      <option value="verdant">Verdant</option>
+      <option value="tealamber">Teal &amp; Amber</option>
+      <option value="bleach">Bleach Bypass</option>
+      <option value="pastel">Pastel</option>
+      <option value="ember">Ember</option>
+      <option value="moonlit">Moonlit</option>
+      <option value="noir">Noir</option>
+    </select></div>
   <div class="row"><label>Tone</label>
     <select id="r-tone">
       <option value="aces">Filmic (ACES)</option>
@@ -539,6 +552,7 @@ $('t-rotate').onchange = e => { controls.autoRotate = e.target.checked; controls
 $('r-sun').oninput = e => { TA.sunFromElevation(state, parseFloat(e.target.value)); apply(); };
 $('t-cinema').onchange = e => { post.setEnabled(e.target.checked); };
 $('r-weather').onchange = e => { weatherOverride = e.target.value; setWeather(); toast(weatherOverride ? 'Weather: ' + e.target.options[e.target.selectedIndex].text : 'Weather: as exported'); };
+$('r-look').onchange = e => { post.setLook(e.target.value); post.setNight(state.night); toast('Look: ' + e.target.options[e.target.selectedIndex].text); };
 // Live colour controls — tone mapping shapes saturation/contrast; exposure = brightness.
 // (Tone mapping is compiled into each material's shader, so a change must flag loaded materials for recompile.)
 const TONEMAPS = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping, reinhard: THREE.ReinhardToneMapping, linear: THREE.LinearToneMapping, none: THREE.NoToneMapping };
