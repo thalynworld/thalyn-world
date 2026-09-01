@@ -17,6 +17,13 @@
   Loads one or many .glb at once (drag-drop / file picker / ?model=URL); drop a
   whole export folder and it reassembles at the origin. Supports KTX2 (Basis),
   Meshopt and Draco. Embedded in /demo/ via an <iframe> + postMessage bridge.
+
+  A world's own waterfalls run, its water and tree cover sound from where they
+  are, and ?session=… lets two people share the same world: wisps with name
+  tags, one cinema screen with a synced showing, push-to-talk voice.
+  Quality is one tier table (Desktop / Laptop / Phone) every effect obeys;
+  ?q=high|laptop|lite forces it, ?perf=1 shows a frame-time read-out,
+  ?hidehud=1 hides every panel for filming.
 -->
 <style>
   :root { --gold: #E8C66A; --ink: #0d1411; --panel: rgba(13,20,17,0.82); --ash: #9DBCAC; --line: rgba(232,198,106,0.30); color-scheme: dark; }
@@ -88,7 +95,36 @@
     background: var(--gold); opacity: 0; pointer-events: none; box-shadow: 0 0 0 1px rgba(0,0,0,0.6); }
   body.walking #cross { opacity: 0.9; }
   body.walking #hud, body.walking #cta, body.walking #b-fs { opacity: 0.2; pointer-events: none; }
-  body.clean #hud, body.clean #cta, body.clean #b-fs, body.clean #title { opacity: 0; pointer-events: none; }
+  body.clean #hud, body.clean #cta, body.clean #b-fs, body.clean #title, body.clean #tg { opacity: 0; pointer-events: none; }
+  #hud input[type=range].vol { width: 70px; }
+  #tg { right: 14px; bottom: 64px; width: 250px; padding: 12px 14px; max-height: calc(100vh - 100px); overflow-y: auto; display: none; z-index: 12; }
+  #tg.show { display: block; }
+  #tg h2 { margin: 0 0 6px; font: 600 14px Georgia, serif; color: var(--gold); }
+  #tg .st { color: var(--ash); font-size: 12px; margin-bottom: 6px; min-height: 16px; }
+  #tg .peers { font-size: 12px; color: #cfe0d7; margin-bottom: 6px; }
+  #tg button { width: 100%; margin-top: 6px; padding: 7px; border-radius: 8px; cursor: pointer; background: rgba(232,198,106,0.14); color: var(--gold); border: 1px solid rgba(232,198,106,0.45); font-size: 13px; }
+  #tg button:hover { background: rgba(232,198,106,0.24); }
+  #tg .half { display: flex; gap: 6px; } #tg .half button { width: 50%; }
+  #tg input[type=text] { width: 100%; margin-top: 6px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: #e8efe9; font-size: 12px; }
+  #tg select { width: 100%; margin-top: 6px; }
+  #tg .hint { color: var(--ash); font-size: 11px; margin-top: 6px; }
+  #tg .host-only { display: none; } #tg.host .host-only { display: block; } #tg.host .half.host-only { display: flex; }
+  #tg-ptt { position: fixed; right: 14px; bottom: 64px; z-index: 13; width: 74px; height: 74px; border-radius: 50%; display: none; align-items: center; justify-content: center;
+    background: rgba(13,20,17,0.7); border: 2px solid rgba(232,198,106,0.6); color: var(--gold); font-size: 12px; user-select: none; -webkit-user-select: none; touch-action: none; }
+  #tg-ptt.show { display: flex; } #tg-ptt.on { background: rgba(232,198,106,0.55); color: #1a1205; }
+  #tg-join { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 45; width: 320px; padding: 18px; background: var(--panel);
+    border: 1px solid rgba(232,198,106,0.45); border-radius: 14px; backdrop-filter: blur(10px); display: none; }
+  #tg-join.show { display: block; }
+  #tg-join h2 { margin: 0 0 6px; font: 600 16px Georgia, serif; color: var(--gold); }
+  #tg-join p { margin: 6px 0; font-size: 13px; color: #cfe0d7; }
+  #tg-join input[type=text] { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: #e8efe9; font-size: 14px; }
+  #tg-join label { display: block; font-size: 12px; color: var(--ash); margin: 8px 0; }
+  #tg-join .consent { font-size: 12px; color: var(--gold); }
+  #tg-join button { width: 100%; margin-top: 10px; padding: 9px; border-radius: 8px; cursor: pointer; background: rgba(232,198,106,0.2); color: var(--gold); border: 1px solid rgba(232,198,106,0.5); font-size: 14px; }
+  #tg-showing { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); z-index: 14; padding: 10px 18px; border-radius: 10px; cursor: pointer; display: none;
+    background: rgba(232,198,106,0.22); color: var(--gold); border: 1px solid rgba(232,198,106,0.6); font-size: 14px; backdrop-filter: blur(8px); }
+  #tg-showing.show { display: block; }
+  body.walking #tg { opacity: 0.25; pointer-events: none; }
 </style>
 </head>
 <body>
@@ -100,6 +136,31 @@
   <input id="share-link" type="text" readonly />
   <div><button id="share-copy">Copy link</button><button id="share-close">Close</button></div>
 </div>
+<div id="tg-join" role="dialog" aria-label="Join this world together">
+  <h2>Come on in</h2>
+  <p id="tg-join-world">Someone has invited you into their world.</p>
+  <input id="tg-name" type="text" maxlength="24" placeholder="Your name (shown above your wisp)" />
+  <label><input type="checkbox" id="tg-voice" checked /> Push-to-talk voice — hold <b>T</b> (or the button on a phone).<br/><span class="consent"></span></label>
+  <button id="tg-go">Join</button>
+</div>
+<div id="tg" class="panel" aria-label="Together">
+  <h2>Together</h2>
+  <div class="st" id="tg-status">Connecting…</div>
+  <div class="peers" id="tg-peers"></div>
+  <button id="tg-invite">Copy invite link</button>
+  <div class="half"><button id="tg-wave" title="G">Wave (G)</button><button id="tg-leave">Leave</button></div>
+  <div class="host-only">
+    <div class="half host-only"><button id="tg-place">Place the screen here</button><button id="tg-remove">Remove screen</button></div>
+    <input id="tg-url" type="text" placeholder="Paste a YouTube link or a .mp4 / .webm link" />
+    <div class="half host-only"><button id="tg-load">Load</button><button id="tg-playpause">Play</button></div>
+    <div class="half host-only"><button id="tg-back">−10 s</button><button id="tg-fwd">+10 s</button></div>
+    <div class="half host-only"><button id="tg-sync">Sync everyone</button><button id="tg-size">Screen size</button></div>
+    <select id="tg-pass" title="Hand the remote to someone"><option value="">Pass the remote to…</option></select>
+  </div>
+  <div class="hint" id="tg-hint">Hold T to talk · G to wave · the host holds the remote</div>
+</div>
+<button id="tg-showing" type="button">Tap to join the showing</button>
+<div id="tg-ptt" role="button" aria-label="Hold to talk">HOLD<br/>TO TALK</div>
 <div id="cross" aria-hidden="true"></div>
 <div id="title" aria-hidden="true"><div class="n" id="title-n"></div><div class="s" id="title-s"></div></div>
 
@@ -112,7 +173,17 @@
   <button id="b-postcard" style="display:none" title="Copy the postcard code — paste it into Thalyn to regrow this world">Copy postcard code</button>
   <button id="b-shot" style="display:none" title="Walk to where the picture was taken (V leaves)">Stand where the picture was taken</button>
   <button id="b-share-w" style="display:none" title="Copy a link + QR for this world">Share this world…</button>
-  <div class="row"><label><input type="checkbox" id="t-sound" /> Sound</label><span class="stat" id="s-sound"></span></div>
+  <button id="b-together" style="display:none" title="Invite someone into this world with you — a link they open in any browser">Invite a friend here…</button>
+  <div class="row"><label><input type="checkbox" id="t-sound" /> Sound</label>
+    <input type="range" id="r-vol" class="vol" min="0" max="1" step="0.05" value="0.9" title="Volume" /><span class="stat" id="s-sound"></span></div>
+  <div class="row"><label>Quality</label>
+    <select id="r-quality" title="Desktop / Laptop / Phone — every effect budgets against this">
+      <option value="auto">Auto</option>
+      <option value="high">Desktop</option>
+      <option value="laptop">Laptop</option>
+      <option value="lite">Phone</option>
+    </select></div>
+  <div class="sub" id="s-quality"></div>
   <div class="row"><label><input type="checkbox" id="t-cinema" checked /> Cinematic</label>
     <span class="stat" id="s-grade"></span></div>
   <div class="row"><label>Weather</label>
@@ -199,6 +270,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
 import * as TA from './thalyn-atmos.js';
+import * as TG from './thalyn-together.js';
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const $ = id => document.getElementById(id);
@@ -274,7 +346,8 @@ let pendingThalyn = null, pendingAtmos = null;
 let anchorRoot = null, shotPose = null;
 const kit = TA.makeMaterialKit();
 const weather = TA.makeWeather(scene, camera);
-const audio = TA.makeAudioBeds('audio/');
+const audio = TA.makeSoundscape('audio/');   // beds + positional voices (waterfalls / shores / canopies)
+const waterfalls = TA.makeWaterfalls(scene);
 let fileWeather = '', weatherOverride = '', currentModelURL = null;
 const _sunV = new THREE.Vector3();
 function setWeather() { weather.set(weatherOverride || fileWeather); apply(); }
@@ -348,6 +421,13 @@ function applyThalynBlock(tx) {
     if (tx.water && tx.water.present) TA.tintWater(tx.water, worldRoot, kit.lavaMats);
     if (anchorRoot && anchorRoot.parent) anchorRoot.parent.remove(anchorRoot);
     anchorRoot = TA.buildAnchors(tx.anchors, worldRoot);
+    // Living worlds: the falls the world measured run; water edges, falls and tree cover sound from where they are.
+    const lv = tx.living && tx.living.present ? tx.living : null;
+    const shallow = tx.water && TA.rgbOf(tx.water.shallow);
+    const fallTint = shallow ? shallow.clone().lerp(new THREE.Color(0.92, 0.96, 0.98), 0.55) : new THREE.Color(0.62, 0.82, 0.9);
+    const nFalls = waterfalls.build(lv ? lv.waterfalls : null, fallTint);
+    audio.setWorld({ waterfalls: lv ? lv.waterfalls : [], liquids: tx.liquids || [], canopies: lv ? lv.canopies : [] });
+    if (lv) console.info('[thalyn] living: ' + nFalls + ' waterfall(s) built of ' + ((lv.waterfalls || []).length) + ', ' + ((lv.canopies || []).length) + ' canopy zone(s), ' + audio.sources + ' sound source(s)');
     // HUD: world name · tone · clock · weather, the postcard code, the shot.
     const name = String(tx.worldName || tx.sceneName || 'Thalyn world').slice(0, 40);
     $('w-row').style.display = '';
@@ -365,7 +445,8 @@ function applyThalynBlock(tx) {
     $('b-shot').style.display = (shotPose && !coarsePointer) ? '' : 'none';
     showTitle(name, [tx.creator ? 'woven by ' + String(tx.creator).slice(0, 40) : '', tx.tone, tx.clock, tx.weather].filter(Boolean).join(' · '));
     $('cta').classList.add('show');
-    console.info('[thalyn] extras.thalyn applied ' + JSON.stringify({ tone: tx.tone, clock: tx.clock, weather: tx.weather, anchors: (tx.anchors || []).length, dome: !!skyEnv.active, shot: !!shotPose, night: +state.night.toFixed(2) }));
+    console.info('[thalyn] extras.thalyn applied ' + JSON.stringify({ tone: tx.tone, clock: tx.clock, weather: tx.weather, anchors: (tx.anchors || []).length, dome: !!skyEnv.active, shot: !!shotPose, night: +state.night.toFixed(2), falls: waterfalls.count }));
+    if (together) $('tg-join-world').textContent = `${together.isHost ? 'You are hosting' : 'You have been invited into'} “${name}”.`;
   } catch (e) { console.warn('[thalyn] extras block apply failed (ignored)', e); }
 }
 
@@ -405,6 +486,8 @@ function clearWorld() {
   walkMeshes.length = 0;
   kit.reset();
   skyEnv.useDome(null);
+  waterfalls.clear();
+  audio.setWorld(null);
 }
 
 // Dispose the old world AND zero the HUD readouts, so a fully-failed load doesn't leave stale counts.
@@ -504,7 +587,7 @@ function loadFromURL(url, name) {
   loader.load(url, gltf => {
       if (bar) { bar.style.width = '100%'; setTimeout(() => { bar.style.width = '0'; }, 600); }
       currentModelURL = url;
-      $('b-share-w').style.display = '';
+      $('b-share-w').style.display = ''; $('b-together').style.display = '';
       ingest(gltf); frameWorld(); toast('Loaded ' + (name || '') ); $('empty').style.display = 'none';
       postUp({ type: 'thalyn:loaded', label: name || '', meshes: meshCount }); },
     ev => { if (bar && ev && ev.total) bar.style.width = Math.min(96, Math.round(ev.loaded / ev.total * 100)) + '%';
@@ -562,12 +645,12 @@ async function loadFiles(fileList) {
 const walk = TA.makeWalk(camera, document.body, groundAt, (on, why) => {
   document.body.classList.toggle('walking', on);
   controls.enabled = !on;
-  $('b-walk').textContent = on ? 'Orbit (V)' : 'Walk (V)';
-  if (on) toast('WASD to walk · Shift to run · E/Q up/down · F back to ground · Esc or V to leave');
+  $('b-walk').textContent = on ? (coarsePointer ? 'Stop walking' : 'Orbit (V)') : (coarsePointer ? 'Walk' : 'Walk (V)');
+  if (on) toast(coarsePointer ? 'Left thumb walks · right thumb looks · push far to run' : 'WASD to walk · Shift to run · E/Q up/down · F back to ground · Esc or V to leave');
   else if (why === 'refused') toast('Pointer lock refused — try V again in a second');
   else { const fwd = new THREE.Vector3(); camera.getWorldDirection(fwd); controls.target.copy(camera.position).addScaledVector(fwd, 30); controls.update(); }
-});
-if (coarsePointer) $('b-walk').style.display = 'none';
+}, { touch: coarsePointer });
+if (coarsePointer) $('b-walk').textContent = 'Walk';
 function toggleWalk() {
   if (walk.active) { walk.exit(); return; }
   if (!walkMeshes.length) { toast('Load a world first'); return; }
@@ -598,9 +681,10 @@ $('r-look').onchange = e => { post.setLook(e.target.value); post.setNight(state.
 // ── Sound (starts only on this gesture — browsers require it) ────────────────
 $('t-sound').onchange = e => {
   audio.setEnabled(e.target.checked);
-  if (e.target.checked) { audio.setScene(state.tone, state.night, weather.key, kit.uWindStrength.value); $('s-sound').textContent = state.tone; toast('Sound on — the bed follows the world'); }
+  if (e.target.checked) { audio.setVolume(parseFloat($('r-vol').value)); audio.setScene(state.tone, state.night, weather.key, kit.uWindStrength.value); $('s-sound').textContent = state.tone; toast(audio.sources ? 'Sound on — falls, shores and birds from where they are' : 'Sound on — the bed follows the world'); }
   else $('s-sound').textContent = '';
 };
+$('r-vol').oninput = e => audio.setVolume(parseFloat(e.target.value));
 // ── Share: link + QR for a URL-loaded world (a dragged local file has no address to share) ──
 // Share links go through the share service so a pasted link unfurls with THIS world's name and
 // creator (chat crawlers read tags, not JS); humans are redirected straight back to this viewer.
@@ -641,8 +725,10 @@ addEventListener('keydown', e => {
   if (!walk.onKey(e, true)) return;
   if (e.code === 'KeyV') { toggleWalk(); }
   else if (e.code === 'KeyH') { document.body.classList.toggle('clean'); }
+  else if (e.code === 'KeyT' && together && !e.repeat) { together.voice.setTalking(true); $('tg-ptt').classList.add('on'); }
+  else if (e.code === 'KeyG' && together && !e.repeat) { together.wave(); toast('You waved'); }
 });
-addEventListener('keyup', e => walk.onKey(e, false));
+addEventListener('keyup', e => { walk.onKey(e, false); if (e.code === 'KeyT' && together) { together.voice.setTalking(false); $('tg-ptt').classList.remove('on'); } });
 
 let toastT;
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
@@ -656,6 +742,28 @@ function resizeToViewport() {
 }
 addEventListener('resize', resizeToViewport);
 resizeToViewport();
+
+// ── Quality: ONE tier table every effect registers against ───────────────────
+// Nothing sizes itself. Pixel ratio, shadows, MSAA, bloom, shafts, weather density, waterfall spray and
+// count, and the positional-audio voice cap all read the same row (TA.TIERS); Auto picks by device.
+const paramsEarly = new URLSearchParams(location.search);
+const tier = TA.makeTier(renderer, paramsEarly.get('q') || (() => { try { return localStorage.getItem('thalyn.viewer.q') || ''; } catch (e) { return ''; } })());
+tier.on((t, name) => {
+  renderer.setPixelRatio(Math.min(devicePixelRatio, t.pixelRatio));
+  renderer.shadowMap.enabled = t.shadows; L.sun.castShadow = t.shadows;
+  if (L.sun.shadow.mapSize.x !== t.shadowMap) { L.sun.shadow.mapSize.set(t.shadowMap, t.shadowMap); if (L.sun.shadow.map) { L.sun.shadow.map.dispose(); L.sun.shadow.map = null; } }
+  weather.setBudget(t.weather);
+  waterfalls.setBudget(t);
+  audio.setVoiceCap(t.voices);
+  post.setQuality(t);
+  $('r-quality').value = tier.auto ? 'auto' : name;
+  $('s-quality').textContent = (tier.auto ? 'Auto → ' : '') + t.label + (tier.auto && tier.guess.why ? ' (' + tier.guess.why + ')' : '');
+  resizeToViewport();
+  console.info('[thalyn] quality tier ' + name + (tier.auto ? ' (auto: ' + tier.guess.why + ')' : ' (forced)'));
+});
+$('r-quality').onchange = e => { tier.set(e.target.value); try { localStorage.setItem('thalyn.viewer.q', e.target.value === 'auto' ? '' : e.target.value); } catch (err) {} toast('Quality: ' + e.target.options[e.target.selectedIndex].text); };
+const perf = paramsEarly.get('perf') === '1' ? TA.makePerfHud(renderer) : null;
+if (paramsEarly.get('hidehud') === '1') document.body.classList.add('clean');
 
 // ── VR (WebXR): the button appears only where a headset is reachable ─────────
 let snapCooldown = 0;
@@ -730,6 +838,84 @@ addEventListener('message', (e) => {
 });
 postUp({ type: 'thalyn:ready' }); // announce once on startup (parent also pings as a fallback)
 
+// ── Together: ?session=<token> shares this world with whoever holds the link ──────────────────
+// The relay is a small worker (workers/together in the site repo); RELAY_BASE follows it. ?relay= overrides
+// (local testing). Nothing here runs without a session.
+const RELAY_BASE = 'https://thalyn-together.curly-disk-aea2.workers.dev';
+let together = null;
+const tgEl = $('tg');
+function tgRefresh() {
+  if (!together) return;
+  const c = together.cinema;
+  tgEl.classList.toggle('host', together.isHost);
+  const peers = together.peers;
+  $('tg-peers').textContent = peers.length ? 'Here with you: ' + peers.map(p => p.name).join(', ') : 'No one else here yet — send the invite link';
+  $('tg-playpause').textContent = c.playing ? 'Pause' : 'Play';
+  $('tg-showing').classList.toggle('show', c.hasShowing && !c.joined);
+  $('tg-ptt').classList.toggle('show', coarsePointer && together.voice.wanted);
+  const sel = $('tg-pass');
+  if (sel.options.length !== peers.length + 1) { sel.innerHTML = '<option value="">Pass the remote to…</option>' + peers.map(p => `<option value="${p.id}">${p.name.replace(/[<>&"]/g, '')}</option>`).join(''); }
+}
+function startTogether(session, name, voice) {
+  if (together) together.close();
+  const relay = (() => { const r = paramsEarly.get('relay'); if (!r) return RELAY_BASE; try { const u = new URL(r); return (u.protocol === 'https:' || u.hostname === 'localhost' || u.hostname === '127.0.0.1') ? u.origin : RELAY_BASE; } catch (e) { return RELAY_BASE; } })();
+  together = TG.makeTogether({ relay, session, name, camera, scene, dom: document.body, voice,
+    onStatus: t => { $('tg-status').textContent = t; tgRefresh(); },
+    onPeers: () => tgRefresh(), onHost: () => tgRefresh() });
+  tgEl.classList.add('show');
+  $('b-together').textContent = 'Invite link…';
+  const u = new URL(location.href); u.searchParams.set('session', session); history.replaceState(null, '', u.toString());
+  if (!$('t-sound').checked) { $('t-sound').checked = true; $('t-sound').onchange({ target: $('t-sound') }); } // the join click is the gesture
+  tgRefresh();
+}
+function showInvite() {
+  if (!together) return;
+  const link = together.inviteURL();
+  $('share-link').value = link;
+  try { const qr = window.qrcode(0, 'M'); qr.addData(link); qr.make(); $('share-qr').innerHTML = qr.createImgTag(4, 8); }
+  catch (e) { $('share-qr').textContent = 'QR unavailable — copy the link'; }
+  $('share-panel').querySelector('h2').textContent = 'Invite a friend here';
+  $('share-panel').classList.add('show');
+}
+function askToJoin(session, hosting) {
+  const box = $('tg-join');
+  $('tg-join-world').textContent = hosting ? 'Choose the name your friend will see above your wisp.' : 'Someone has invited you into their world.';
+  box.querySelector('.consent').textContent = TG.CONSENT_LINE;
+  try { $('tg-name').value = localStorage.getItem('thalyn.viewer.name') || ''; } catch (e) {}
+  box.classList.add('show'); $('tg-name').focus();
+  $('tg-go').onclick = () => {
+    const name = ($('tg-name').value || '').trim() || 'Someone';
+    try { localStorage.setItem('thalyn.viewer.name', name); } catch (e) {}
+    box.classList.remove('show');
+    startTogether(session, name, $('tg-voice').checked);
+    if (hosting) showInvite();
+  };
+}
+$('b-together').onclick = () => {
+  if (together) { showInvite(); return; }
+  if (!currentModelURL) { toast('Load a world from a link first — a friend needs an address to open'); return; }
+  askToJoin(TG.mintSession(), true);
+};
+$('tg-invite').onclick = showInvite;
+$('tg-wave').onclick = () => { if (together) { together.wave(); toast('You waved'); } };
+$('tg-leave').onclick = () => { if (together) { together.close(); together = null; } tgEl.classList.remove('show'); $('tg-showing').classList.remove('show'); $('tg-ptt').classList.remove('show'); const u = new URL(location.href); u.searchParams.delete('session'); history.replaceState(null, '', u.toString()); $('b-together').textContent = 'Invite a friend here…'; toast('You left the session'); };
+$('tg-place').onclick = () => together && together.cinema.placeHere();
+$('tg-remove').onclick = () => together && together.cinema.remove();
+$('tg-load').onclick = () => { if (together && together.cinema.load($('tg-url').value)) { if (!together.cinema.placed) together.cinema.placeHere(); toast('Loading the showing for everyone'); } };
+$('tg-url').onkeydown = e => { if (e.key === 'Enter') $('tg-load').onclick(); };
+$('tg-playpause').onclick = () => { if (!together) return; if (together.cinema.playing) together.cinema.pause(); else together.cinema.play(); };
+$('tg-back').onclick = () => together && together.cinema.seek(-10);
+$('tg-fwd').onclick = () => together && together.cinema.seek(10);
+$('tg-sync').onclick = () => { if (together) { together.cinema.resync(); toast('Everyone re-synced to your clock'); } };
+$('tg-size').onclick = () => { if (!together) return; const w = together.cinema.width; together.cinema.resize(w >= 24 ? 6 : w * 1.5); };
+$('tg-pass').onchange = e => { if (together && e.target.value) { together.passRemote(e.target.value); e.target.value = ''; } };
+$('tg-showing').onclick = () => { if (together) { together.cinema.join(); tgRefresh(); } };
+const ptt = $('tg-ptt');
+ptt.addEventListener('pointerdown', e => { e.preventDefault(); if (together) { together.voice.setTalking(true); ptt.classList.add('on'); } });
+const pttUp = () => { if (together) together.voice.setTalking(false); ptt.classList.remove('on'); };
+ptt.addEventListener('pointerup', pttUp); ptt.addEventListener('pointercancel', pttUp); ptt.addEventListener('pointerleave', pttUp);
+setInterval(tgRefresh, 700);
+
 // ?model=URL deep link + ?atmos=URL for a sidecar atmosphere block + &cta=0 to hide the store link.
 // Only allow https: or same-origin URLs — a deep link must not make the page fetch arbitrary
 // schemes (javascript:/data:/file:) or be used to render attacker content under this domain.
@@ -744,6 +930,12 @@ $('cta').href = TA.steamLink(parent && parent !== window ? 'demo_embed' : 'viewe
 if (params.get('cta') === '0') $('cta').style.display = 'none';
 const qp = params.get('model');
 if (qp) { const s = safeURL(qp); if (s) loadFromURL(s); else toast('That world link is not allowed.'); }
+const sessionParam = params.get('session');
+if (sessionParam && TG.validSession(sessionParam)) {
+  const autoName = params.get('name');
+  if (autoName) startTogether(sessionParam, autoName.slice(0, 24), params.get('voice') === '1'); // headless / scripted joins
+  else askToJoin(sessionParam, false);
+} else if (sessionParam) toast('That invite link is not valid.');
 const atmosUrl = params.get('atmos');
 if (atmosUrl) { const s = safeURL(atmosUrl); if (s) fetchAtmos(s); }
 
@@ -755,7 +947,11 @@ renderer.setAnimationLoop(() => {
     kit.tick(dt);
     TA.tickAnchors(anchorRoot, kit.uWindTime.value);
     weather.tick(dt, kit.uWindStrength.value);
+    waterfalls.tick(dt, camera, scene.fog ? scene.fog.density : 0, scene.fog ? scene.fog.color : null);
   }
+  audio.tick(dt, camera);
+  if (together) together.tick(dt);
+  if (perf) perf.tick(dt, { tier: tier.name, falls: waterfalls.awake + '/' + waterfalls.count + ' (' + waterfalls.particles + ' spray)', weather: weather.particles + ' drops', voices: audio.voices + '/' + audio.sources, together: together ? (together.peers.length + 1) + ' here · ' + together.rtt.toFixed(0) + ' ms' : 'off' });
   // Sun shafts: aim the radial pass at the sun's screen position; fade out off-screen / at night / in weather.
   _sunV.copy(state.sunDir).multiplyScalar(2000).add(camera.position).project(camera);
   const shaftsOn = skyOn && weather.shaftsOk && state.sunDir.y > 0.04 && state.night < 0.5

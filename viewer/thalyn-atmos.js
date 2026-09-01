@@ -5,6 +5,8 @@
 // equirect of the sky). Any glTF viewer shows the dome; this module lifts it out of the scene and turns
 // it into the real background + image-based light, blends the numeric block into three.js lighting,
 // adds the cinematic pass (bloom + a per-tone grade), first-person walking, and a night sky.
+// A `living` sub-block (waterfalls the world measured, where its tree cover is thickest) becomes running
+// water and a positional soundscape; every effect budgets against ONE quality-tier table (TIERS).
 // Everything degrades silently: no block → viewer defaults, no dome → procedural sky.
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
@@ -324,11 +326,25 @@ export const LOOKS = {
   ember:     { tint: [1.10, 0.96, 0.88], sat: 1.05, con: 1.10, lift: -0.006, vig: 0.42, bloom: 0.50, splitS: [1.04, 0.94, 0.88], splitH: [1.10, 1.00, 0.86] },
   moonlit:   { tint: [0.92, 0.97, 1.10], sat: 0.80, con: 1.06, lift: -0.004, vig: 0.44, bloom: 0.55, splitS: [0.90, 0.95, 1.10], splitH: [1.00, 1.01, 1.05] },
 };
+// The amplifier guard (2026-09-02): a glossy highlight (a roughness-0.04 water plane under a 2× sun) overflows the
+// half-float frame to Infinity, the bloom blur turns that into NaN and smears it — 84% of the frame went BLACK on an
+// RTX with the cinematic pass on, raw render fine. Same defect class as the app's Aug-15 bloom guard; same cure: clamp
+// and drop NaN BEFORE the amplifier. One full-screen pass.
+const ClampShader = {
+  uniforms: { tDiffuse: { value: null }, uMax: { value: 48.0 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uMax; varying vec2 vUv;
+    void main(){ vec4 c = texture2D(tDiffuse, vUv);
+      vec3 rgb = c.rgb; rgb = mix(rgb, vec3(0.0), vec3(isnan(rgb)));
+      gl_FragColor = vec4(min(rgb, vec3(uMax)), 1.0); }`,
+};
 export function makePost(renderer, scene, camera) {
   const size = renderer.getSize(new THREE.Vector2());
   const target = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
   const composer = new EffectComposer(renderer, target);
   composer.addPass(new RenderPass(scene, camera));
+  composer.addPass(new ShaderPass(ClampShader));
   const bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.32, 0.55, 0.92);
   composer.addPass(bloom);
   const shafts = new ShaderPass(SunShaftsShader);
@@ -336,7 +352,7 @@ export function makePost(renderer, scene, camera) {
   const grade = new ShaderPass(GradeShader);
   composer.addPass(grade);
   composer.addPass(new OutputPass());
-  let enabled = true, tone = 'serene', look = 'auto', shaftStrength = 0;
+  let enabled = true, tone = 'serene', look = 'auto', shaftStrength = 0, shaftsAllowed = true;
   function applyGrade() {
     const t = TONE_GRADES[tone] || TONE_GRADES.serene;
     const g = (look !== 'auto' && LOOKS[look]) ? LOOKS[look] : t;
@@ -363,31 +379,51 @@ export function makePost(renderer, scene, camera) {
     // Call once per frame: the sun's screen position (0..1) and a target strength (0 = off).
     // Damped internally so shafts breathe in/out instead of popping at the frame edge.
     setSunScreen(x, y, strength) {
-      shaftStrength += (clamp(strength, 0, 1) - shaftStrength) * 0.06;
+      shaftStrength += (clamp(shaftsAllowed ? strength : 0, 0, 1) - shaftStrength) * 0.06;
       shafts.uniforms.uSun.value.set(x, y);
-      shafts.uniforms.uStrength.value = enabled ? shaftStrength * 0.85 : 0;
+      shafts.uniforms.uStrength.value = (enabled && shaftsAllowed) ? shaftStrength * 0.85 : 0;
     },
     resize(w, h) { composer.setSize(w, h); grade.uniforms.uAspect.value = w / h; bloom.resolution.set(w, h); },
+    // Tier budget: MSAA samples on the HDR target, bloom on/off, shafts on/off (bloom off = the pass is skipped).
+    setQuality(q) {
+      if (!q) return;
+      if (typeof q.msaa === 'number' && target.samples !== q.msaa) { target.samples = q.msaa; target.dispose(); }
+      bloom.enabled = q.bloom !== false;
+      shaftsAllowed = q.shafts !== false;
+      if (!shaftsAllowed) shafts.uniforms.uStrength.value = 0;
+    },
     render() { if (enabled) composer.render(); else renderer.render(scene, camera); },
   };
 }
 
-// ── First-person walk (pointer lock + WASD + ground follow) ──────────────────
+// ── First-person walk (pointer lock + WASD + ground follow; on a touch screen, a thumb-stick + look-drag) ──
 // groundAt(x, z, fromY) → y or null. onState(walking) is called on lock/unlock.
-export function makeWalk(camera, dom, groundAt, onState) {
+// opts.touch = true → no pointer lock: the left half of the screen is a thumb-stick (drag to walk, push far
+// to run), the right half looks (drag). The stick is drawn by this module (two rings) and only while walking.
+export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
   const EYE = 1.7;
+  const touch = !!opts.touch;
   const ctl = new PointerLockControls(camera, dom);
   const keys = new Set();
   let walking = false, walkY = 0, fly = false;
+  // Touch state
+  let yaw = 0, pitch = 0, joyId = null, lookId = null, jx = 0, jy = 0, jox = 0, joy = 0, lx = 0, ly = 0;
+  let stickEl = null, knobEl = null;
   ctl.addEventListener('lock', () => { walking = true; onState && onState(true); });
   ctl.addEventListener('unlock', () => { walking = false; keys.clear(); onState && onState(false); });
   document.addEventListener('pointerlockerror', () => { walking = false; onState && onState(false, 'refused'); });
+  function syncAngles() { const e = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ'); yaw = e.y; pitch = e.x; }
+  function begin() {
+    if (touch) { syncAngles(); walking = true; showStick(true); onState && onState(true); }
+    else ctl.lock();
+  }
   function enterAt(pos, lookAt) {
     const g = groundAt(pos.x, pos.z, pos.y + 50);
     walkY = (g !== null ? g : pos.y - EYE) + EYE;
     camera.position.set(pos.x, walkY, pos.z);
     if (lookAt) camera.lookAt(lookAt.x, lookAt.y, lookAt.z);
-    ctl.lock();
+    fly = false;
+    begin();
   }
   function enterPose(pose) {
     const g = groundAt(pose.position.x, pose.position.z, pose.position.y + 50);
@@ -396,21 +432,78 @@ export function makeWalk(camera, dom, groundAt, onState) {
     walkY = pose.position.y;
     camera.position.copy(pose.position);
     camera.lookAt(pose.position.clone().add(pose.forward));
-    ctl.lock();
+    begin();
   }
-  function exit() { if (walking) ctl.unlock(); }
+  function exit() {
+    if (!walking) return;
+    if (touch) { walking = false; joyId = lookId = null; jx = jy = 0; showStick(false); onState && onState(false); }
+    else ctl.unlock();
+  }
+  // Touch input — only installed for touch mode, only acted on while walking.
+  if (touch) {
+    const opt = { passive: false };
+    dom.addEventListener('touchstart', e => {
+      if (!walking) return;
+      for (const t of e.changedTouches) {
+        if (t.target && /^(INPUT|TEXTAREA|SELECT|BUTTON|A|LABEL)$/.test(t.target.tagName)) continue;
+        if (t.clientX < innerWidth * 0.5 && joyId === null) { joyId = t.identifier; jox = t.clientX; joy = t.clientY; jx = jy = 0; placeStick(jox, joy); }
+        else if (lookId === null) { lookId = t.identifier; lx = t.clientX; ly = t.clientY; }
+        else continue;
+        e.preventDefault();
+      }
+    }, opt);
+    dom.addEventListener('touchmove', e => {
+      if (!walking) return;
+      for (const t of e.changedTouches) {
+        if (t.identifier === joyId) {
+          const R = 56; const dx = t.clientX - jox, dy = t.clientY - joy; const d = Math.hypot(dx, dy) || 1; const k = Math.min(1, d / R);
+          jx = dx / d * k; jy = dy / d * k; moveKnob(jx * R, jy * R); e.preventDefault();
+        } else if (t.identifier === lookId) {
+          yaw -= (t.clientX - lx) * 0.0045; pitch -= (t.clientY - ly) * 0.0045;
+          pitch = clamp(pitch, -1.45, 1.45); lx = t.clientX; ly = t.clientY; e.preventDefault();
+        }
+      }
+    }, opt);
+    const end = e => { for (const t of e.changedTouches) { if (t.identifier === joyId) { joyId = null; jx = jy = 0; moveKnob(0, 0); } if (t.identifier === lookId) lookId = null; } };
+    dom.addEventListener('touchend', end); dom.addEventListener('touchcancel', end);
+  }
+  function showStick(on) {
+    if (!touch) return;
+    if (!stickEl) {
+      stickEl = document.createElement('div'); stickEl.id = 'thalyn-stick';
+      stickEl.style.cssText = 'position:fixed;left:24px;bottom:90px;width:112px;height:112px;border-radius:50%;border:1px solid rgba(232,198,106,0.45);background:rgba(13,20,17,0.35);z-index:9;pointer-events:none;display:none';
+      knobEl = document.createElement('div');
+      knobEl.style.cssText = 'position:absolute;left:36px;top:36px;width:40px;height:40px;border-radius:50%;background:rgba(232,198,106,0.55);box-shadow:0 0 10px rgba(232,198,106,0.5)';
+      stickEl.appendChild(knobEl); document.body.appendChild(stickEl);
+    }
+    stickEl.style.display = on ? 'block' : 'none';
+    if (on) { stickEl.style.left = '24px'; stickEl.style.bottom = '90px'; stickEl.style.top = ''; moveKnob(0, 0); }
+  }
+  function placeStick(x, y) { if (!stickEl) return; stickEl.style.left = (x - 56) + 'px'; stickEl.style.top = (y - 56) + 'px'; stickEl.style.bottom = ''; }
+  function moveKnob(dx, dy) { if (knobEl) knobEl.style.transform = `translate(${dx}px, ${dy}px)`; }
+  const _fwd = new THREE.Vector3(), _right = new THREE.Vector3();
   function step(dt) {
     if (!walking) return;
-    const run = keys.has('ShiftLeft') || keys.has('ShiftRight');
-    const speed = run ? 12 : 5;
-    let f = 0, r = 0, u = 0;
+    let f = 0, r = 0, u = 0, run = keys.has('ShiftLeft') || keys.has('ShiftRight');
     if (keys.has('KeyW') || keys.has('ArrowUp')) f += 1;
     if (keys.has('KeyS') || keys.has('ArrowDown')) f -= 1;
     if (keys.has('KeyD') || keys.has('ArrowRight')) r += 1;
     if (keys.has('KeyA') || keys.has('ArrowLeft')) r -= 1;
     if (keys.has('KeyE') || keys.has('Space')) u += 1;
     if (keys.has('KeyQ') || keys.has('KeyC')) u -= 1;
-    if (f || r) { const n = Math.hypot(f, r); ctl.moveForward(f / n * speed * dt); ctl.moveRight(r / n * speed * dt); }
+    if (touch) {
+      camera.rotation.set(pitch, yaw, 0, 'YXZ');
+      if (Math.hypot(jx, jy) > 0.08) { f = -jy; r = jx; run = Math.hypot(jx, jy) > 0.85; }
+    }
+    const speed = run ? 12 : 5;
+    if (f || r) {
+      const n = Math.max(1, Math.hypot(f, r));
+      if (touch) {
+        camera.getWorldDirection(_fwd); _fwd.y = 0; if (_fwd.lengthSq() > 1e-6) _fwd.normalize();
+        _right.set(-_fwd.z, 0, _fwd.x);
+        camera.position.addScaledVector(_fwd, f / n * speed * dt).addScaledVector(_right, r / n * speed * dt);
+      } else { ctl.moveForward(f / n * speed * dt); ctl.moveRight(r / n * speed * dt); }
+    }
     if (u) { fly = true; walkY += u * speed * dt; }
     if (!fly) {
       const g = groundAt(camera.position.x, camera.position.z, camera.position.y + 3);
@@ -423,7 +516,7 @@ export function makeWalk(camera, dom, groundAt, onState) {
     if (down) keys.add(e.code); else keys.delete(e.code);
     return true;
   }
-  return { enterAt, enterPose, exit, step, onKey, get active() { return walking; }, get flying() { return fly; }, ctl };
+  return { enterAt, enterPose, exit, step, onKey, get active() { return walking; }, get flying() { return fly; }, get touch() { return touch; }, ctl };
 }
 
 // You stand on terrain, rock and built things — never on blades and petals. A mesh whose every
@@ -574,7 +667,8 @@ export function makeWeather(scene, camera) {
   flakes.frustumCulled = false; flakes.visible = false; flakes.renderOrder = 900;
   scene.add(rain, flakes);
 
-  let profile = WEATHER_PROFILES.clear, key = 'clear', t = 0, level = 0, target = 0;
+  let profile = WEATHER_PROFILES.clear, key = 'clear', t = 0, level = 0, target = 0, budget = 1;
+  function setBudget(mul) { budget = clamp(+mul || 1, 0.05, 1); }
   function set(weatherString) {
     key = weatherKey(weatherString);
     profile = WEATHER_PROFILES[key];
@@ -591,7 +685,7 @@ export function makeWeather(scene, camera) {
     level += (target - level) * Math.min(1, dt * 2);
     const c = camera.getWorldPosition(_camW); // world position — correct in VR too, where camera sits in a rig
     const lean = (0.35 + windStrength) * profile.wind * 10; // metres of sideways drift over a fall
-    const nRain = Math.round((profile.rain || 0) * level);
+    const nRain = Math.round((profile.rain || 0) * level * budget);
     rain.visible = nRain > 0;
     if (rain.visible) {
       for (let i = 0; i < nRain; i++) {
@@ -607,7 +701,7 @@ export function makeWeather(scene, camera) {
       rainGeo.setDrawRange(0, nRain * 2);
       rainGeo.attributes.position.needsUpdate = true;
     }
-    const nFlake = Math.round(((profile.snow || 0) + (profile.dust || 0)) * level);
+    const nFlake = Math.round(((profile.snow || 0) + (profile.dust || 0)) * level * budget);
     flakes.visible = nFlake > 0;
     if (flakes.visible) {
       const fall = profile.dust ? 1.6 : 2.6;
@@ -624,9 +718,10 @@ export function makeWeather(scene, camera) {
       flakeGeo.attributes.position.needsUpdate = true;
     }
   }
-  return { set, tick, get key() { return key; }, get profile() { return profile; },
+  return { set, tick, setBudget, get key() { return key; }, get profile() { return profile; },
            get fogMul() { return profile.fogMul; }, get sunDim() { return profile.sunDim; },
-           get windFloor() { return profile.wind; }, get shaftsOk() { return profile.shafts; } };
+           get windFloor() { return profile.wind; }, get shaftsOk() { return profile.shafts; },
+           get particles() { return (rain.visible ? rainGeo.drawRange.count / 2 : 0) + (flakes.visible ? flakeGeo.drawRange.count : 0); } };
 }
 
 // ── Sun shafts (screen-space radial scatter toward the sun) ─────────────────
@@ -655,36 +750,51 @@ export const SunShaftsShader = {
     }`
 };
 
-// ── Ambient audio beds ──────────────────────────────────────────────────────
-// Starts only on a user gesture (the Sound toggle). Tries a recorded bed at audio/<tone>.mp3 first
-// (drop files in later — absence is silent, not an error); until one exists, a procedural bed plays:
-// filtered noise as wind, a second band as rain when the weather calls for it. Everything is gain-
-// ramped so toggles and weather changes breathe instead of clicking.
-export function makeAudioBeds(baseUrl = 'audio/') {
-  let ctx = null, master = null, windGain = null, rainGain = null, el = null, elTone = '';
-  let enabled = false, tone = 'serene', night = 0, wkey = 'clear', wind = 0;
+// ── Soundscape: beds + positional sources ───────────────────────────────────
+// Starts only on a user gesture (the Sound toggle / the join click — browsers require it). Nothing is
+// downloaded: every voice is synthesised in Web Audio (filtered noise, short tone bursts), so there are
+// no files, no CORS, no attribution — the same choice the app makes for its own falling-water rumble.
+// A recorded bed at audio/<tone>.mp3 is still layered under the wind when one exists.
+//
+//   beds      wind + rain, sized by the weather (global, as before)
+//   waterfall a roar AT the plunge point (roar ∝ drop × flow; rolls off over ~200 m)
+//   shore     lapping along a water body's edge — the source sits at the nearest shoreline point to you
+//   canopy    birdsong by day / crickets by night from the thickest tree cover
+//
+// Voices are capped per quality tier: the nearest N play, the rest are ramped to silence (not stopped —
+// walking back into range never clicks). The listener is the camera.
+export function makeSoundscape(baseUrl = 'audio/') {
+  let ctx = null, master = null, bedGain = null, windGain = null, rainGain = null, el = null, elTone = '';
+  let enabled = false, volume = 0.9, tone = 'serene', night = 0, wkey = 'clear', wind = 0, voiceCap = 8;
+  let noiseBuf = null, whiteBuf = null;
+  const sources = []; // { kind, pos: Vector3, gain, panner, want, update(dt, cam), free() }
+  const _p = new THREE.Vector3(), _f = new THREE.Vector3(), _u = new THREE.Vector3();
+  let chirpBudget = 0, tickT = 0, lastCam = null;
+
   function ensure() {
     if (ctx) return;
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     master = ctx.createGain(); master.gain.value = 0.0; master.connect(ctx.destination);
+    bedGain = ctx.createGain(); bedGain.gain.value = 1; bedGain.connect(master);
     const len = ctx.sampleRate * 2;
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const d = buf.getChannelData(0);
+    noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+    whiteBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0), w = whiteBuf.getChannelData(0);
     let last = 0;
-    for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; } // brown-ish
-    const mk = (type, freq, q) => {
+    for (let i = 0; i < len; i++) { const r = Math.random() * 2 - 1; w[i] = r; last = (last + 0.02 * r) / 1.02; d[i] = last * 3.5; } // brown-ish
+    const mk = (buf, type, freq, q, dest) => {
       const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
       const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
       const g = ctx.createGain(); g.gain.value = 0;
-      src.connect(f); f.connect(g); g.connect(master); src.start();
+      src.connect(f); f.connect(g); g.connect(dest); src.start();
       return g;
     };
-    windGain = mk('lowpass', 420, 0.6);
-    rainGain = mk('bandpass', 2400, 0.5);
-    // A slow breath on the wind so it never reads as a constant hiss.
+    windGain = mk(noiseBuf, 'lowpass', 420, 0.6, bedGain);
+    rainGain = mk(noiseBuf, 'bandpass', 2400, 0.5, bedGain);
     const lfo = ctx.createOscillator(); lfo.frequency.value = 0.07;
     const lfoG = ctx.createGain(); lfoG.gain.value = 0.12;
     lfo.connect(lfoG); lfoG.connect(windGain.gain); lfo.start();
+    for (const src of sources) src.attach();
   }
   function ramp(g, v, t = 1.2) { if (g && ctx) g.gain.setTargetAtTime(v, ctx.currentTime, t); }
   function refresh() {
@@ -693,28 +803,465 @@ export function makeAudioBeds(baseUrl = 'audio/') {
     if (ctx.state === 'suspended') ctx.resume();
     const rain = /rain|storm/.test(wkey) ? (wkey === 'storm' ? 0.16 : (wkey === 'heavyrain' ? 0.12 : 0.07)) : 0;
     const windLvl = 0.10 + 0.10 * Math.min(2, wind) + (/blizzard|storm|dust/.test(wkey) ? 0.10 : 0);
-    ramp(master, 0.9); ramp(windGain, windLvl); ramp(rainGain, rain);
-    // Recorded bed, when one exists for this tone — layered under the procedural weather.
+    ramp(master, volume); ramp(windGain, windLvl); ramp(rainGain, rain);
     if (el && elTone !== tone) { el.pause(); el = null; }
-    if (!el) {
+    if (!el && !noBed.has(tone)) {
       const a = new Audio(baseUrl + tone + '.mp3');
       a.loop = true; a.volume = 0.0;
       a.play().then(() => { el = a; elTone = tone; const fade = setInterval(() => { a.volume = Math.min(0.5, a.volume + 0.05); if (a.volume >= 0.5) clearInterval(fade); }, 120); })
-       .catch(() => { /* no recorded bed for this tone — the procedural bed carries it */ });
+       .catch(() => { noBed.add(tone); /* no recorded bed for this tone — the procedural bed carries it; asked once */ });
+    }
+  }
+  const noBed = new Set();
+
+  // A positional voice: gain → panner → master. `build` wires the synth into `gain` once the context exists.
+  function voice(kind, pos, opts) {
+    const v = { kind, pos: pos.clone(), want: 0, level: 0, gain: null, panner: null, built: false, opts,
+      attach() {
+        if (this.built || !ctx) return;
+        this.built = true;
+        this.gain = ctx.createGain(); this.gain.gain.value = 0;
+        this.panner = ctx.createPanner();
+        this.panner.panningModel = 'HRTF'; this.panner.distanceModel = 'inverse';
+        this.panner.refDistance = opts.ref; this.panner.maxDistance = opts.max; this.panner.rolloffFactor = opts.roll;
+        this.gain.connect(this.panner); this.panner.connect(master);
+        this.place(this.pos);
+        opts.build(this);
+      },
+      place(p) { this.pos.copy(p); if (!this.panner) return; const t = ctx.currentTime;
+        if (this.panner.positionX) { this.panner.positionX.setTargetAtTime(p.x, t, 0.05); this.panner.positionY.setTargetAtTime(p.y, t, 0.05); this.panner.positionZ.setTargetAtTime(p.z, t, 0.05); }
+        else this.panner.setPosition(p.x, p.y, p.z); },
+      free() { try { opts.free && opts.free(this); this.gain && this.gain.disconnect(); this.panner && this.panner.disconnect(); } catch (e) {} },
+    };
+    return v;
+  }
+  const noiseChain = (v, buf, stages, level) => {
+    let node = ctx.createBufferSource(); node.buffer = buf; node.loop = true; node.start();
+    v.nodes = [node];
+    let head = node;
+    for (const st of stages) { const f = ctx.createBiquadFilter(); f.type = st.type; f.frequency.value = st.f; f.Q.value = st.q || 0.7; head.connect(f); head = f; v.nodes.push(f); }
+    const g = ctx.createGain(); g.gain.value = level; head.connect(g); g.connect(v.gain); v.nodes.push(g);
+    return g;
+  };
+  const freeNodes = v => { for (const n of (v.nodes || [])) { try { n.stop && n.stop(); } catch (e) {} try { n.disconnect(); } catch (e) {} } };
+
+  function addWaterfall(w) {
+    const p = v3(w.plunge) || v3(w.lip); if (!p) return;
+    const drop = Math.max(2, +w.drop || 4), flow = clamp(+w.flow || 0.5, 0.15, 1), width = Math.max(1, +w.width || 3);
+    const loud = clamp(0.35 + 0.65 * flow, 0, 1) * clamp(drop / 12, 0.4, 1.4);
+    const v = voice('waterfall', p, { ref: 5 + width * 0.6, max: 240, roll: 1.15,
+      build(v) {
+        noiseChain(v, whiteBuf, [{ type: 'lowpass', f: 700 + 60 * drop, q: 0.5 }], 0.55);
+        noiseChain(v, noiseBuf, [{ type: 'lowpass', f: 180, q: 0.8 }], 0.9);
+        const hiss = noiseChain(v, whiteBuf, [{ type: 'bandpass', f: 2600, q: 0.6 }], 0.10 + 0.12 * flow);
+        const lfo = ctx.createOscillator(); lfo.frequency.value = 0.21 + Math.random() * 0.2;
+        const lg = ctx.createGain(); lg.gain.value = 0.05; lfo.connect(lg); lg.connect(hiss.gain); lfo.start(); v.nodes.push(lfo, lg);
+      }, free: freeNodes });
+    v.want = loud;
+    sources.push(v);
+  }
+  function addShore(rect) {
+    // rect: { cx, cz, hx, hz, y } in the viewer frame. The source follows the nearest edge point to the listener.
+    const v = voice('shore', new THREE.Vector3(rect.cx, rect.y, rect.cz), { ref: 8, max: 160, roll: 1.0,
+      build(v) {
+        const g = noiseChain(v, noiseBuf, [{ type: 'lowpass', f: 650, q: 0.7 }], 0.5);
+        const swell = ctx.createOscillator(); swell.frequency.value = 0.11 + Math.random() * 0.05;
+        const sg = ctx.createGain(); sg.gain.value = 0.22; swell.connect(sg); sg.connect(g.gain); swell.start();
+        const swell2 = ctx.createOscillator(); swell2.frequency.value = 0.29; const sg2 = ctx.createGain(); sg2.gain.value = 0.12;
+        swell2.connect(sg2); sg2.connect(g.gain); swell2.start();
+        v.nodes.push(swell, sg, swell2, sg2);
+        v.lapAt = 0;
+      }, free: freeNodes });
+    v.rect = rect; v.want = 0.55;
+    v.update = (dt, cam) => {
+      // nearest point on the rectangle's edge; inside the rect (over the water) the lap sits under you
+      const dx = clamp(cam.x, rect.cx - rect.hx, rect.cx + rect.hx), dz = clamp(cam.z, rect.cz - rect.hz, rect.cz + rect.hz);
+      let px = dx, pz = dz;
+      const inside = Math.abs(cam.x - rect.cx) < rect.hx && Math.abs(cam.z - rect.cz) < rect.hz;
+      if (inside) { // snap to the closest edge so the sound still reads as a shoreline
+        const ex = rect.hx - Math.abs(cam.x - rect.cx), ez = rect.hz - Math.abs(cam.z - rect.cz);
+        if (ex < ez) px = rect.cx + Math.sign(cam.x - rect.cx || 1) * rect.hx; else pz = rect.cz + Math.sign(cam.z - rect.cz || 1) * rect.hz;
+      }
+      _p.set(px, rect.y, pz);
+      if (_p.distanceToSquared(v.pos) > 0.25) v.place(_p);
+      // an occasional lap: a short bandpass burst
+      if (v.built && v.level > 0.02) { v.lapAt -= dt; if (v.lapAt <= 0) { v.lapAt = 1.8 + Math.random() * 3.5; burst(v, whiteBuf, 900 + Math.random() * 500, 0.35, 0.6 + Math.random() * 0.5); } }
+    };
+    sources.push(v);
+  }
+  function burst(v, buf, freq, level, dur) {
+    const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 0.9;
+    const g = ctx.createGain(); const t = ctx.currentTime;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(level, t + dur * 0.3); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(f); f.connect(g); g.connect(v.gain); src.start(t); src.stop(t + dur + 0.05);
+  }
+  function addCanopy(c) {
+    const p = v3(c.center); if (!p) return;
+    const r = Math.max(8, +c.radius || 18);
+    const v = voice('canopy', p.clone().setY(p.y + 6), { ref: r * 0.6, max: 110, roll: 1.1,
+      build(v) { v.next = Math.random() * 3; v.base = 1900 + Math.random() * 1400; v.pattern = 2 + Math.floor(Math.random() * 3); v.rate = 0.7 + Math.random() * 0.8; },
+      free: freeNodes });
+    v.want = 0.7 * clamp((+c.trees || 8) / 30, 0.5, 1.2);
+    v.update = (dt) => {
+      if (!v.built || v.level < 0.03) return;
+      v.next -= dt * v.rate;
+      if (v.next > 0) return;
+      if (night > 0.6) { v.next = 0.9 + Math.random() * 1.6; cricket(v); }
+      else { v.next = 1.4 + Math.random() * 5.5; song(v); }
+    };
+    sources.push(v);
+  }
+  // Birdsong: a handful of sine chirps with a glissando each, a per-zone "species" (base pitch, count, pace).
+  function song(v) {
+    if (chirpBudget <= 0) return; chirpBudget--;
+    const n = v.pattern + Math.floor(Math.random() * 2);
+    let t = ctx.currentTime + 0.02;
+    for (let i = 0; i < n; i++) {
+      const o = ctx.createOscillator(); o.type = 'sine';
+      const f0 = v.base * (0.9 + Math.random() * 0.25), f1 = f0 * (1.15 + Math.random() * 0.35);
+      const dur = 0.06 + Math.random() * 0.08;
+      o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.7); o.frequency.exponentialRampToValueAtTime(f0 * 0.95, t + dur);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.16, t + 0.012); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.connect(g); g.connect(v.gain); o.start(t); o.stop(t + dur + 0.02);
+      t += dur + 0.05 + Math.random() * 0.12;
+    }
+  }
+  function cricket(v) {
+    if (chirpBudget <= 0) return; chirpBudget--;
+    const t = ctx.currentTime + 0.02, dur = 0.5 + Math.random() * 0.8;
+    const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 4100 + Math.random() * 500;
+    const am = ctx.createOscillator(); am.frequency.value = 28 + Math.random() * 10;
+    const amg = ctx.createGain(); amg.gain.value = 0.03; am.connect(amg);
+    const g = ctx.createGain(); g.gain.value = 0; amg.connect(g.gain);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.035, t + 0.05); g.gain.setValueAtTime(0.035, t + dur - 0.08); g.gain.linearRampToValueAtTime(0, t + dur);
+    o.connect(g); g.connect(v.gain); o.start(t); am.start(t); o.stop(t + dur + 0.02); am.stop(t + dur + 0.02);
+  }
+
+  function clearWorld() { for (const v of sources) v.free(); sources.length = 0; }
+  // world = { waterfalls: [...living.waterfalls], liquids: [...extras.liquids (app frame — X is negated here)], canopies: [...] }
+  function setWorld(world) {
+    clearWorld();
+    if (!world) return;
+    for (const w of (world.waterfalls || []).slice(0, 24)) addWaterfall(w);
+    for (const l of (world.liquids || [])) {
+      if (!l || l.type !== 'water' || !Array.isArray(l.centerXZ) || !Array.isArray(l.sizeXZ)) continue;
+      const hx = Math.abs(l.sizeXZ[0]) / 2, hz = Math.abs(l.sizeXZ[1]) / 2;
+      if (!(hx > 2 && hz > 2)) continue;
+      addShore({ cx: -l.centerXZ[0], cz: l.centerXZ[1], hx, hz, y: +l.surfaceY || 0 }); // app → viewer frame: X negated
+    }
+    for (const c of (world.canopies || []).slice(0, 14)) addCanopy(c);
+    if (ctx) for (const v of sources) v.attach();
+  }
+  function tick(dt, camera) {
+    if (!enabled || !ctx) return;
+    camera.getWorldPosition(_p); lastCam = _p;
+    const L = ctx.listener, t = ctx.currentTime;
+    camera.getWorldDirection(_f); _u.set(0, 1, 0).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion()));
+    if (L.positionX) {
+      L.positionX.setTargetAtTime(_p.x, t, 0.04); L.positionY.setTargetAtTime(_p.y, t, 0.04); L.positionZ.setTargetAtTime(_p.z, t, 0.04);
+      L.forwardX.setTargetAtTime(_f.x, t, 0.04); L.forwardY.setTargetAtTime(_f.y, t, 0.04); L.forwardZ.setTargetAtTime(_f.z, t, 0.04);
+      L.upX.setTargetAtTime(_u.x, t, 0.04); L.upY.setTargetAtTime(_u.y, t, 0.04); L.upZ.setTargetAtTime(_u.z, t, 0.04);
+    } else { L.setPosition(_p.x, _p.y, _p.z); L.setOrientation(_f.x, _f.y, _f.z, _u.x, _u.y, _u.z); }
+    chirpBudget = 6; // per frame — keeps a dense grove from scheduling hundreds of oscillators at once
+    for (const v of sources) if (v.update) v.update(dt, _p);
+    // Voice cap: nearest N audible, the rest ramped to silence.
+    tickT += dt;
+    if (tickT > 0.25) {
+      tickT = 0;
+      const ranked = sources.map(v => ({ v, d: v.pos.distanceTo(_p) / (v.opts.max || 200) })).sort((a, b) => a.d - b.d);
+      let on = 0;
+      for (const { v, d } of ranked) {
+        const audible = on < voiceCap && d < 1.05;
+        if (audible) on++;
+        const target = audible ? v.want : 0;
+        if (v.built && Math.abs(v.level - target) > 0.005) { v.level = target; ramp(v.gain, target, 0.6); }
+      }
     }
   }
   return {
     setEnabled(v) {
       enabled = !!v;
-      if (enabled) refresh();
+      if (enabled) { refresh(); for (const s of sources) s.attach(); }
       else { if (master && ctx) ramp(master, 0, 0.4); if (el) { el.pause(); el = null; elTone = ''; } }
     },
     get enabled() { return enabled; },
+    setVolume(v) { volume = clamp(+v, 0, 1); if (enabled && master) ramp(master, volume, 0.2); },
+    setVoiceCap(n) { voiceCap = Math.max(1, n | 0); },
     setScene(t, n, w, ws) { tone = t || 'serene'; night = n || 0; wkey = w || 'clear'; wind = ws || 0; refresh(); },
+    setWorld, tick,
+    get context() { return ctx; },
+    get voices() { let n = 0; for (const v of sources) if (v.level > 0.01) n++; return n; },
+    get sources() { return sources.length; },
   };
 }
 
 export const STEAM_URL = 'https://store.steampowered.com/app/4581800/Thalyn/';
 export function steamLink(source) {
   return STEAM_URL + '?utm_source=thalyn_world&utm_medium=' + encodeURIComponent(source) + '&utm_campaign=share';
+}
+
+// ── Quality tiers: ONE table every effect budgets against ───────────────────
+// The scar this honours: individually cheap effects, added one at a time, are what sank a Cosy world's
+// frame rate in the app. Here nothing sizes itself — every effect registers with makeTier and reads
+// its numbers from the row below; a new effect adds a column, never a private constant.
+export const TIERS = {
+  high:   { label: 'Desktop', pixelRatio: 2.0, shadows: true,  shadowMap: 2048, msaa: 4, bloom: true,  shafts: true,  weather: 1.0,  sprayPerFall: 220, fallsMax: 24, sheetRows: 28, foam: true,  voices: 12, canopies: 6, wisps: 8 },
+  laptop: { label: 'Laptop',  pixelRatio: 1.5, shadows: true,  shadowMap: 1024, msaa: 2, bloom: true,  shafts: false, weather: 0.55, sprayPerFall: 90,  fallsMax: 12, sheetRows: 20, foam: true,  voices: 8,  canopies: 4, wisps: 8 },
+  lite:   { label: 'Phone',   pixelRatio: 1.0, shadows: false, shadowMap: 512,  msaa: 0, bloom: false, shafts: false, weather: 0.30, sprayPerFall: 36,  fallsMax: 6,  sheetRows: 12, foam: false, voices: 5,  canopies: 3, wisps: 8 },
+};
+// Heuristic: what the device says about itself. Returns { name, why } so the HUD can show the reason.
+export function guessTier(renderer) {
+  const ua = navigator.userAgent || '';
+  const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua) && !/Chrome/.test(ua));
+  let gpu = '';
+  try { const gl = renderer.getContext(); const dbg = gl.getExtension('WEBGL_debug_renderer_info'); if (dbg) gpu = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || ''; } catch (e) {}
+  const g = gpu.toLowerCase();
+  if (mobile) return { name: 'lite', why: 'phone/tablet' };
+  if (/swiftshader|llvmpipe|software|basic render/.test(g)) return { name: 'lite', why: 'software GPU' };
+  if (/intel|iris|uhd|hd graphics|mali|adreno|apple gpu|apple m1|powervr/.test(g)) return { name: 'laptop', why: gpu.slice(0, 40) || 'integrated GPU' };
+  if ((navigator.hardwareConcurrency || 8) <= 4) return { name: 'laptop', why: 'few cores' };
+  return { name: 'high', why: gpu.slice(0, 40) || 'desktop' };
+}
+export function makeTier(renderer, forced) {
+  const listeners = [];
+  const guess = guessTier(renderer);
+  let name = TIERS[forced] ? forced : guess.name, auto = !TIERS[forced];
+  function set(n) {
+    if (n === 'auto' || !n) { auto = true; n = guess.name; } else auto = false;
+    if (!TIERS[n]) n = guess.name;
+    name = n;
+    for (const fn of listeners) { try { fn(TIERS[name], name); } catch (e) { console.warn('[tier]', e); } }
+  }
+  return {
+    on(fn) { listeners.push(fn); try { fn(TIERS[name], name); } catch (e) { console.warn('[tier]', e); } },
+    set, get name() { return name; }, get table() { return TIERS[name]; }, get auto() { return auto; }, get guess() { return guess; },
+  };
+}
+
+// ── Waterfalls: running water where the world says it falls ─────────────────
+// One sheet (a scrolling-noise ribbon, lip → plunge, over a free-fall arc), one foam disc at the plunge,
+// one spray cloud. Three draws per fall; spray count and fall count come from the tier. Falls further than
+// ~260 m from the camera stop animating their spray (the sheet keeps scrolling — it is what you see from afar).
+const SheetShader = {
+  vertexShader: `
+    attribute float aEdge; attribute float aSeed;
+    varying vec2 vUv; varying float vEdge; varying float vSeed; varying vec3 vN; varying vec3 vV;
+    void main(){ vUv = uv; vEdge = aEdge; vSeed = aSeed; vN = normalize(normalMatrix * normal);
+      vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = -mv.xyz; gl_Position = projectionMatrix * mv; }`,
+  fragmentShader: `
+    uniform float uTime; uniform vec3 uTint; uniform float uAlpha; uniform vec3 uFog; uniform float uFogD;
+    varying vec2 vUv; varying float vEdge; varying float vSeed; varying vec3 vN; varying vec3 vV;
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+      return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y); }
+    void main(){
+      float v = vUv.y;                                   // 0 lip → 1 plunge
+      float speed = 1.6 + 1.2 * v;                       // water accelerates as it falls
+      float n1 = noise(vec2(vUv.x * 3.0 + vSeed * 7.0, v * 6.0 - uTime * speed));
+      float n2 = noise(vec2(vUv.x * 9.0 + vSeed * 3.0, v * 14.0 - uTime * speed * 1.7));
+      float streak = smoothstep(0.30, 0.78, n1 * 0.62 + n2 * 0.38);
+      vec3 nn = normalize(vN + vec3(1e-6)); vec3 vv = normalize(vV + vec3(1e-6));
+      float rim = pow(max(0.0, 1.0 - abs(dot(nn, vv))), 2.0);
+      float lipFade = smoothstep(0.0, 0.08, v);
+      float a = (0.28 + 0.62 * streak) * vEdge * lipFade * uAlpha;
+      vec3 col = mix(uTint, vec3(1.0), streak * 0.75 + rim * 0.25) * (1.0 + 0.35 * streak + 0.3 * rim);
+      float fog = 1.0 - exp(-uFogD * length(vV));
+      col = mix(col, uFog, fog);
+      gl_FragColor = vec4(col, a * (1.0 - fog * 0.6));
+    }`,
+};
+const FoamShader = {
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform float uTime; uniform vec3 uTint; uniform float uAlpha; varying vec2 vUv;
+    // NaN law: atan(0,0) and pow(<0, x) are UNDEFINED in GLSL; one NaN pixel through the bloom blur blacks out the frame.
+    void main(){ vec2 q = vUv - 0.5; float r = length(q) * 2.0; float ang = (r > 0.002) ? atan(q.y, q.x) : 0.0;
+      float rings = 0.5 + 0.5 * sin(r * 14.0 - uTime * 2.6 + sin(ang * 5.0 + uTime) * 0.6);
+      float a = smoothstep(1.0, 0.25, r) * (0.25 + 0.55 * rings) * smoothstep(0.0, 0.12, r) * uAlpha;
+      gl_FragColor = vec4(mix(uTint, vec3(1.0), 0.7) * 1.2, a); }`,
+};
+const SprayShader = {
+  vertexShader: `
+    attribute float aSize; attribute float aAlpha; varying float vA; uniform float uScale;
+    void main(){ vA = aAlpha; vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      gl_PointSize = aSize * uScale / max(1.0, -mv.z); gl_Position = projectionMatrix * mv; }`,
+  fragmentShader: `
+    uniform sampler2D uTex; uniform vec3 uTint; varying float vA;
+    void main(){ vec4 t = texture2D(uTex, gl_PointCoord); gl_FragColor = vec4(mix(uTint, vec3(1.0), 0.8), t.a * vA * 0.55); }`,
+};
+let sprayTex = null;
+function sprayTexture() {
+  if (sprayTex) return sprayTex;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 32;
+  const g = cv.getContext('2d'); const grd = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+  grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.5, 'rgba(255,255,255,0.35)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 32, 32);
+  sprayTex = new THREE.CanvasTexture(cv); return sprayTex;
+}
+export function makeWaterfalls(scene) {
+  const root = new THREE.Group(); root.name = 'Thalyn_Waterfalls'; scene.add(root);
+  const falls = [];
+  let budget = TIERS.high, pending = null, pendingTint = null;
+  const uTime = { value: 0 };
+  const uFog = { value: new THREE.Color(0xbcd0e0) }, uFogD = { value: 0 };
+  function sheetGeometry(lip, plunge, dir, width, rows) {
+    const cols = 5, W = width, W2 = width * 1.4;
+    const side = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
+    const run = new THREE.Vector3(plunge.x - lip.x, 0, plunge.z - lip.z);
+    const drop = lip.y - plunge.y;
+    const pos = [], nrm = [], uv = [], edge = [], idx = [];
+    for (let r = 0; r <= rows; r++) {
+      const t = r / rows;
+      // free-fall arc: horizontal advance linear in t, vertical quadratic — starts level at the brink, ends near-vertical
+      const cx = lip.x + run.x * t, cz = lip.z + run.z * t, cy = lip.y - drop * t * t;
+      const w = W + (W2 - W) * t;
+      // tangent for the normal
+      const tx = run.x, tz = run.z, ty = -2 * drop * t;
+      const tangent = new THREE.Vector3(tx, ty, tz).normalize();
+      const n = new THREE.Vector3().crossVectors(side, tangent).normalize();
+      for (let c = 0; c <= cols; c++) {
+        const u = c / cols, k = (u - 0.5) * w;
+        pos.push(cx + side.x * k, cy, cz + side.z * k);
+        nrm.push(n.x, n.y, n.z);
+        uv.push(u, t);
+        edge.push(1 - Math.pow(Math.abs(u - 0.5) * 2, 2.2)); // soft sides
+      }
+    }
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const a = r * (cols + 1) + c, b = a + cols + 1;
+      idx.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setAttribute('aEdge', new THREE.Float32BufferAttribute(edge, 1));
+    const seed = Math.random(); g.setAttribute('aSeed', new THREE.Float32BufferAttribute(new Array(pos.length / 3).fill(seed), 1));
+    g.setIndex(idx); g.computeBoundingSphere();
+    return g;
+  }
+  function build(list, tint) {
+    clear();
+    pending = Array.isArray(list) ? list : null; pendingTint = tint || null;
+    if (!pending) return 0;
+    const col = (tint && tint.isColor) ? tint.clone() : new THREE.Color(0.62, 0.82, 0.9);
+    const usable = pending.filter(w => v3(w.lip) && v3(w.plunge)).slice(0, budget.fallsMax);
+    for (const w of usable) {
+      const lip = v3(w.lip), plunge = v3(w.plunge);
+      const dir = v3(w.dir) || new THREE.Vector3(plunge.x - lip.x, 0, plunge.z - lip.z);
+      dir.y = 0; if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1); dir.normalize();
+      const width = Math.max(1, +w.width || 3), drop = Math.max(1, lip.y - plunge.y), flow = clamp(+w.flow || 0.5, 0.15, 1);
+      const rapids = w.kind === 4;
+      const fall = { lip, plunge, width, drop, flow, rapids, group: new THREE.Group(), asleep: false };
+      // sheet
+      const sm = new THREE.ShaderMaterial({ uniforms: { uTime, uTint: { value: col }, uAlpha: { value: rapids ? 0.55 : 0.92 }, uFog, uFogD },
+        vertexShader: SheetShader.vertexShader, fragmentShader: SheetShader.fragmentShader, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+      const sheet = new THREE.Mesh(sheetGeometry(lip, plunge, dir, width, budget.sheetRows), sm);
+      sheet.frustumCulled = true; sheet.renderOrder = 5;
+      fall.group.add(sheet); fall.sheet = sheet;
+      // foam
+      if (budget.foam) {
+        const fm = new THREE.ShaderMaterial({ uniforms: { uTime, uTint: { value: col }, uAlpha: { value: 0.6 + 0.3 * flow } },
+          vertexShader: FoamShader.vertexShader, fragmentShader: FoamShader.fragmentShader, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+        const foam = new THREE.Mesh(new THREE.CircleGeometry(width * 0.9 + drop * 0.12, 28), fm);
+        foam.rotation.x = -Math.PI / 2; foam.position.set(plunge.x, plunge.y + 0.06, plunge.z); foam.renderOrder = 4;
+        fall.group.add(foam);
+      }
+      // spray
+      const n = Math.max(0, Math.round(budget.sprayPerFall * (0.5 + 0.5 * flow)));
+      if (n > 0) {
+        const pos = new Float32Array(n * 3), size = new Float32Array(n), alpha = new Float32Array(n);
+        const vel = new Float32Array(n * 3), life = new Float32Array(n), age = new Float32Array(n);
+        for (let i = 0; i < n; i++) { age[i] = Math.random() * 1.2; life[i] = 0.7 + Math.random() * 0.9; size[i] = 28 + Math.random() * 30; }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+        g.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
+        g.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1).setUsage(THREE.DynamicDrawUsage));
+        const pm = new THREE.ShaderMaterial({ uniforms: { uTex: { value: sprayTexture() }, uTint: { value: col }, uScale: { value: 240 } },
+          vertexShader: SprayShader.vertexShader, fragmentShader: SprayShader.fragmentShader, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+        const pts = new THREE.Points(g, pm); pts.frustumCulled = false; pts.renderOrder = 6;
+        fall.group.add(pts);
+        fall.spray = { pts, pos, vel, life, age, alpha, n, dir, up: Math.min(7, 2.5 + drop * 0.35) };
+        for (let i = 0; i < n; i++) respawn(fall.spray, i, plunge, width);
+      }
+      root.add(fall.group);
+      falls.push(fall);
+    }
+    return falls.length;
+  }
+  function respawn(sp, i, plunge, width) {
+    const j = i * 3, a = Math.random() * Math.PI * 2, r = Math.random() * width * 0.5;
+    sp.pos[j] = plunge.x + Math.cos(a) * r; sp.pos[j + 1] = plunge.y + 0.1; sp.pos[j + 2] = plunge.z + Math.sin(a) * r;
+    const out = 0.6 + Math.random() * 1.8;
+    sp.vel[j] = Math.cos(a) * out + sp.dir.x * 0.8; sp.vel[j + 1] = sp.up * (0.5 + Math.random() * 0.8); sp.vel[j + 2] = Math.sin(a) * out + sp.dir.z * 0.8;
+    sp.age[i] = 0;
+  }
+  const _c = new THREE.Vector3();
+  function tick(dt, camera, fogDensity, fogColor) {
+    uTime.value += dt;
+    if (fogColor) uFog.value.copy(fogColor);
+    uFogD.value = fogDensity > 0 ? fogDensity : 0;
+    if (!falls.length) return;
+    camera.getWorldPosition(_c);
+    for (const f of falls) {
+      const d2 = f.plunge.distanceToSquared(_c);
+      f.asleep = d2 > 260 * 260;
+      if (f.asleep || !f.spray) { if (f.spray) f.spray.pts.visible = false; continue; }
+      const sp = f.spray; sp.pts.visible = true;
+      for (let i = 0; i < sp.n; i++) {
+        const j = i * 3;
+        sp.age[i] += dt;
+        if (sp.age[i] > sp.life[i]) respawn(sp, i, f.plunge, f.width);
+        sp.vel[j + 1] -= 9.8 * dt;
+        sp.pos[j] += sp.vel[j] * dt; sp.pos[j + 1] += sp.vel[j + 1] * dt; sp.pos[j + 2] += sp.vel[j + 2] * dt;
+        const k = sp.age[i] / sp.life[i];
+        sp.alpha[i] = Math.sin(k * Math.PI) * (sp.pos[j + 1] > f.plunge.y - 0.5 ? 1 : 0);
+      }
+      sp.pts.geometry.attributes.position.needsUpdate = true;
+      sp.pts.geometry.attributes.aAlpha.needsUpdate = true;
+    }
+  }
+  function clear() {
+    for (const f of falls) { root.remove(f.group); f.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
+    falls.length = 0;
+  }
+  function setBudget(t) { budget = t || TIERS.high; if (pending) build(pending, pendingTint); }
+  return { build, tick, clear, setBudget, root,
+    get count() { return falls.length; },
+    get awake() { let n = 0; for (const f of falls) if (!f.asleep) n++; return n; },
+    get particles() { let n = 0; for (const f of falls) if (!f.asleep && f.spray) n += f.spray.n; return n; } };
+}
+
+// ── Perf HUD (dev): frame time, draw calls, triangles, live effect counts — behind ?perf=1 ──
+export function makePerfHud(renderer) {
+  const el = document.createElement('div');
+  el.id = 'perf';
+  el.style.cssText = 'position:fixed;top:14px;right:14px;z-index:25;padding:8px 10px;background:rgba(13,20,17,0.82);border:1px solid rgba(232,198,106,0.3);border-radius:8px;color:#9DBCAC;font:11px/1.45 ui-monospace,Consolas,monospace;white-space:pre;pointer-events:none;min-width:190px';
+  document.body.appendChild(el);
+  let ema = 16.7, worst = 0, frames = 0, acc = 0, shown = '';
+  const samples = [];
+  // The composer's passes each reset renderer.info — hold it for the whole frame and reset here instead.
+  renderer.info.autoReset = false;
+  let calls = 0, tris = 0;
+  return {
+    el,
+    tick(dt, extra) {
+      const ms = dt * 1000; ema += (ms - ema) * 0.08; worst = Math.max(worst, ms); frames++; acc += dt;
+      samples.push(ms); if (samples.length > 600) samples.shift();
+      calls = renderer.info.render.calls; tris = renderer.info.render.triangles; renderer.info.reset();
+      if (acc < 0.25) return; acc = 0;
+      const sorted = [...samples].sort((a, b) => a - b), p95 = sorted[Math.floor(sorted.length * 0.95)] || ema;
+      const inf = { calls, triangles: tris };
+      const lines = [
+        `frame ${ema.toFixed(1)} ms  (${(1000 / Math.max(1, ema)).toFixed(0)} fps)`,
+        `p95   ${p95.toFixed(1)} ms   worst ${worst.toFixed(0)} ms`,
+        `draws ${inf.calls}   tris ${(inf.triangles / 1e6).toFixed(2)} M`,
+        `dpr ${renderer.getPixelRatio().toFixed(2)}  ${innerWidth}×${innerHeight}`,
+      ];
+      for (const k in (extra || {})) lines.push(`${k} ${extra[k]}`);
+      shown = lines.join('\n'); el.textContent = shown; worst *= 0.98;
+    },
+    get text() { return shown; },
+  };
 }
