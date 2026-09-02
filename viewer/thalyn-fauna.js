@@ -48,12 +48,20 @@ export function makeFauna(scene, getLoader, groundAt, base = 'creatures/') {
     const p = loader.loadAsync(base + species + '.glb').then(g => {
       const s = g.scene;
       s.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; o.frustumCulled = true; if (o.material) { o.material.side = THREE.FrontSide; } } });
-      const box = new THREE.Box3().setFromObject(s);
-      const size = box.getSize(new THREE.Vector3());
+      // ⚠ MEASURE THE BIND POSE, NOT THE SKIN: Box3.setFromObject on a SkinnedMesh runs every vertex through the
+      // bone matrices, which are all zero until the first render — the first smoke measured every species at
+      // 0.00 m and scaled a fox to a hillside. The raw position attribute × the node's world matrix (which carries
+      // gltfpack's dequantisation scale) is the honest size.
+      s.updateMatrixWorld(true);
+      const box = new THREE.Box3(), tmp = new THREE.Box3();
+      s.traverse(o => { if (o.isMesh && o.geometry && o.geometry.attributes && o.geometry.attributes.position) { tmp.setFromBufferAttribute(o.geometry.attributes.position).applyMatrix4(o.matrixWorld); box.union(tmp); } });
+      const size = box.isEmpty() ? new THREE.Vector3() : box.getSize(new THREE.Vector3());
       const clips = new Map();
       for (const c of (g.animations || [])) { const n = String(c.name).split('|').pop().toLowerCase(); clips.set(n, c); }
+      let length = Math.max(size.x, size.z), minY = box.isEmpty() ? 0 : box.min.y;
+      if (!(length > 0.05)) { console.warn('[fauna] ' + species + '.glb measured ' + length.toFixed(3) + ' m — using the species\' own length'); length = (SPEC[species] || BIRD[species] || { lengthM: 1 }).lengthM; minY = 0; }
       console.info('[fauna] ' + species + '.glb — ' + [...clips.keys()].join(' ') + ' · ' + size.x.toFixed(2) + '×' + size.y.toFixed(2) + '×' + size.z.toFixed(2) + ' m');
-      return { scene: s, clips, length: Math.max(size.x, size.z, 0.01), minY: box.min.y, height: size.y };
+      return { scene: s, clips, length, minY, height: size.y };
     }).catch(e => { if (!missing.has(species)) { missing.add(species); console.warn('[fauna] no ' + base + species + '.glb — ' + species + ' skipped (' + (e && e.message) + ')'); } return null; });
     protos.set(species, p);
     return p;
