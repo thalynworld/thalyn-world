@@ -456,6 +456,7 @@ function applyThalynBlock(tx) {
     if (cinemaSeed) console.info('[thalyn] cinema: the world carries a screen (' + cinemaSeed.w.toFixed(1) + ' m wide' + (cinemaSeed.floating ? ', floating' : '') + (cs.count > 1 ? ', ' + cs.count + ' standing' : '') + ') — a shared session stands it there');
     if (together) together.setCinemaSeed(cinemaSeed);
     syncSoloScreen();
+    waterProbe = TA.makeWaterProbe(tx.liquids || []);   // A171 · swimming
     // HUD: world name · tone · clock · weather, the postcard code, the shot.
     const name = String(tx.worldName || tx.sceneName || 'Thalyn world').slice(0, 40);
     $('w-row').style.display = '';
@@ -686,7 +687,9 @@ async function loadFiles(fileList) {
 }
 
 // ── Walk mode ────────────────────────────────────────────────────────────────
+let waterProbe = () => null;   // A171 · rebuilt from extras.thalyn.liquids on every world (the walker swims where the bed lies under water)
 const walk = TA.makeWalk(camera, document.body, groundAt, (on, why) => {
+  if (on && (why === 'swim' || why === 'walk')) { if (why === 'swim') toast('Swimming — you float at the surface, half pace'); return; }   // A171 · a swim/walk change, not an enter/exit
   document.body.classList.toggle('walking', on);
   controls.enabled = !on;
   $('b-walk').textContent = on ? (coarsePointer ? 'Stop walking' : 'Orbit (V)') : (coarsePointer ? 'Walk' : 'Walk (V)');
@@ -694,7 +697,7 @@ const walk = TA.makeWalk(camera, document.body, groundAt, (on, why) => {
   if (on) toast(coarsePointer ? 'Left thumb walks · right thumb looks · push far to run' : 'WASD to walk · Shift to run · E/Q up/down · F back to ground · Esc or V to leave');
   else if (why === 'refused') toast('Pointer lock refused — try V again in a second');
   else { const fwd = new THREE.Vector3(); camera.getWorldDirection(fwd); controls.target.copy(camera.position).addScaledVector(fwd, 30); controls.update(); }
-}, { touch: coarsePointer });
+}, { touch: coarsePointer, waterAt: (x, z) => waterProbe(x, z) });
 if (coarsePointer) $('b-walk').textContent = 'Walk';
 function toggleWalk() {
   if (walk.active) { walk.exit(); return; }

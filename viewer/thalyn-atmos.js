@@ -411,7 +411,7 @@ export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
   const touch = !!opts.touch;
   const ctl = new PointerLockControls(camera, dom);
   const keys = new Set();
-  let walking = false, walkY = 0, fly = false;
+  let walking = false, walkY = 0, fly = false, swimming = false;
   // Touch state
   let yaw = 0, pitch = 0, joyId = null, lookId = null, jx = 0, jy = 0, jox = 0, joy = 0, lx = 0, ly = 0;
   let stickEl = null, knobEl = null;
@@ -501,7 +501,7 @@ export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
       camera.rotation.set(pitch, yaw, 0, 'YXZ');
       if (Math.hypot(jx, jy) > 0.08) { f = -jy; r = jx; run = Math.hypot(jx, jy) > 0.85; }
     }
-    const speed = run ? 12 : 5;
+    const speed = (run ? 12 : 5) * (swimming ? 0.5 : 1);
     if (f || r) {
       const n = Math.max(1, Math.hypot(f, r));
       if (touch) {
@@ -513,16 +513,36 @@ export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
     if (u) { fly = true; walkY += u * speed * dt; }
     if (!fly) {
       const g = groundAt(camera.position.x, camera.position.z, camera.position.y + 3);
-      if (g !== null) walkY = g + EYE;
+      // A171 · SWIMMING (founder 2026-09-02: "there's no water to swim in, only the surface"): where the bed lies
+      // under a liquid surface you float, chest-deep, and move at half pace — the app's own swim. Deeper than
+      // the eye's reach the ground is left alone (the surface carries you); wading is just walking.
+      const w = opts.waterAt ? opts.waterAt(camera.position.x, camera.position.z) : null;
+      if (g !== null && w !== null && w - g > 1.2) { walkY = w + EYE - 1.1; if (!swimming) { swimming = true; onState && onState(true, 'swim'); } }
+      else { if (g !== null) walkY = g + EYE; if (swimming) { swimming = false; onState && onState(true, 'walk'); } }
     } else if (keys.has('KeyF')) { fly = false; }
-    camera.position.y += (walkY - camera.position.y) * Math.min(1, dt * 12);
+    camera.position.y += (walkY - camera.position.y) * Math.min(1, dt * (swimming ? 4 : 12));
   }
   function onKey(e, down) {
     if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return false;
     if (down) keys.add(e.code); else keys.delete(e.code);
     return true;
   }
-  return { enterAt, enterPose, exit, step, onKey, get active() { return walking; }, get flying() { return fly; }, get touch() { return touch; }, ctl };
+  return { enterAt, enterPose, exit, step, onKey, get active() { return walking; }, get flying() { return fly; }, get swimming() { return swimming; }, get touch() { return touch; }, ctl };
+}
+
+// A171 · the liquid surface under a point, from the export's own liquid rectangles (APP frame — X is negated
+// here, the same read the soundscape and the fauna make). Returns the surface Y or null. Lava is never water.
+export function makeWaterProbe(liquids) {
+  const rects = [];
+  for (const l of (liquids || [])) {
+    if (!l || l.type !== 'water' || !Array.isArray(l.centerXZ) || !Array.isArray(l.sizeXZ)) continue;
+    rects.push({ cx: -l.centerXZ[0], cz: l.centerXZ[1], hx: Math.max(0.5, l.sizeXZ[0] * 0.5), hz: Math.max(0.5, l.sizeXZ[1] * 0.5), y: +l.surfaceY || 0 });
+  }
+  return (x, z) => {
+    let best = null;
+    for (const r of rects) if (Math.abs(x - r.cx) <= r.hx && Math.abs(z - r.cz) <= r.hz && (best === null || r.y > best)) best = r.y;
+    return best;
+  };
 }
 
 // You stand on terrain, rock and built things — never on blades and petals. A mesh whose every
