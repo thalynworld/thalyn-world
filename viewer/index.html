@@ -443,6 +443,12 @@ function applyThalynBlock(tx) {
     const nLights = lanterns.build(lv ? lv.lights : null); lanterns.setNight(state.night);
     audio.setWorld({ waterfalls: lv ? lv.waterfalls : [], liquids: tx.liquids || [], canopies: lv ? lv.canopies : [], anchors: tx.anchors || [] });
     if (lv) console.info('[thalyn] living: ' + nFalls + ' waterfall(s) built of ' + ((lv.waterfalls || []).length) + ', ' + ((lv.canopies || []).length) + ' canopy zone(s), ' + nLights + ' lantern/bulb light(s), ' + audio.sources + ' sound source(s)');
+    // A165 · the world's own cinema screen: stood for a shared session where the maker put it (the host may still move it).
+    const cs = tx.cinema;
+    cinemaSeed = (cs && cs.present && Array.isArray(cs.position) && cs.position.length === 3)
+      ? { pos: cs.position, yaw: (Number(cs.yawDeg) || 0) * Math.PI / 180, w: Number(cs.width) || 8 } : null;
+    if (cinemaSeed) console.info('[thalyn] cinema: the world carries a screen (' + cinemaSeed.w.toFixed(1) + ' m wide' + (cs.count > 1 ? ', ' + cs.count + ' standing' : '') + ') — a shared session stands it there');
+    if (together) together.setCinemaSeed(cinemaSeed);
     // HUD: world name · tone · clock · weather, the postcard code, the shot.
     const name = String(tx.worldName || tx.sceneName || 'Thalyn world').slice(0, 40);
     $('w-row').style.display = '';
@@ -882,6 +888,7 @@ postUp({ type: 'thalyn:ready' }); // announce once on startup (parent also pings
 // (local testing). Nothing here runs without a session.
 const RELAY_BASE = 'https://thalyn-together.curly-disk-aea2.workers.dev';
 let together = null;
+let cinemaSeed = null;   // A165 · the screen the maker stood in the app (extras.thalyn.cinema): {pos, yaw, w}, or null
 const tgEl = $('tg');
 function tgRefresh() {
   if (!together) return;
@@ -898,7 +905,7 @@ function tgRefresh() {
 function startTogether(session, name, voice) {
   if (together) together.close();
   const relay = (() => { const r = paramsEarly.get('relay'); if (!r) return RELAY_BASE; try { const u = new URL(r); return (u.protocol === 'https:' || u.hostname === 'localhost' || u.hostname === '127.0.0.1') ? u.origin : RELAY_BASE; } catch (e) { return RELAY_BASE; } })();
-  together = TG.makeTogether({ relay, session, name, camera, scene, dom: document.body, voice,
+  together = TG.makeTogether({ relay, session, name, camera, scene, dom: document.body, voice, cinemaSeed,
     onStatus: t => { $('tg-status').textContent = t; tgRefresh(); },
     onPeers: () => tgRefresh(), onHost: () => tgRefresh() });
   tgEl.classList.add('show');

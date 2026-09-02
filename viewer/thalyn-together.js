@@ -138,6 +138,7 @@ export function makeTogether(opts) {
         me = m.id; hostId = m.host;
         for (const p of (m.peers || [])) addPeer(p.id, p.name, p.pose);
         if (m.cinema) cinema.apply(m.cinema, m.serverTs);
+        cinema.trySeed();   // the world's own screen (extras.thalyn.cinema) stands itself when the room has none and I hold the remote
         status(peers.size ? `${peers.size + 1} here` : 'You are here alone — send the invite link');
         try { opts.onHost && opts.onHost(me === hostId); } catch (e) {}
         log('joined as', me, 'host', hostId, 'peers', peers.size);
@@ -149,7 +150,7 @@ export function makeTogether(opts) {
       case 'join': { const p = addPeer(m.id, m.name, null); status(`${m.name} is here · ${peers.size + 1} here`); log('join', m.id, m.name); voice.ensurePeer(p); cinema.nudge(); return; }
       case 'leave': { const p = peers.get(m.id); removePeer(m.id); status(peers.size ? `${p ? p.name + ' left · ' : ''}${peers.size + 1} here` : 'You are here alone'); log('leave', m.id); return; }
       case 'pose': { const p = peers.get(m.id) || addPeer(m.id, '…', null); p.target.set(m.p[0], m.p[1], m.p[2]); p.yaw = m.y || 0; if (!p.group.visible) { p.group.position.copy(p.target); p.group.visible = true; } if (!p.poses) { p.poses = 0; console.info('[together] first pose from', m.id, m.p.map(v => v.toFixed(1)).join(',')); } p.poses++; p.seen = performance.now(); return; }
-      case 'host': { hostId = m.id; try { opts.onHost && opts.onHost(me === hostId); } catch (e) {} const who = hostId === me ? 'You hold the remote' : ((peers.get(hostId) || {}).name || 'Someone') + ' holds the remote'; status(who); return; }
+      case 'host': { hostId = m.id; try { opts.onHost && opts.onHost(me === hostId); } catch (e) {} const who = hostId === me ? 'You hold the remote' : ((peers.get(hostId) || {}).name || 'Someone') + ' holds the remote'; status(who); cinema.trySeed(); return; }
       case 'cinema': cinema.apply(m.cinema, m.serverTs); return;
       case 'rtc': voice.onSignal(m.from, m.data); return;
       case 'wave': { const p = peers.get(m.id); if (p) p.waveT = 1.6; return; }
@@ -159,8 +160,9 @@ export function makeTogether(opts) {
   }
 
   // ── Cinema ──
-  const cinema = makeCinema({ scene, camera, dom: opts.dom, onState: t => status(t), isHost: () => me === hostId, serverNow: () => serverNow(),
+  const cinema = makeCinema({ scene, camera, dom: opts.dom, onState: t => status(t), isHost: () => me === hostId, joinedRoom: () => !!me, serverNow: () => serverNow(),
     sendCinema: c => send({ type: 'cinema', cinema: c }) });
+  if (opts.cinemaSeed) cinema.setSeed(opts.cinemaSeed);   // the export's screen, when the world loaded before the session began
 
   // ── Voice (push-to-talk, P2P, spatial) ──
   const voice = makeVoice({ peers, send, myId: () => me, camera, enabled: !!opts.voice, onStatus: status });
@@ -212,6 +214,7 @@ export function makeTogether(opts) {
   connect();
   return {
     tick, inviteURL, wave, passRemote, close, cinema, voice,
+    setCinemaSeed: c => cinema.setSeed(c),   // the world's own screen (extras.thalyn.cinema), when it loads after the session began
     get session() { return session; }, get me() { return me; }, get isHost() { return me === hostId; }, get hostId() { return hostId; },
     get peers() { return [...peers.values()].map(p => ({ id: p.id, name: p.name })); },
     get rtt() { return rtt; }, get connected() { return !!(ws && ws.readyState === 1); },
@@ -225,8 +228,25 @@ export function makeTogether(opts) {
 // sits over the canvas (so it draws on top of the world — nothing can stand in front of it, an accepted
 // V1 limit); a plain media file is a VideoTexture on the screen mesh itself (fully in the world).
 // Sync: the host's state {playing|paused, t, at(serverTs)} → everyone snaps to t + (now − at).
-function makeCinema({ scene, camera, dom, onState, isHost, serverNow, sendCinema }) {
+function makeCinema({ scene, camera, dom, onState, isHost, joinedRoom, serverNow, sendCinema }) {
   let state = null;            // last cinema record from the room
+  // A165 · THE WORLD'S OWN SCREEN. A Thalyn export carries `extras.thalyn.cinema` — the screen the maker stood
+  // in the app (centre, facing, width; never any media). When the room has no screen yet and I hold the
+  // remote, that screen is stood exactly there, once; the host may still move or remove it, and a room that
+  // already has a screen keeps it. Host-placed remains the fallback for worlds exported without one.
+  let seed = null, seedSent = false;
+  function setSeed(c) {
+    seed = (c && Array.isArray(c.pos) && c.pos.length === 3 && c.pos.every(Number.isFinite))
+      ? { pos: c.pos.map(Number), yaw: Number(c.yaw) || 0, w: clamp(Number(c.w) || 8, 2, 60) } : null;
+    trySeed();
+  }
+  function trySeed() {
+    if (!seed || seedSent || !(joinedRoom && joinedRoom()) || !isHost()) return;
+    seedSent = true;
+    if (state && state.placed) { console.info('[together] cinema: the room already has a screen — the export\'s own is not applied'); return; }
+    sendCinema({ pos: seed.pos, yaw: seed.yaw, w: seed.w });
+    console.info('[together] cinema seeded from the export', JSON.stringify(seed));
+  }
   const group = new THREE.Group(); group.name = 'Thalyn_Cinema'; group.visible = false; scene.add(group);
   let W = 8, H = 4.5;
   const frameMat = new THREE.MeshStandardMaterial({ color: 0x1a1512, roughness: 0.6, metalness: 0.2 });
@@ -399,7 +419,7 @@ function makeCinema({ scene, camera, dom, onState, isHost, serverNow, sendCinema
   function onResize(w, h) { css.setSize(w, h); }
   onResize(innerWidth, innerHeight);
   addEventListener('resize', () => onResize(innerWidth, innerHeight));
-  return { apply, placeHere, remove, resize, load, play, pause, seek, resync, join, nudge, tick, dispose,
+  return { apply, placeHere, remove, resize, load, play, pause, seek, resync, join, nudge, tick, dispose, setSeed, trySeed,
     get state() { return state; }, get placed() { return !!(state && state.placed); }, get hasShowing() { return !!(state && state.source); }, get joined() { return joined; },
     get playing() { return !!(state && state.state === 'playing'); }, get width() { return W; }, group };
 }
