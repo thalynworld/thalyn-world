@@ -228,7 +228,7 @@ export function makeTogether(opts) {
 // sits over the canvas (so it draws on top of the world — nothing can stand in front of it, an accepted
 // V1 limit); a plain media file is a VideoTexture on the screen mesh itself (fully in the world).
 // Sync: the host's state {playing|paused, t, at(serverTs)} → everyone snaps to t + (now − at).
-function makeCinema({ scene, camera, dom, onState, isHost, joinedRoom, serverNow, sendCinema }) {
+export function makeCinema({ scene, camera, dom, onState, isHost, joinedRoom, serverNow, sendCinema }) {
   let state = null;            // last cinema record from the room
   // A165 · THE WORLD'S OWN SCREEN. A Thalyn export carries `extras.thalyn.cinema` — the screen the maker stood
   // in the app (centre, facing, width; never any media). When the room has no screen yet and I hold the

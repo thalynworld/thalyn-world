@@ -455,6 +455,7 @@ function applyThalynBlock(tx) {
       ? { pos: cs.position, yaw: (Number(cs.yawDeg) || 0) * Math.PI / 180, pitch: (Number(cs.pitchDeg) || 0) * Math.PI / 180, floating: !!cs.floating, w: Number(cs.width) || 8 } : null;
     if (cinemaSeed) console.info('[thalyn] cinema: the world carries a screen (' + cinemaSeed.w.toFixed(1) + ' m wide' + (cinemaSeed.floating ? ', floating' : '') + (cs.count > 1 ? ', ' + cs.count + ' standing' : '') + ') — a shared session stands it there');
     if (together) together.setCinemaSeed(cinemaSeed);
+    syncSoloScreen();
     // HUD: world name · tone · clock · weather, the postcard code, the shot.
     const name = String(tx.worldName || tx.sceneName || 'Thalyn world').slice(0, 40);
     $('w-row').style.display = '';
@@ -897,6 +898,19 @@ postUp({ type: 'thalyn:ready' }); // announce once on startup (parent also pings
 const RELAY_BASE = 'https://thalyn-together.curly-disk-aea2.workers.dev';
 let together = null;
 let cinemaSeed = null;   // A165 · the screen the maker stood in the app (extras.thalyn.cinema): {pos, yaw, w}, or null
+// A170 · THE WORLD'S OWN SCREEN STANDS EVEN WITHOUT A SESSION (founder 2026-09-02 22:15: "where is the giant screen I
+// exported?" — he opened the plain link). A solo view gets the same framed screen at the exported pose, dark until a
+// session gives it a showing; the moment a session starts, the room's screen takes over and this one goes.
+let soloScreen = null;
+function syncSoloScreen() {
+  if (soloScreen) { soloScreen.dispose(); soloScreen = null; }
+  if (!cinemaSeed || together) return;
+  try {
+    soloScreen = TG.makeCinema({ scene, camera, dom: document.body, onState: () => {}, isHost: () => false, joinedRoom: () => false, serverNow: () => performance.now(), sendCinema: () => {} });
+    soloScreen.apply({ placed: true, pos: cinemaSeed.pos, yaw: cinemaSeed.yaw, pitch: cinemaSeed.pitch, floating: cinemaSeed.floating, w: cinemaSeed.w, source: null, state: 'paused', t: 0, at: 0 }, 0);
+    console.info('[thalyn] cinema: the world\'s own screen is standing (solo view — start a session to put a showing on it)');
+  } catch (e) { console.warn('[thalyn] solo screen failed', e); soloScreen = null; }
+}
 const tgEl = $('tg');
 function tgRefresh() {
   if (!together) return;
@@ -913,6 +927,7 @@ function tgRefresh() {
 function startTogether(session, name, voice) {
   if (together) together.close();
   const relay = (() => { const r = paramsEarly.get('relay'); if (!r) return RELAY_BASE; try { const u = new URL(r); return (u.protocol === 'https:' || u.hostname === 'localhost' || u.hostname === '127.0.0.1') ? u.origin : RELAY_BASE; } catch (e) { return RELAY_BASE; } })();
+  if (soloScreen) { soloScreen.dispose(); soloScreen = null; }   // A170 · the room's screen takes over
   together = TG.makeTogether({ relay, session, name, camera, scene, dom: document.body, voice, cinemaSeed,
     onStatus: t => { $('tg-status').textContent = t; tgRefresh(); },
     onPeers: () => tgRefresh(), onHost: () => tgRefresh() });
@@ -952,7 +967,7 @@ $('b-together').onclick = () => {
 };
 $('tg-invite').onclick = showInvite;
 $('tg-wave').onclick = () => { if (together) { together.wave(); toast('You waved'); } };
-$('tg-leave').onclick = () => { if (together) { together.close(); together = null; } tgEl.classList.remove('show'); $('tg-showing').classList.remove('show'); $('tg-ptt').classList.remove('show'); const u = new URL(location.href); u.searchParams.delete('session'); history.replaceState(null, '', u.toString()); $('b-together').textContent = 'Invite a friend here…'; toast('You left the session'); };
+$('tg-leave').onclick = () => { if (together) { together.close(); together = null; } syncSoloScreen(); tgEl.classList.remove('show'); $('tg-showing').classList.remove('show'); $('tg-ptt').classList.remove('show'); const u = new URL(location.href); u.searchParams.delete('session'); history.replaceState(null, '', u.toString()); $('b-together').textContent = 'Invite a friend here…'; toast('You left the session'); };
 $('tg-place').onclick = () => together && together.cinema.placeHere();
 $('tg-remove').onclick = () => together && together.cinema.remove();
 $('tg-load').onclick = () => { if (together && together.cinema.load($('tg-url').value)) { if (!together.cinema.placed) together.cinema.placeHere(); toast('Loading the showing for everyone'); } };
@@ -1008,6 +1023,7 @@ renderer.setAnimationLoop(() => {
   }
   audio.tick(dt, camera);
   if (together) together.tick(dt);
+  else if (soloScreen) soloScreen.tick(dt);
   if (perf) perf.tick(dt, { tier: tier.name, falls: waterfalls.awake + '/' + waterfalls.count + ' (' + waterfalls.particles + ' spray)', lanterns: lanterns.lit + '/' + lanterns.count + ' lit', fauna: fauna.awake + '/' + fauna.count + ' · ' + fauna.birds + ' birds', weather: weather.particles + ' drops', voices: audio.voices + '/' + audio.sources, together: together ? (together.peers.length + 1) + ' here · ' + together.rtt.toFixed(0) + ' ms' : 'off' });
   // Sun shafts: aim the radial pass at the sun's screen position; fade out off-screen / at night / in weather.
   _sunV.copy(state.sunDir).multiplyScalar(2000).add(camera.position).project(camera);
