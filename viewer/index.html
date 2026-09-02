@@ -431,13 +431,13 @@ function applyThalynBlock(tx) {
     apply();
     if (tx.water && tx.water.present) TA.tintWater(tx.water, worldRoot, kit.lavaMats);
     if (anchorRoot && anchorRoot.parent) anchorRoot.parent.remove(anchorRoot);
-    anchorRoot = TA.buildAnchors(tx.anchors, worldRoot);
+    anchorRoot = TA.buildAnchors(tx.anchors, worldRoot, (typeof tier !== 'undefined' ? tier.table.fireLights : 48));
     // Living worlds: the falls the world measured run; water edges, falls and tree cover sound from where they are.
     const lv = tx.living && tx.living.present ? tx.living : null;
     const shallow = tx.water && TA.rgbOf(tx.water.shallow);
     const fallTint = shallow ? shallow.clone().lerp(new THREE.Color(0.92, 0.96, 0.98), 0.55) : new THREE.Color(0.62, 0.82, 0.9);
     const nFalls = waterfalls.build(lv ? lv.waterfalls : null, fallTint);
-    audio.setWorld({ waterfalls: lv ? lv.waterfalls : [], liquids: tx.liquids || [], canopies: lv ? lv.canopies : [] });
+    audio.setWorld({ waterfalls: lv ? lv.waterfalls : [], liquids: tx.liquids || [], canopies: lv ? lv.canopies : [], anchors: tx.anchors || [] });
     if (lv) console.info('[thalyn] living: ' + nFalls + ' waterfall(s) built of ' + ((lv.waterfalls || []).length) + ', ' + ((lv.canopies || []).length) + ' canopy zone(s), ' + audio.sources + ' sound source(s)');
     // HUD: world name · tone · clock · weather, the postcard code, the shot.
     const name = String(tx.worldName || tx.sceneName || 'Thalyn world').slice(0, 40);
@@ -784,6 +784,7 @@ tier.on((t, name) => {
   waterfalls.setBudget(t);
   audio.setVoiceCap(t.voices);
   post.setQuality(t);
+  if (anchorRoot && pendingThalyn) { anchorRoot.parent && anchorRoot.parent.remove(anchorRoot); anchorRoot = TA.buildAnchors(pendingThalyn.anchors, worldRoot, t.fireLights); }
   $('r-quality').value = tier.auto ? 'auto' : name;
   $('s-quality').textContent = (tier.auto ? 'Auto → ' : '') + t.label + (tier.auto && tier.guess.why ? ' (' + tier.guess.why + ')' : '');
   resizeToViewport();

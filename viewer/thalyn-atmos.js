@@ -221,10 +221,13 @@ function glowTexture() {
   glowTex = new THREE.CanvasTexture(cv); glowTex.colorSpace = THREE.SRGBColorSpace;
   return glowTex;
 }
-export function buildAnchors(list, parent) {
+// maxLights = the tier's point-light budget (TIERS.fireLights): every fire keeps its glow sprite, only the
+// first N also cast real light — a phone is never asked to shade dozens of point lights.
+export function buildAnchors(list, parent, maxLights = 48) {
   const root = new THREE.Group(); root.name = 'Thalyn_Anchors';
   const flames = [];
-  for (const a of (Array.isArray(list) ? list : []).slice(0, 48)) {
+  let lit = 0;
+  for (const a of (Array.isArray(list) ? list : []).slice(0, 96)) {
     const p = a && a.position; if (!Array.isArray(p) || p.length < 3) continue;
     const kind = String(a.builder || '').toLowerCase();
     const torch = kind.includes('torch'), hearth = kind.includes('hearth') || kind.includes('fire') || kind.includes('camp');
@@ -232,6 +235,7 @@ export function buildAnchors(list, parent) {
     const colour = torch ? 0xffb050 : 0xff8a38;
     const light = new THREE.PointLight(colour, torch ? 14 : 28, torch ? 12 : 22, 2);
     light.position.set(p[0], p[1] + (torch ? 1.6 : 0.9), p[2]);
+    light.visible = lit++ < maxLights;
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: colour, transparent: true,
       blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.85 }));
     const base = torch ? 1.4 : 3.2;
@@ -248,7 +252,8 @@ export function tickAnchors(root, t) {
   const flames = root && root.userData && root.userData.flames; if (!flames) return;
   for (const f of flames) {
     const n = 0.86 + 0.14 * Math.sin(t * 9.1 + f.phase) * Math.sin(t * 3.7 + f.phase * 1.3) + 0.06 * Math.sin(t * 23 + f.phase);
-    f.light.intensity = f.base * n; f.sprite.scale.setScalar(f.scale * (0.92 + 0.08 * n));
+    if (f.light.visible) f.light.intensity = f.base * n;
+    f.sprite.scale.setScalar(f.scale * (0.92 + 0.08 * n));
   }
 }
 
@@ -896,6 +901,22 @@ export function makeSoundscape(baseUrl = 'audio/') {
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(level, t + dur * 0.3); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
     src.connect(f); f.connect(g); g.connect(v.gain); src.start(t); src.stop(t + dur + 0.05);
   }
+  // A fire: a low filtered-noise bed with random pops (short bandpass bursts) — heard from the hearth.
+  function addHearth(a, torch) {
+    const p = v3(a.position); if (!p) return;
+    const v = voice('hearth', p.clone().setY(p.y + (torch ? 1.4 : 0.6)), { ref: torch ? 1.5 : 2.5, max: torch ? 24 : 45, roll: 1.3,
+      build(v) { noiseChain(v, noiseBuf, [{ type: 'lowpass', f: 900, q: 0.6 }], torch ? 0.28 : 0.45); v.next = Math.random(); },
+      free: freeNodes });
+    v.want = torch ? 0.45 : 0.7;
+    v.update = (dt) => {
+      if (!v.built || v.level < 0.03) return;
+      v.next -= dt;
+      if (v.next > 0) return;
+      v.next = 0.08 + Math.random() * (torch ? 0.9 : 0.5);
+      burst(v, whiteBuf, 1800 + Math.random() * 2600, 0.12 + Math.random() * 0.2, 0.03 + Math.random() * 0.06);
+    };
+    sources.push(v);
+  }
   function addCanopy(c) {
     const p = v3(c.center); if (!p) return;
     const r = Math.max(8, +c.radius || 18);
@@ -951,6 +972,10 @@ export function makeSoundscape(baseUrl = 'audio/') {
       addShore({ cx: -l.centerXZ[0], cz: l.centerXZ[1], hx, hz, y: +l.surfaceY || 0 }); // app → viewer frame: X negated
     }
     for (const c of (world.canopies || []).slice(0, 14)) addCanopy(c);
+    for (const a of (world.anchors || []).slice(0, 48)) {
+      const k = String(a && a.builder || '').toLowerCase();
+      if (k.includes('torch')) addHearth(a, true); else if (k.includes('hearth') || k.includes('fire') || k.includes('camp')) addHearth(a, false);
+    }
     if (ctx) for (const v of sources) v.attach();
   }
   function tick(dt, camera) {
@@ -1006,9 +1031,9 @@ export function steamLink(source) {
 // frame rate in the app. Here nothing sizes itself — every effect registers with makeTier and reads
 // its numbers from the row below; a new effect adds a column, never a private constant.
 export const TIERS = {
-  high:   { label: 'Desktop', pixelRatio: 2.0, shadows: true,  shadowMap: 2048, msaa: 4, bloom: true,  shafts: true,  weather: 1.0,  sprayPerFall: 220, fallsMax: 24, sheetRows: 28, foam: true,  voices: 12, canopies: 6, wisps: 8 },
-  laptop: { label: 'Laptop',  pixelRatio: 1.5, shadows: true,  shadowMap: 1024, msaa: 2, bloom: true,  shafts: false, weather: 0.55, sprayPerFall: 90,  fallsMax: 12, sheetRows: 20, foam: true,  voices: 8,  canopies: 4, wisps: 8 },
-  lite:   { label: 'Phone',   pixelRatio: 1.0, shadows: false, shadowMap: 512,  msaa: 0, bloom: false, shafts: false, weather: 0.30, sprayPerFall: 36,  fallsMax: 6,  sheetRows: 12, foam: false, voices: 5,  canopies: 3, wisps: 8 },
+  high:   { label: 'Desktop', pixelRatio: 2.0, shadows: true,  shadowMap: 2048, msaa: 4, bloom: true,  shafts: true,  weather: 1.0,  sprayPerFall: 220, fallsMax: 24, sheetRows: 28, foam: true,  voices: 12, canopies: 6, wisps: 8, fireLights: 48 },
+  laptop: { label: 'Laptop',  pixelRatio: 1.5, shadows: true,  shadowMap: 1024, msaa: 2, bloom: true,  shafts: false, weather: 0.55, sprayPerFall: 90,  fallsMax: 12, sheetRows: 20, foam: true,  voices: 8,  canopies: 4, wisps: 8, fireLights: 20 },
+  lite:   { label: 'Phone',   pixelRatio: 1.0, shadows: false, shadowMap: 512,  msaa: 0, bloom: false, shafts: false, weather: 0.30, sprayPerFall: 36,  fallsMax: 6,  sheetRows: 12, foam: false, voices: 5,  canopies: 3, wisps: 8, fireLights: 6 },
 };
 // Heuristic: what the device says about itself. Returns { name, why } so the HUD can show the reason.
 export function guessTier(renderer) {
