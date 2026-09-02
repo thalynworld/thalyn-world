@@ -1031,9 +1031,9 @@ export function steamLink(source) {
 // frame rate in the app. Here nothing sizes itself — every effect registers with makeTier and reads
 // its numbers from the row below; a new effect adds a column, never a private constant.
 export const TIERS = {
-  high:   { label: 'Desktop', pixelRatio: 2.0, shadows: true,  shadowMap: 2048, msaa: 4, bloom: true,  shafts: true,  weather: 1.0,  sprayPerFall: 220, fallsMax: 24, sheetRows: 28, foam: true,  voices: 12, canopies: 6, wisps: 8, fireLights: 48 },
-  laptop: { label: 'Laptop',  pixelRatio: 1.5, shadows: true,  shadowMap: 1024, msaa: 2, bloom: true,  shafts: false, weather: 0.55, sprayPerFall: 90,  fallsMax: 12, sheetRows: 20, foam: true,  voices: 8,  canopies: 4, wisps: 8, fireLights: 20 },
-  lite:   { label: 'Phone',   pixelRatio: 1.0, shadows: false, shadowMap: 512,  msaa: 0, bloom: false, shafts: false, weather: 0.30, sprayPerFall: 36,  fallsMax: 6,  sheetRows: 12, foam: false, voices: 5,  canopies: 3, wisps: 8, fireLights: 6 },
+  high:   { label: 'Desktop', pixelRatio: 2.0, shadows: true,  shadowMap: 2048, msaa: 4, bloom: true,  shafts: true,  weather: 1.0,  sprayPerFall: 220, fallsMax: 24, sheetRows: 28, foam: true,  voices: 12, canopies: 6, wisps: 8, fireLights: 48, lanternLights: 16 },
+  laptop: { label: 'Laptop',  pixelRatio: 1.5, shadows: true,  shadowMap: 1024, msaa: 2, bloom: true,  shafts: false, weather: 0.55, sprayPerFall: 90,  fallsMax: 12, sheetRows: 20, foam: true,  voices: 8,  canopies: 4, wisps: 8, fireLights: 20, lanternLights: 8 },
+  lite:   { label: 'Phone',   pixelRatio: 1.0, shadows: false, shadowMap: 512,  msaa: 0, bloom: false, shafts: false, weather: 0.30, sprayPerFall: 36,  fallsMax: 6,  sheetRows: 12, foam: false, voices: 5,  canopies: 3, wisps: 8, fireLights: 6, lanternLights: 3 },
 };
 // Heuristic: what the device says about itself. Returns { name, why } so the HUD can show the reason.
 export function guessTier(renderer) {
@@ -1289,4 +1289,76 @@ export function makePerfHud(renderer) {
     },
     get text() { return shown; },
   };
+}
+
+// ── Lanterns, fairy lights, water lights: the world's glow points ────────────
+// `extras.thalyn.living.lights[]` is every point the app itself lights — string-light bulbs, hung lanterns,
+// floating water lanterns — {pos, color, kind: 'lantern'|'water'|'bulb', priority, mul}. The app's own
+// design is reproduced: glow mass is FREE (an additive sprite per point, bloom does the rest) and realness
+// is a small ROLLING POOL of true point lights that re-assign to the points nearest the camera. Water
+// lanterns bob. Everything fades up with the night (by day a lit lantern is a faint warm dot).
+let lanternTex = null;
+function lanternTexture() {
+  if (lanternTex) return lanternTex;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+  const g = cv.getContext('2d'); const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.22, 'rgba(255,255,255,0.85)'); grd.addColorStop(0.5, 'rgba(255,255,255,0.28)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+  lanternTex = new THREE.CanvasTexture(cv); lanternTex.colorSpace = THREE.SRGBColorSpace; return lanternTex;
+}
+export function makeLanterns(scene) {
+  const root = new THREE.Group(); root.name = 'Thalyn_Lanterns'; scene.add(root);
+  const points = [];            // { pos, base(Vector3), color, kind, sprite, mul, phase }
+  const pool = [];              // PointLights
+  let poolSize = 16, night = 0, acc = 0;
+  const _c = new THREE.Vector3();
+  function build(list) {
+    clear();
+    for (const e of (Array.isArray(list) ? list : []).slice(0, 600)) {
+      const p = v3(e.pos); if (!p) continue;
+      const col = rgbOf(e.color) || new THREE.Color(1.0, 0.78, 0.45);
+      const kind = String(e.kind || 'lantern');
+      const size = kind === 'bulb' ? 0.55 : (kind === 'water' ? 1.1 : 0.9);
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: lanternTexture(), color: col, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.9 }));
+      sprite.scale.setScalar(size * (0.8 + 0.6 * clamp(+e.mul || 1, 0.5, 2))); sprite.position.copy(p); sprite.renderOrder = 8;
+      root.add(sprite);
+      points.push({ pos: p.clone(), base: p, color: col, kind, sprite, mul: clamp(+e.mul || 1, 0.5, 2), priority: +e.priority || 0, phase: Math.random() * 6.28, light: null });
+    }
+    ensurePool();
+    return points.length;
+  }
+  function ensurePool() {
+    while (pool.length < poolSize) { const l = new THREE.PointLight(0xffc878, 0, 14, 2); l.visible = false; root.add(l); pool.push(l); }
+    while (pool.length > poolSize) { const l = pool.pop(); root.remove(l); }
+  }
+  function setBudget(t) { poolSize = Math.max(0, (t && t.lanternLights) | 0); ensurePool(); }
+  function setNight(n) { night = clamp(n, 0, 1); }
+  function tick(dt, camera) {
+    if (!points.length) return;
+    const t = performance.now() / 1000;
+    const glow = 0.18 + 0.82 * night;                 // lanterns come alive with the dark
+    for (const pt of points) {
+      if (pt.kind === 'water') { pt.pos.y = pt.base.y + Math.sin(t * 0.9 + pt.phase) * 0.04; pt.sprite.position.y = pt.pos.y; }
+      const flick = 0.92 + 0.08 * Math.sin(t * 6.3 + pt.phase) * Math.sin(t * 2.1 + pt.phase * 1.7);
+      pt.sprite.material.opacity = glow * flick;
+      if (pt.light) { pt.light.position.copy(pt.pos); pt.light.intensity = (pt.kind === 'bulb' ? 4 : 9) * pt.mul * glow * flick; }
+    }
+    acc += dt;
+    if (acc < 0.4 || !pool.length) return;
+    acc = 0;
+    // the rolling pool: the N nearest points (priority breaks ties) own the real lights
+    camera.getWorldPosition(_c);
+    const ranked = points.map(pt => ({ pt, d: pt.pos.distanceToSquared(_c) - pt.priority * 25 })).sort((a, b) => a.d - b.d);
+    const keep = new Set();
+    for (let i = 0; i < Math.min(poolSize, ranked.length); i++) keep.add(ranked[i].pt);
+    for (const pt of points) if (pt.light && !keep.has(pt)) { pt.light.visible = false; pool.push(pt.light); pt.light = null; }
+    const free = pool.filter(l => !l.visible);
+    for (const pt of keep) {
+      if (pt.light) continue;
+      const l = free.pop(); if (!l) break;
+      l.visible = true; l.color.copy(pt.color); l.distance = pt.kind === 'bulb' ? 8 : 14; pt.light = l;
+    }
+  }
+  function clear() { for (const pt of points) { root.remove(pt.sprite); pt.sprite.material.dispose(); } points.length = 0; for (const l of pool) l.visible = false; }
+  return { build, tick, setBudget, setNight, clear, root, get count() { return points.length; }, get lit() { let n = 0; for (const pt of points) if (pt.light) n++; return n; } };
 }

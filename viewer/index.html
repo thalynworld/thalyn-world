@@ -359,6 +359,7 @@ const kit = TA.makeMaterialKit();
 const weather = TA.makeWeather(scene, camera);
 const audio = TA.makeSoundscape('audio/');   // beds + positional voices (waterfalls / shores / canopies)
 const waterfalls = TA.makeWaterfalls(scene);
+const lanterns = TA.makeLanterns(scene);      // string-light bulbs, hung lanterns, water lights — the app's glow points
 let fileWeather = '', weatherOverride = '', currentModelURL = null;
 const _sunV = new THREE.Vector3();
 function setWeather() { weather.set(weatherOverride || fileWeather); apply(); }
@@ -437,8 +438,9 @@ function applyThalynBlock(tx) {
     const shallow = tx.water && TA.rgbOf(tx.water.shallow);
     const fallTint = shallow ? shallow.clone().lerp(new THREE.Color(0.92, 0.96, 0.98), 0.55) : new THREE.Color(0.62, 0.82, 0.9);
     const nFalls = waterfalls.build(lv ? lv.waterfalls : null, fallTint);
+    const nLights = lanterns.build(lv ? lv.lights : null); lanterns.setNight(state.night);
     audio.setWorld({ waterfalls: lv ? lv.waterfalls : [], liquids: tx.liquids || [], canopies: lv ? lv.canopies : [], anchors: tx.anchors || [] });
-    if (lv) console.info('[thalyn] living: ' + nFalls + ' waterfall(s) built of ' + ((lv.waterfalls || []).length) + ', ' + ((lv.canopies || []).length) + ' canopy zone(s), ' + audio.sources + ' sound source(s)');
+    if (lv) console.info('[thalyn] living: ' + nFalls + ' waterfall(s) built of ' + ((lv.waterfalls || []).length) + ', ' + ((lv.canopies || []).length) + ' canopy zone(s), ' + nLights + ' lantern/bulb light(s), ' + audio.sources + ' sound source(s)');
     // HUD: world name · tone · clock · weather, the postcard code, the shot.
     const name = String(tx.worldName || tx.sceneName || 'Thalyn world').slice(0, 40);
     $('w-row').style.display = '';
@@ -498,6 +500,7 @@ function clearWorld() {
   kit.reset();
   skyEnv.useDome(null);
   waterfalls.clear();
+  lanterns.clear();
   audio.setWorld(null);
 }
 
@@ -782,6 +785,7 @@ tier.on((t, name) => {
   if (L.sun.shadow.mapSize.x !== t.shadowMap) { L.sun.shadow.mapSize.set(t.shadowMap, t.shadowMap); if (L.sun.shadow.map) { L.sun.shadow.map.dispose(); L.sun.shadow.map = null; } }
   weather.setBudget(t.weather);
   waterfalls.setBudget(t);
+  lanterns.setBudget(t);
   audio.setVoiceCap(t.voices);
   post.setQuality(t);
   if (anchorRoot && pendingThalyn) { anchorRoot.parent && anchorRoot.parent.remove(anchorRoot); anchorRoot = TA.buildAnchors(pendingThalyn.anchors, worldRoot, t.fireLights); }
@@ -977,10 +981,11 @@ renderer.setAnimationLoop(() => {
     TA.tickAnchors(anchorRoot, kit.uWindTime.value);
     weather.tick(dt, kit.uWindStrength.value);
     waterfalls.tick(dt, camera, scene.fog ? scene.fog.density : 0, scene.fog ? scene.fog.color : null);
+    lanterns.setNight(state.night); lanterns.tick(dt, camera);
   }
   audio.tick(dt, camera);
   if (together) together.tick(dt);
-  if (perf) perf.tick(dt, { tier: tier.name, falls: waterfalls.awake + '/' + waterfalls.count + ' (' + waterfalls.particles + ' spray)', weather: weather.particles + ' drops', voices: audio.voices + '/' + audio.sources, together: together ? (together.peers.length + 1) + ' here · ' + together.rtt.toFixed(0) + ' ms' : 'off' });
+  if (perf) perf.tick(dt, { tier: tier.name, falls: waterfalls.awake + '/' + waterfalls.count + ' (' + waterfalls.particles + ' spray)', lanterns: lanterns.lit + '/' + lanterns.count + ' lit', weather: weather.particles + ' drops', voices: audio.voices + '/' + audio.sources, together: together ? (together.peers.length + 1) + ' here · ' + together.rtt.toFixed(0) + ' ms' : 'off' });
   // Sun shafts: aim the radial pass at the sun's screen position; fade out off-screen / at night / in weather.
   _sunV.copy(state.sunDir).multiplyScalar(2000).add(camera.position).project(camera);
   const shaftsOn = skyOn && weather.shaftsOk && state.sunDir.y > 0.04 && state.night < 0.5
