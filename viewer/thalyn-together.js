@@ -237,14 +237,14 @@ function makeCinema({ scene, camera, dom, onState, isHost, joinedRoom, serverNow
   let seed = null, seedSent = false;
   function setSeed(c) {
     seed = (c && Array.isArray(c.pos) && c.pos.length === 3 && c.pos.every(Number.isFinite))
-      ? { pos: c.pos.map(Number), yaw: Number(c.yaw) || 0, w: clamp(Number(c.w) || 8, 2, 60) } : null;
+      ? { pos: c.pos.map(Number), yaw: Number(c.yaw) || 0, pitch: clamp(Number(c.pitch) || 0, -1.55, 1.55), floating: !!c.floating, w: clamp(Number(c.w) || 8, 2, 60) } : null;
     trySeed();
   }
   function trySeed() {
     if (!seed || seedSent || !(joinedRoom && joinedRoom()) || !isHost()) return;
     seedSent = true;
     if (state && state.placed) { console.info('[together] cinema: the room already has a screen — the export\'s own is not applied'); return; }
-    sendCinema({ pos: seed.pos, yaw: seed.yaw, w: seed.w });
+    sendCinema({ pos: seed.pos, yaw: seed.yaw, pitch: seed.pitch, floating: seed.floating, w: seed.w });
     console.info('[together] cinema seeded from the export', JSON.stringify(seed));
   }
   const group = new THREE.Group(); group.name = 'Thalyn_Cinema'; group.visible = false; scene.add(group);
@@ -345,8 +345,10 @@ function makeCinema({ scene, camera, dom, onState, isHost, joinedRoom, serverNow
     const prevSrc = state && (state.source + state.id + state.url);
     state = c;
     if (c && c.placed && Array.isArray(c.pos)) {
-      group.position.set(c.pos[0], c.pos[1], c.pos[2]); group.rotation.set(0, c.yaw || 0, 0);
+      // Yaw about the world's up, then pitch about the screen's own horizontal axis (a floating screen looks down at you).
+      group.position.set(c.pos[0], c.pos[1], c.pos[2]); group.rotation.order = 'YXZ'; group.rotation.set(c.pitch || 0, c.yaw || 0, 0);
       W = c.w || 8; H = W * 9 / 16; layout(); group.visible = true;
+      legL.visible = legR.visible = !c.floating;   // a floating screen has nothing to stand on
     } else group.visible = false;
     const src = c && (c.source + c.id + c.url);
     if (c && c.source && src !== prevSrc) {
@@ -365,7 +367,7 @@ function makeCinema({ scene, camera, dom, onState, isHost, joinedRoom, serverNow
     const yaw = Math.atan2(-f.x, -f.z); // face back toward the placer
     const w = state && state.w ? state.w : 8;
     p.y += w * 9 / 16 * 0.5 + 0.4;
-    sendCinema({ pos: [p.x, p.y, p.z], yaw, w });
+    sendCinema({ pos: [p.x, p.y, p.z], yaw, w, pitch: 0, floating: false });
   }
   function remove() { if (isHost()) sendCinema({ placed: false, source: null }); }
   function resize(w) { if (isHost()) sendCinema({ w: clamp(w, 2, 60) }); }

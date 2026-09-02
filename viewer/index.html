@@ -446,8 +446,8 @@ function applyThalynBlock(tx) {
     // A165 · the world's own cinema screen: stood for a shared session where the maker put it (the host may still move it).
     const cs = tx.cinema;
     cinemaSeed = (cs && cs.present && Array.isArray(cs.position) && cs.position.length === 3)
-      ? { pos: cs.position, yaw: (Number(cs.yawDeg) || 0) * Math.PI / 180, w: Number(cs.width) || 8 } : null;
-    if (cinemaSeed) console.info('[thalyn] cinema: the world carries a screen (' + cinemaSeed.w.toFixed(1) + ' m wide' + (cs.count > 1 ? ', ' + cs.count + ' standing' : '') + ') — a shared session stands it there');
+      ? { pos: cs.position, yaw: (Number(cs.yawDeg) || 0) * Math.PI / 180, pitch: (Number(cs.pitchDeg) || 0) * Math.PI / 180, floating: !!cs.floating, w: Number(cs.width) || 8 } : null;
+    if (cinemaSeed) console.info('[thalyn] cinema: the world carries a screen (' + cinemaSeed.w.toFixed(1) + ' m wide' + (cinemaSeed.floating ? ', floating' : '') + (cs.count > 1 ? ', ' + cs.count + ' standing' : '') + ') — a shared session stands it there');
     if (together) together.setCinemaSeed(cinemaSeed);
     // HUD: world name · tone · clock · weather, the postcard code, the shot.
     const name = String(tx.worldName || tx.sceneName || 'Thalyn world').slice(0, 40);
