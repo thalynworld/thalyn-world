@@ -345,6 +345,8 @@ function apply() {
   kit.uWindStrength.value = Math.max(kit.uWindStrength.value, weather.windFloor * 1.4); // storms lean the trees
   TA.applyState(s, L, renderer, scene, fogOn || weather.fogMul > 1.05);
   L.sky.visible = skyOn && !skyEnv.active;
+  // No baked dome → the studio room IBL lights everything; at night that reads as a lit-from-nowhere ground. Drop it after dusk.
+  if (!skyEnv.active) scene.environment = state.night > 0.5 ? null : roomEnv;
   $('r-exp').value = renderer.toneMappingExposure;
   $('r-sun').value = Math.min(0.95, Math.max(0.05, state.sunDir.y));
   $('t-fog').checked = fogOn;
@@ -535,6 +537,10 @@ function ingest(gltf) {
       o.castShadow = true; o.receiveShadow = true;
       meshCount++;
       const g = o.geometry;
+      // A mesh without normals is flat-shaded from screen derivatives, which go NaN on a flat quad — and one NaN pixel
+      // through the bloom blur blacks out (or whites out) the frame. Real Thalyn exports carry normals; hand-made and
+      // third-party GLBs may not. Compute them once here.
+      if (g && g.attributes.position && !g.attributes.normal) { try { g.computeVertexNormals(); } catch (e) {} }
       if (g && g.index) triCount += g.index.count / 3;
       else if (g && g.attributes.position) triCount += g.attributes.position.count / 3;
       if (kit.upgradeLiquid(o)) return; // animated water/lava — no wind sway
@@ -982,6 +988,7 @@ renderer.setAnimationLoop(() => {
     weather.tick(dt, kit.uWindStrength.value);
     waterfalls.tick(dt, camera, scene.fog ? scene.fog.density : 0, scene.fog ? scene.fog.color : null);
     lanterns.setNight(state.night); lanterns.tick(dt, camera);
+    waterfalls.setLight(Math.max(0.08, 1 - state.night * 0.92) * Math.min(1, 0.4 + state.sunIntensity / 2.2 * weather.sunDim));
   }
   audio.tick(dt, camera);
   if (together) together.tick(dt);

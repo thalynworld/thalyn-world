@@ -331,12 +331,13 @@ export const LOOKS = {
   ember:     { tint: [1.10, 0.96, 0.88], sat: 1.05, con: 1.10, lift: -0.006, vig: 0.42, bloom: 0.50, splitS: [1.04, 0.94, 0.88], splitH: [1.10, 1.00, 0.86] },
   moonlit:   { tint: [0.92, 0.97, 1.10], sat: 0.80, con: 1.06, lift: -0.004, vig: 0.44, bloom: 0.55, splitS: [0.90, 0.95, 1.10], splitH: [1.00, 1.01, 1.05] },
 };
-// The amplifier guard (2026-09-02): a glossy highlight (a roughness-0.04 water plane under a 2× sun) overflows the
-// half-float frame to Infinity, the bloom blur turns that into NaN and smears it — 84% of the frame went BLACK on an
-// RTX with the cinematic pass on, raw render fine. Same defect class as the app's Aug-15 bloom guard; same cure: clamp
-// and drop NaN BEFORE the amplifier. One full-screen pass.
+// The amplifier guard (2026-09-02): NaN or Infinity anywhere in the HDR frame is smeared across it by the bloom blur
+// (84% of the frame went BLACK on an RTX; a mesh WITHOUT normals was the source — three.js flat-shades it from screen
+// derivatives and those go NaN). The source is fixed in ingest (normals computed when missing); this pass stays as the
+// belt: clamp and drop NaN BEFORE the amplifier. ⚠ D3D's shader compiler assumes no NaN and may fold isnan() away
+// (warning X3577) — so never rely on this pass alone; fix NaN at its source.
 const ClampShader = {
-  uniforms: { tDiffuse: { value: null }, uMax: { value: 48.0 } },
+  uniforms: { tDiffuse: { value: null }, uMax: { value: 16.0 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `
     uniform sampler2D tDiffuse; uniform float uMax; varying vec2 vUv;
@@ -1075,7 +1076,7 @@ const SheetShader = {
     void main(){ vUv = uv; vEdge = aEdge; vSeed = aSeed; vN = normalize(normalMatrix * normal);
       vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = -mv.xyz; gl_Position = projectionMatrix * mv; }`,
   fragmentShader: `
-    uniform float uTime; uniform vec3 uTint; uniform float uAlpha; uniform vec3 uFog; uniform float uFogD;
+    uniform float uTime; uniform vec3 uTint; uniform float uAlpha; uniform vec3 uFog; uniform float uFogD; uniform float uLight;
     varying vec2 vUv; varying float vEdge; varying float vSeed; varying vec3 vN; varying vec3 vV;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
@@ -1089,8 +1090,12 @@ const SheetShader = {
       vec3 nn = normalize(vN + vec3(1e-6)); vec3 vv = normalize(vV + vec3(1e-6));
       float rim = pow(max(0.0, 1.0 - abs(dot(nn, vv))), 2.0);
       float lipFade = smoothstep(0.0, 0.08, v);
-      float a = (0.28 + 0.62 * streak) * vEdge * lipFade * uAlpha;
-      vec3 col = mix(uTint, vec3(1.0), streak * 0.75 + rim * 0.25) * (1.0 + 0.35 * streak + 0.3 * rim);
+      // Translucent streaks, not a white wall: alpha lives mostly in the froth, and the sheet is LIT by the scene
+      // (uLight = day 1 → night ~0.08) so at night it reads as dim moving water, never a lamp. Colour is capped so
+      // only the brightest froth crosses the bloom threshold.
+      float a = (0.10 + 0.42 * streak) * vEdge * lipFade * uAlpha;
+      vec3 col = mix(uTint, vec3(1.0), streak * 0.7 + rim * 0.2) * uLight * (0.85 + 0.35 * streak + 0.25 * rim);
+      col = min(col, vec3(1.25));
       float fog = 1.0 - exp(-uFogD * length(vV));
       col = mix(col, uFog, fog);
       gl_FragColor = vec4(col, a * (1.0 - fog * 0.6));
@@ -1099,12 +1104,12 @@ const SheetShader = {
 const FoamShader = {
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-    uniform float uTime; uniform vec3 uTint; uniform float uAlpha; varying vec2 vUv;
+    uniform float uTime; uniform vec3 uTint; uniform float uAlpha; uniform float uLight; varying vec2 vUv;
     // NaN law: atan(0,0) and pow(<0, x) are UNDEFINED in GLSL; one NaN pixel through the bloom blur blacks out the frame.
     void main(){ vec2 q = vUv - 0.5; float r = length(q) * 2.0; float ang = (r > 0.002) ? atan(q.y, q.x) : 0.0;
       float rings = 0.5 + 0.5 * sin(r * 14.0 - uTime * 2.6 + sin(ang * 5.0 + uTime) * 0.6);
-      float a = smoothstep(1.0, 0.25, r) * (0.25 + 0.55 * rings) * smoothstep(0.0, 0.12, r) * uAlpha;
-      gl_FragColor = vec4(mix(uTint, vec3(1.0), 0.7) * 1.2, a); }`,
+      float a = smoothstep(1.0, 0.25, r) * (0.25 + 0.55 * rings) * smoothstep(0.0, 0.12, r) * uAlpha * (0.25 + 0.75 * uLight);
+      gl_FragColor = vec4(mix(uTint, vec3(1.0), 0.7), a); }`,
 };
 const SprayShader = {
   vertexShader: `
@@ -1129,7 +1134,7 @@ export function makeWaterfalls(scene) {
   const falls = [];
   let budget = TIERS.high, pending = null, pendingTint = null;
   const uTime = { value: 0 };
-  const uFog = { value: new THREE.Color(0xbcd0e0) }, uFogD = { value: 0 };
+  const uFog = { value: new THREE.Color(0xbcd0e0) }, uFogD = { value: 0 }, uLight = { value: 1 }, uScale = { value: 900 };
   function sheetGeometry(lip, plunge, dir, width, rows) {
     const cols = 5, W = width, W2 = width * 1.4;
     const side = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
@@ -1180,14 +1185,14 @@ export function makeWaterfalls(scene) {
       const rapids = w.kind === 4;
       const fall = { lip, plunge, width, drop, flow, rapids, group: new THREE.Group(), asleep: false };
       // sheet
-      const sm = new THREE.ShaderMaterial({ uniforms: { uTime, uTint: { value: col }, uAlpha: { value: rapids ? 0.55 : 0.92 }, uFog, uFogD },
+      const sm = new THREE.ShaderMaterial({ uniforms: { uTime, uTint: { value: col }, uAlpha: { value: rapids ? 0.5 : 0.8 }, uFog, uFogD, uLight },
         vertexShader: SheetShader.vertexShader, fragmentShader: SheetShader.fragmentShader, transparent: true, depthWrite: false, side: THREE.DoubleSide });
       const sheet = new THREE.Mesh(sheetGeometry(lip, plunge, dir, width, budget.sheetRows), sm);
       sheet.frustumCulled = true; sheet.renderOrder = 5;
       fall.group.add(sheet); fall.sheet = sheet;
       // foam
       if (budget.foam) {
-        const fm = new THREE.ShaderMaterial({ uniforms: { uTime, uTint: { value: col }, uAlpha: { value: 0.6 + 0.3 * flow } },
+        const fm = new THREE.ShaderMaterial({ uniforms: { uTime, uTint: { value: col }, uAlpha: { value: 0.35 + 0.2 * flow }, uLight },
           vertexShader: FoamShader.vertexShader, fragmentShader: FoamShader.fragmentShader, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
         const foam = new THREE.Mesh(new THREE.CircleGeometry(width * 0.9 + drop * 0.12, 28), fm);
         foam.rotation.x = -Math.PI / 2; foam.position.set(plunge.x, plunge.y + 0.06, plunge.z); foam.renderOrder = 4;
@@ -1198,12 +1203,12 @@ export function makeWaterfalls(scene) {
       if (n > 0) {
         const pos = new Float32Array(n * 3), size = new Float32Array(n), alpha = new Float32Array(n);
         const vel = new Float32Array(n * 3), life = new Float32Array(n), age = new Float32Array(n);
-        for (let i = 0; i < n; i++) { age[i] = Math.random() * 1.2; life[i] = 0.7 + Math.random() * 0.9; size[i] = 28 + Math.random() * 30; }
+        for (let i = 0; i < n; i++) { age[i] = Math.random() * 1.2; life[i] = 0.7 + Math.random() * 0.9; size[i] = 0.10 + Math.random() * 0.22; } // metres
         const g = new THREE.BufferGeometry();
         g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
         g.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
         g.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1).setUsage(THREE.DynamicDrawUsage));
-        const pm = new THREE.ShaderMaterial({ uniforms: { uTex: { value: sprayTexture() }, uTint: { value: col }, uScale: { value: 240 } },
+        const pm = new THREE.ShaderMaterial({ uniforms: { uTex: { value: sprayTexture() }, uTint: { value: col }, uScale },
           vertexShader: SprayShader.vertexShader, fragmentShader: SprayShader.fragmentShader, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
         const pts = new THREE.Points(g, pm); pts.frustumCulled = false; pts.renderOrder = 6;
         fall.group.add(pts);
@@ -1223,8 +1228,11 @@ export function makeWaterfalls(scene) {
     sp.age[i] = 0;
   }
   const _c = new THREE.Vector3();
+  function setLight(v) { uLight.value = clamp(v, 0.05, 1.2); }
   function tick(dt, camera, fogDensity, fogColor) {
     uTime.value += dt;
+    // pixels per metre at 1 m: half the viewport height over tan(fov/2) — a 0.2 m droplet at 10 m is ~20 px at 1080p
+    if (camera && camera.isPerspectiveCamera) uScale.value = (innerHeight * 0.5) / Math.tan(camera.fov * 0.5 * Math.PI / 180);
     if (fogColor) uFog.value.copy(fogColor);
     uFogD.value = fogDensity > 0 ? fogDensity : 0;
     if (!falls.length) return;
@@ -1252,7 +1260,7 @@ export function makeWaterfalls(scene) {
     falls.length = 0;
   }
   function setBudget(t) { budget = t || TIERS.high; if (pending) build(pending, pendingTint); }
-  return { build, tick, clear, setBudget, root,
+  return { build, tick, clear, setBudget, setLight, root,
     get count() { return falls.length; },
     get awake() { let n = 0; for (const f of falls) if (!f.asleep) n++; return n; },
     get particles() { let n = 0; for (const f of falls) if (!f.asleep && f.spray) n += f.spray.n; return n; } };
@@ -1297,6 +1305,8 @@ export function makePerfHud(renderer) {
 // design is reproduced: glow mass is FREE (an additive sprite per point, bloom does the rest) and realness
 // is a small ROLLING POOL of true point lights that re-assign to the points nearest the camera. Water
 // lanterns bob. Everything fades up with the night (by day a lit lantern is a faint warm dot).
+let discGeo = null;
+function discGeometry() { return discGeo || (discGeo = new THREE.CircleGeometry(1.3, 24)); }
 let lanternTex = null;
 function lanternTexture() {
   if (lanternTex) return lanternTex;
@@ -1318,11 +1328,18 @@ export function makeLanterns(scene) {
       const p = v3(e.pos); if (!p) continue;
       const col = rgbOf(e.color) || new THREE.Color(1.0, 0.78, 0.45);
       const kind = String(e.kind || 'lantern');
-      const size = kind === 'bulb' ? 0.55 : (kind === 'water' ? 1.1 : 0.9);
-      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: lanternTexture(), color: col, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.9 }));
+      const size = kind === 'bulb' ? 0.55 : (kind === 'water' ? 0.7 : 0.9);
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: lanternTexture(), color: col, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.6 }));
       sprite.scale.setScalar(size * (0.8 + 0.6 * clamp(+e.mul || 1, 0.5, 2))); sprite.position.copy(p); sprite.renderOrder = 8;
       root.add(sprite);
-      points.push({ pos: p.clone(), base: p, color: col, kind, sprite, mul: clamp(+e.mul || 1, 0.5, 2), priority: +e.priority || 0, phase: Math.random() * 6.28, light: null });
+      // A floating lantern: the app's own ruling (2026-09-01, "water default = ZERO real lights + glow discs") —
+      // a flat additive disc on the surface carries the glow; no point light ever sits on a mirror-smooth water plane.
+      let disc = null;
+      if (kind === 'water') {
+        disc = new THREE.Mesh(discGeometry(), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }));
+        disc.rotation.x = -Math.PI / 2; disc.position.set(p.x, p.y + 0.03, p.z); disc.renderOrder = 7; root.add(disc);
+      }
+      points.push({ pos: p.clone(), base: p, color: col, kind, sprite, disc, mul: clamp(+e.mul || 1, 0.5, 2), priority: +e.priority || 0, phase: Math.random() * 6.28, light: null });
     }
     ensurePool();
     return points.length;
@@ -1340,15 +1357,16 @@ export function makeLanterns(scene) {
     for (const pt of points) {
       if (pt.kind === 'water') { pt.pos.y = pt.base.y + Math.sin(t * 0.9 + pt.phase) * 0.04; pt.sprite.position.y = pt.pos.y; }
       const flick = 0.92 + 0.08 * Math.sin(t * 6.3 + pt.phase) * Math.sin(t * 2.1 + pt.phase * 1.7);
-      pt.sprite.material.opacity = glow * flick;
-      if (pt.light) { pt.light.position.copy(pt.pos); pt.light.intensity = (pt.kind === 'bulb' ? 4 : 9) * pt.mul * glow * flick; }
+      pt.sprite.material.opacity = 0.62 * glow * flick;
+      if (pt.disc) pt.disc.material.opacity = 0.22 * glow * (0.85 + 0.15 * Math.sin(t * 0.7 + pt.phase));
+      if (pt.light) { pt.light.position.copy(pt.pos); pt.light.intensity = (pt.kind === 'bulb' ? 0.9 : 2.2) * pt.mul * glow * flick; }
     }
     acc += dt;
     if (acc < 0.4 || !pool.length) return;
     acc = 0;
     // the rolling pool: the N nearest points (priority breaks ties) own the real lights
     camera.getWorldPosition(_c);
-    const ranked = points.map(pt => ({ pt, d: pt.pos.distanceToSquared(_c) - pt.priority * 25 })).sort((a, b) => a.d - b.d);
+    const ranked = points.filter(pt => pt.kind !== 'water').map(pt => ({ pt, d: pt.pos.distanceToSquared(_c) - pt.priority * 25 })).sort((a, b) => a.d - b.d);
     const keep = new Set();
     for (let i = 0; i < Math.min(poolSize, ranked.length); i++) keep.add(ranked[i].pt);
     for (const pt of points) if (pt.light && !keep.has(pt)) { pt.light.visible = false; pool.push(pt.light); pt.light = null; }
@@ -1356,9 +1374,9 @@ export function makeLanterns(scene) {
     for (const pt of keep) {
       if (pt.light) continue;
       const l = free.pop(); if (!l) break;
-      l.visible = true; l.color.copy(pt.color); l.distance = pt.kind === 'bulb' ? 8 : 14; pt.light = l;
+      l.visible = true; l.color.copy(pt.color); l.distance = pt.kind === 'bulb' ? 6 : 9; pt.light = l;
     }
   }
-  function clear() { for (const pt of points) { root.remove(pt.sprite); pt.sprite.material.dispose(); } points.length = 0; for (const l of pool) l.visible = false; }
+  function clear() { for (const pt of points) { root.remove(pt.sprite); pt.sprite.material.dispose(); if (pt.disc) { root.remove(pt.disc); pt.disc.material.dispose(); } } points.length = 0; for (const l of pool) l.visible = false; }
   return { build, tick, setBudget, setNight, clear, root, get count() { return points.length; }, get lit() { let n = 0; for (const pt of points) if (pt.light) n++; return n; } };
 }
