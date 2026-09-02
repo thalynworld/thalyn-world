@@ -125,6 +125,15 @@
     background: rgba(232,198,106,0.22); color: var(--gold); border: 1px solid rgba(232,198,106,0.6); font-size: 14px; backdrop-filter: blur(8px); }
   #tg-showing.show { display: block; }
   body.walking #tg { opacity: 0.25; pointer-events: none; }
+  .fab { position: fixed; z-index: 15; width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; color: var(--gold); backdrop-filter: blur(8px); font-size: 20px; line-height: 1; }
+  .fab:hover { background: rgba(232,198,106,0.18); }
+  #b-hud { top: 14px; left: 14px; }
+  body:not(.clean) #b-hud { left: 280px; }
+  #b-walk-m { top: 14px; right: 14px; width: auto; padding: 0 14px; font-size: 14px; display: none; }
+  body.touch #b-walk-m { display: flex; }
+  body.walking #b-walk-m { opacity: 0.85; }
+  @media (max-width: 600px) { #hud { width: min(252px, calc(100vw - 28px)); } body:not(.clean) #b-hud { left: 14px; top: auto; bottom: 14px; } }
 </style>
 </head>
 <body>
@@ -244,6 +253,8 @@
 <div id="drop">Release to load</div>
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <a id="cta" href="https://store.steampowered.com/app/4581800/Thalyn/" target="_blank" rel="noopener">Built in Thalyn — make yours ↗</a>
+<button id="b-hud" class="fab" type="button" aria-label="Hide or show the panels" title="Hide / show panels (H)">&#x2715;</button>
+<button id="b-walk-m" class="fab" type="button" aria-label="Walk">Walk</button>
 <button id="b-fs" type="button" aria-label="Enter fullscreen" title="Fullscreen">
   <svg class="fs-enter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
   <svg class="fs-exit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
@@ -656,6 +667,7 @@ const walk = TA.makeWalk(camera, document.body, groundAt, (on, why) => {
   document.body.classList.toggle('walking', on);
   controls.enabled = !on;
   $('b-walk').textContent = on ? (coarsePointer ? 'Stop walking' : 'Orbit (V)') : (coarsePointer ? 'Walk' : 'Walk (V)');
+  $('b-walk-m').textContent = on ? 'Stop' : 'Walk';
   if (on) toast(coarsePointer ? 'Left thumb walks · right thumb looks · push far to run' : 'WASD to walk · Shift to run · E/Q up/down · F back to ground · Esc or V to leave');
   else if (why === 'refused') toast('Pointer lock refused — try V again in a second');
   else { const fwd = new THREE.Vector3(); camera.getWorldDirection(fwd); controls.target.copy(camera.position).addScaledVector(fwd, 30); controls.update(); }
@@ -734,12 +746,18 @@ $('r-exp').oninput = e => { state.exposure = parseFloat(e.target.value); rendere
 addEventListener('keydown', e => {
   if (!walk.onKey(e, true)) return;
   if (e.code === 'KeyV') { toggleWalk(); }
-  else if (e.code === 'KeyH') { document.body.classList.toggle('clean'); }
+  else if (e.code === 'KeyH') { setClean(!document.body.classList.contains('clean')); }
   else if (e.code === 'KeyT' && together && !e.repeat) { together.voice.setTalking(true); $('tg-ptt').classList.add('on'); }
   else if (e.code === 'KeyG' && together && !e.repeat) { together.wave(); toast('You waved'); }
 });
 addEventListener('keyup', e => { walk.onKey(e, false); if (e.code === 'KeyT' && together) { together.voice.setTalking(false); $('tg-ptt').classList.remove('on'); } });
 
+// Panels on/off: the H key, the corner button, ?hidehud=1. Phones start with the panels hidden — the
+// world is the point, and the corner button brings the menu back.
+function setClean(on) { document.body.classList.toggle('clean', on); $('b-hud').innerHTML = on ? '&#x2630;' : '&#x2715;'; $('b-hud').title = on ? 'Show panels (H)' : 'Hide panels (H)'; }
+$('b-hud').onclick = () => setClean(!document.body.classList.contains('clean'));
+if (coarsePointer) { document.body.classList.add('touch'); setClean(true); }
+$('b-walk-m').onclick = toggleWalk;
 let toastT;
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
 
@@ -773,7 +791,7 @@ tier.on((t, name) => {
 });
 $('r-quality').onchange = e => { tier.set(e.target.value); try { localStorage.setItem('thalyn.viewer.q', e.target.value === 'auto' ? '' : e.target.value); } catch (err) {} toast('Quality: ' + e.target.options[e.target.selectedIndex].text); };
 const perf = paramsEarly.get('perf') === '1' ? TA.makePerfHud(renderer) : null;
-if (paramsEarly.get('hidehud') === '1') document.body.classList.add('clean');
+if (paramsEarly.get('hidehud') === '1') setClean(true);
 
 // ── VR (WebXR): the button appears only where a headset is reachable ─────────
 let snapCooldown = 0;
