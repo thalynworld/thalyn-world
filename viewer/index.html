@@ -985,9 +985,12 @@ $('tg-wave').onclick = () => { if (together) { together.wave(); toast('You waved
 $('tg-leave').onclick = () => { if (together) { together.close(); together = null; } syncSoloScreen(); tgEl.classList.remove('show'); $('tg-showing').classList.remove('show'); $('tg-ptt').classList.remove('show'); const u = new URL(location.href); u.searchParams.delete('session'); history.replaceState(null, '', u.toString()); $('b-together').textContent = 'Invite a friend here…'; toast('You left the session'); };
 $('tg-place').onclick = () => together && together.cinema.placeHere();
 $('tg-remove').onclick = () => together && together.cinema.remove();
-$('tg-load').onclick = () => { if (together && together.cinema.load($('tg-url').value)) { if (!together.cinema.placed) together.cinema.placeHere(); toast('Loading the showing for everyone'); } };
+// A174 · after a remote button the keys must go back to the WORLD (founder: "I can't move around when the video is
+// playing"): the link box or the button kept focus, so W/A/S/D typed into the panel. Blur, and say how to walk.
+function remoteDone() { try { $('tg-url').blur(); if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {} if (!walk.active && !coarsePointer) toast('Press V (or click the world) to walk while it plays'); }
+$('tg-load').onclick = () => { if (together && together.cinema.load($('tg-url').value)) { if (!together.cinema.placed) together.cinema.placeHere(); toast('Loading the showing for everyone'); } remoteDone(); };
 $('tg-url').onkeydown = e => { if (e.key === 'Enter') $('tg-load').onclick(); };
-$('tg-playpause').onclick = () => { if (!together) return; if (together.cinema.playing) together.cinema.pause(); else together.cinema.play(); };
+$('tg-playpause').onclick = () => { if (!together) return; if (together.cinema.playing) together.cinema.pause(); else together.cinema.play(); remoteDone(); };
 $('tg-back').onclick = () => together && together.cinema.seek(-10);
 $('tg-fwd').onclick = () => together && together.cinema.seek(10);
 $('tg-sync').onclick = () => { if (together) { together.cinema.resync(); toast('Everyone re-synced to your clock'); } };

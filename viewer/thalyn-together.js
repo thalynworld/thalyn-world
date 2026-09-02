@@ -389,7 +389,9 @@ export function makeCinema({ scene, camera, dom, onState, isHost, joinedRoom, se
     if (state && state.source === 'file' && video) return video.currentTime || 0;
     return expectedTime();
   }
-  function play() { if (isHost() && state && state.source) sendCinema({ state: 'playing', t: current() }); }
+  // A174 · the host's own Play IS their autoplay gesture (founder: "no audio from YouTube") — every player starts
+  // muted until a click says otherwise, and the host was never asked to "Tap to join" their own showing.
+  function play() { if (!isHost() || !state || !state.source) return; if (!joined) join(); sendCinema({ state: 'playing', t: current() }); }
   function pause() { if (isHost() && state && state.source) sendCinema({ state: 'paused', t: current() }); }
   function seek(dt) { if (isHost() && state && state.source) sendCinema({ state: state.state, t: Math.max(0, current() + dt) }); }
   function resync() { if (isHost() && state && state.source) sendCinema({ state: state.state, t: current() }); }
