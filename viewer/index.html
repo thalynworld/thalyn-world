@@ -580,13 +580,23 @@ function frameWorld(honourShot = true) {
   controls.update();
 }
 
-function loadFromURL(url, name) {
+// Phones get the lighter copy when one exists: a world published as World_web.glb may sit beside a
+// World_web_lite.glb (fewer triangles, smaller textures). On the Phone tier we ask for it first (one HEAD)
+// and fall back to the full file. Share/invite links always carry the FULL address — each device picks.
+async function preferLite(url) {
+  if (typeof tier === 'undefined' || tier.name !== 'lite' || !/World_web\.glb(\?.*)?$/i.test(url)) return url;
+  const lite = url.replace(/World_web\.glb/i, 'World_web_lite.glb');
+  try { const r = await fetch(lite, { method: 'HEAD' }); if (r.ok) { console.info('[thalyn] phone tier: loading the lighter copy'); return lite; } } catch (e) {}
+  return url;
+}
+function loadFromURL(url, name) { preferLite(url).then(u => loadFromURLNow(u, name, url)); }
+function loadFromURLNow(url, name, shareUrl) {
   toast('Loading ' + (name || url) + ' …');
   const bar = document.querySelector('#loadbar > i');
   if (bar) bar.style.width = '2%';
   loader.load(url, gltf => {
       if (bar) { bar.style.width = '100%'; setTimeout(() => { bar.style.width = '0'; }, 600); }
-      currentModelURL = url;
+      currentModelURL = shareUrl || url;
       $('b-share-w').style.display = ''; $('b-together').style.display = '';
       ingest(gltf); frameWorld(); toast('Loaded ' + (name || '') ); $('empty').style.display = 'none';
       postUp({ type: 'thalyn:loaded', label: name || '', meshes: meshCount }); },
