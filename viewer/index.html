@@ -141,9 +141,11 @@
 <div id="loadbar" aria-hidden="true"><i></i></div>
 <div id="share-panel" role="dialog" aria-label="Share this world">
   <h2>Share this world</h2>
-  <div id="share-qr"><canvas id="share-qr-canvas"></canvas></div>
+  <p id="share-how" style="margin:0 0 8px;font-size:13px;color:#cfe0d7">Send this link any way you like — message, email, chat. The link <b>is</b> the invitation.</p>
   <input id="share-link" type="text" readonly />
-  <div><button id="share-copy">Copy link</button><button id="share-close">Close</button></div>
+  <div><button id="share-copy">Copy link</button><button id="share-send">Send link…</button><button id="share-close">Close</button></div>
+  <p style="margin:10px 0 4px;font-size:12px;color:#9dbcac">Someone next to you? They can point their phone at this:</p>
+  <div id="share-qr"><canvas id="share-qr-canvas"></canvas></div>
 </div>
 <div id="tg-join" role="dialog" aria-label="Join this world together">
   <h2>Come on in</h2>
@@ -758,6 +760,14 @@ $('b-share-w').onclick = () => {
   $('share-panel').classList.add('show');
 };
 $('share-copy').onclick = async () => { try { await navigator.clipboard.writeText($('share-link').value); toast('Link copied'); } catch (e) { toast('Copy failed — select it by hand'); } };
+// A173 · the link IS the invitation (founder: "sharing a QR code is like… you have to take a picture of it"). "Send link…"
+// opens the device's own share sheet where one exists (phones, Windows 10+), and the copy button stays for everything else.
+$('share-send').style.display = navigator.share ? '' : 'none';
+$('share-send').onclick = async () => {
+  const url = $('share-link').value;
+  try { await navigator.share({ title: 'Come into my Thalyn world', text: 'Open this link in any browser — phone or desktop — and you are in.', url }); }
+  catch (e) { if (e && e.name !== 'AbortError') { try { await navigator.clipboard.writeText(url); toast('Link copied instead'); } catch (e2) {} } }
+};
 $('share-close').onclick = () => $('share-panel').classList.remove('show');
 // Live colour controls — tone mapping shapes saturation/contrast; exposure = brightness.
 // (Tone mapping is compiled into each material's shader, so a change must flag loaded materials for recompile.)
@@ -947,6 +957,8 @@ function showInvite() {
   try { const qr = window.qrcode(0, 'M'); qr.addData(link); qr.make(); $('share-qr').innerHTML = qr.createImgTag(4, 8); }
   catch (e) { $('share-qr').textContent = 'QR unavailable — copy the link'; }
   $('share-panel').querySelector('h2').textContent = 'Invite a friend here';
+  // A173 · the link is already on the clipboard the moment the panel opens — paste it to whoever you like.
+  navigator.clipboard && navigator.clipboard.writeText(link).then(() => toast('Invite link copied — paste it to your friend')).catch(() => {});
   $('share-panel').classList.add('show');
 }
 function askToJoin(session, hosting) {
