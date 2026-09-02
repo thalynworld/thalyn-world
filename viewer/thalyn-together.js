@@ -356,6 +356,12 @@ function makeCinema({ scene, camera, dom, onState, isHost, serverNow, sendCinema
     sendCinema(src.source === 'youtube' ? { source: 'youtube', id: src.id } : { source: 'file', url: src.url });
     return true;
   }
+  // Only judge drift once the media can actually play (a file still buffering, a player not yet ready, sits at 0 honestly).
+  function mediaReady() {
+    if (state.source === 'youtube') { try { return !!(yt && ytReady && yt.getDuration() > 0); } catch (e) { return false; } }
+    if (state.source === 'file') return !!(video && video.readyState >= 2);
+    return false;
+  }
   function current() {
     if (state && state.source === 'youtube' && yt && ytReady) { try { return yt.getCurrentTime() || 0; } catch (e) {} }
     if (state && state.source === 'file' && video) return video.currentTime || 0;
@@ -378,10 +384,14 @@ function makeCinema({ scene, camera, dom, onState, isHost, serverNow, sendCinema
     if (group.visible) { css.render(cssScene, camera); if (cssObj) { cssObj.position.copy(group.position); cssObj.quaternion.copy(group.quaternion); cssObj.translateZ(0.14); } }
     else if (cssObj) cssObj.position.set(0, -1e6, 0);
     driftT += dt;
-    if (driftT > 2 && state && state.source && state.state === 'playing') {
+    if (driftT > 2 && state && state.source && state.state === 'playing' && mediaReady()) {
       driftT = 0;
       const t = expectedTime(), cur = current();
-      if (Math.abs(cur - t) > 1.5) { console.info('[together] cinema drift', (cur - t).toFixed(2), 's — re-snapping'); applyState(true); }
+      if (Math.abs(cur - t) > 1.5) {
+        // The host's own player is the truth: it re-broadcasts its clock (an ad, a stall); everyone else snaps to the room's.
+        console.info('[together] cinema drift', (cur - t).toFixed(2), 's —', isHost() ? 're-broadcasting the host clock' : 're-snapping');
+        if (isHost()) resync(); else applyState(true);
+      }
     }
     if (videoTex) videoTex.needsUpdate = true;
   }
