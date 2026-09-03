@@ -330,8 +330,8 @@ const L = TA.makeLights();
 let skyOn = true;
 function setSky(on) {
   skyOn = on;
-  if (on) { scene.add(L.sky, L.sun, L.hemi, L.stars); if (skyEnv.active) scene.background = skyEnv.active; }
-  else { scene.remove(L.sky, L.sun, L.hemi, L.stars); scene.background = new THREE.Color(0x0d1411); }
+  if (on) { scene.add(L.sky, L.sun, L.hemi, L.stars); scene.background = null; skyEnv.setVisible(true); }
+  else { scene.remove(L.sky, L.sun, L.hemi, L.stars); scene.background = new THREE.Color(0x0d1411); skyEnv.setVisible(false); }
   L.sky.visible = !skyEnv.active;
 }
 
@@ -342,11 +342,16 @@ let state = TA.defaultState(worldRadius);   // the applied state
 let fogOn = false, fogScale = 1;
 function apply() {
   const s = Object.assign({}, state);
-  s.fogDensity = state.fogDensity * fogScale * weather.fogMul;   // heavy weather thickens the haze
-  s.sunIntensity = state.sunIntensity * weather.sunDim;          // …and dims the sun
-  if (weather.fogMul > 1.05 && !(state.fogDensity > 0)) s.fogDensity = (1.2 / Math.max(1, worldRadius)) * (weather.fogMul - 1);
+  // The exported fog / sun are the app's ALREADY-weathered values (AtmosphereRenderer folds the weather into
+  // RenderSettings before the export reads them), so the profile's fog/sun multipliers apply only when the viewer
+  // OVERRIDES the weather — "as exported" no longer socks a foggy world in twice (2026-09-03).
+  const wFog = weatherOverride ? weather.fogMul : 1, wDim = weatherOverride ? weather.sunDim : 1;
+  s.fogDensity = state.fogDensity * fogScale * wFog;   // heavy weather thickens the haze
+  s.sunIntensity = state.sunIntensity * wDim;          // …and dims the sun
+  if (wFog > 1.05 && !(state.fogDensity > 0)) s.fogDensity = (1.2 / Math.max(1, worldRadius)) * (wFog - 1);
   kit.uWindStrength.value = Math.max(kit.uWindStrength.value, weather.windFloor * 1.4); // storms lean the trees
-  TA.applyState(s, L, renderer, scene, fogOn || weather.fogMul > 1.05);
+  TA.applyState(s, L, renderer, scene, fogOn || wFog > 1.05);
+  kit.setNight(state.night);
   L.sky.visible = skyOn && !skyEnv.active;
   // No baked dome → the studio room IBL lights everything; at night that reads as a lit-from-nowhere ground. Drop it after dusk.
   if (!skyEnv.active) scene.environment = state.night > 0.5 ? null : roomEnv;
@@ -438,6 +443,10 @@ function applyThalynBlock(tx) {
     weather.set(weatherOverride || fileWeather);
     fillDetails(tx);
     apply();
+    // The seven wind numbers ride extras.thalyn.atmosphere; only the legacy no-block path ever read them, so a
+    // modern export opened dead still. Same scale as that path (2026-09-03).
+    const aw = tx.atmosphere && Number(tx.atmosphere.windStrength);
+    if (aw > 0 && !reduceMotion.matches) { $('t-wind').checked = true; const w = Math.min(2, aw * 0.4); $('r-wind').value = w; kit.uWindStrength.value = Math.max(kit.uWindStrength.value, w); }
     if (tx.water && tx.water.present) TA.tintWater(tx.water, worldRoot, kit.lavaMats);
     if (anchorRoot && anchorRoot.parent) anchorRoot.parent.remove(anchorRoot);
     anchorRoot = TA.buildAnchors(tx.anchors, worldRoot, (typeof tier !== 'undefined' ? tier.table.fireLights : 48));
@@ -548,9 +557,10 @@ function resetAtmosphere() {
 let meshCount = 0, triCount = 0;
 function ingest(gltf) {
   // A baked sky dome travels as an ordinary mesh so every viewer shows it; here it becomes the sky itself.
-  const dome = TA.extractSkyDome(gltf.scene);
+  const sky = TA.extractSkyDome(gltf.scene);
   gltf.scene.traverse(o => {
     if (o.isMesh) {
+      if (o.userData.__skyDome) return;   // the baked sky: drawn as-is, lit by nothing, counted nowhere
       o.castShadow = true; o.receiveShadow = true;
       meshCount++;
       const g = o.geometry;
@@ -572,7 +582,7 @@ function ingest(gltf) {
   const tx = TA.readBlock(gltf);
   if (tx && tx.atmosphere && !pendingAtmos && !TA.hasBlock(tx)) applyAtmosphere(tx.atmosphere);
   worldRoot.add(gltf.scene);
-  if (dome) { skyEnv.useDome(dome); L.sky.visible = false; }
+  if (sky.tex) { skyEnv.useDome(sky.tex, sky.domes); L.sky.visible = false; }
   if (tx) applyThalynBlock(tx); // after the meshes are under worldRoot (water tint / anchors need them)
   $('s-meshes').textContent = meshCount.toLocaleString();
   $('s-tris').textContent = Math.round(triCount).toLocaleString();
@@ -581,7 +591,7 @@ function ingest(gltf) {
 function rebuildWalkMeshes() {
   walkMeshes.length = 0;
   worldRoot.updateMatrixWorld(true);
-  worldRoot.traverse(o => { if (o.isMesh && !o.userData.__liquid && TA.isGroundMesh(o)) walkMeshes.push({ mesh: o, box: new THREE.Box3().setFromObject(o) }); });
+  worldRoot.traverse(o => { if (o.isMesh && !o.userData.__liquid && !o.userData.__skyDome && TA.isGroundMesh(o)) walkMeshes.push({ mesh: o, box: new THREE.Box3().setFromObject(o) }); });
 }
 
 function frameWorld(honourShot = true) {
@@ -590,7 +600,7 @@ function frameWorld(honourShot = true) {
   worldRoot.updateMatrixWorld(true);
   const box = new THREE.Box3();
   let any = false;
-  worldRoot.traverse(o => { if (o.isMesh && !o.userData.__liquid) { box.expandByObject(o); any = true; } });
+  worldRoot.traverse(o => { if (o.isMesh && !o.userData.__liquid && !o.userData.__skyDome) { box.expandByObject(o); any = true; } });
   if (!any) box.setFromObject(worldRoot);
   if (box.isEmpty()) return;
   const size = box.getSize(new THREE.Vector3());
@@ -1032,7 +1042,7 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min(0.1, clock.getDelta());
   if (!reduceMotion.matches) {           // freeze ambient wind/water/lava/weather motion under "reduce motion"
     kit.tick(dt);
-    TA.tickAnchors(anchorRoot, kit.uWindTime.value);
+    TA.tickAnchors(anchorRoot, kit.uWindTime.value, state.night);
     weather.tick(dt, kit.uWindStrength.value);
     waterfalls.tick(dt, camera, scene.fog ? scene.fog.density : 0, scene.fog ? scene.fog.color : null);
     fauna.setNight(state.night); fauna.tick(dt, camera);
@@ -1048,6 +1058,8 @@ renderer.setAnimationLoop(() => {
   const shaftsOn = skyOn && weather.shaftsOk && state.sunDir.y > 0.04 && state.night < 0.5
     && _sunV.z < 1 && Math.abs(_sunV.x) < 1.25 && Math.abs(_sunV.y) < 1.25;
   post.setSunScreen((_sunV.x + 1) / 2, (_sunV.y + 1) / 2, shaftsOn ? 0.55 : 0);
+  TA.followShadow(L, camera, (tier.table && tier.table.shadowHalf) || 0, state.sunDir);
+  skyEnv.follow(camera);                 // the baked sky dome stays centred on the viewer (a sky is at infinity)
   if (renderer.xr.isPresenting) {
     stepXR(dt);
     renderer.render(scene, camera); // the cinematic pass doesn't run in a headset — raw stereo render

@@ -47,25 +47,67 @@ export function toneOf(tx) {
   return TONES.includes(t) ? t : 'serene';
 }
 
-// ── Sky dome: lift the baked sky out of the world and make it the environment ─
-// Returns the equirect texture (already oriented for three.js) or null. The dome meshes are removed
-// from the scene so they neither draw nor take part in framing / walking / fog.
+// ── Sky dome: the baked sky stays a MESH and becomes the environment light ────
+// Returns { tex, domes }: `tex` = the equirect for PMREM (or null), `domes` = the dome meshes, which now STAY in the
+// scene and are drawn as the sky — exactly as Blender / Sketchfab / model-viewer draw them — marked
+// userData.__skyDome so framing, walking, shadows, foliage patching and triangle counts skip them.
+// WHY (2026-09-03, measured): handing the compressed KTX2 equirect to scene.background rendered BLACK on every web
+// export since the KTX2 pack (three.js r160 converts it to a cube internally and that pass samples this texture
+// black — the PMREM pass and an ordinary textured mesh both show it). The dome mesh carries its own UVs and the
+// loader's texture transform, so it is right by construction; the only thing the viewer adds is the IBL.
+const domeHaze = { color: { value: new THREE.Color(0xc8ccd0) }, strength: { value: 0.85 } };
+/** The horizon haze on the baked sky follows the scene fog: colour verbatim, strength from density (none → clear). */
+export function setDomeHaze(fog) {
+  if (fog && fog.color) { domeHaze.color.value.copy(fog.color); domeHaze.strength.value = Math.min(0.9, 0.35 + (fog.density || 0) * 250); }
+  else domeHaze.strength.value = 0;
+}
 export function extractSkyDome(root) {
-  let tex = null; const doomed = [];
+  let tex = null; const domes = [];
   root.traverse(o => {
     if (!o.isMesh) return;
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     if (!mats.some(m => m && SKY_MATERIAL.test(m.name || ''))) return;
     for (const m of mats) { if (m && !tex && m.map) tex = m.map; }
-    doomed.push(o);
+    domes.push(o);
   });
-  for (const o of doomed) { if (o.parent) o.parent.remove(o); if (o.geometry) o.geometry.dispose(); }
-  if (tex) {
-    tex.mapping = THREE.EquirectangularReflectionMapping;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.needsUpdate = true;
+  for (const o of domes) {
+    o.userData.__skyDome = true;
+    o.castShadow = false; o.receiveShadow = false; o.frustumCulled = false; o.renderOrder = -1000;
+    // The export sizes the dome at 3× the world (so a DCC frames the world, not the sky); here the framing camera
+    // can stand OUTSIDE that sphere and see its silhouette cut the sky. A sky is at infinity: `follow` recentres
+    // the dome on the camera every frame (its vertices sit off the node origin, so the centre is measured, not
+    // assumed — scaling about the origin threw the sphere across the world).
+    try {
+      if (o.geometry && !o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+      const c = o.geometry && o.geometry.boundingSphere ? o.geometry.boundingSphere.center.clone().multiply(o.scale) : new THREE.Vector3();
+      o.userData.__domeCentre = c;
+    } catch (e) {}
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats) {
+      if (!m) continue;
+      m.fog = false; m.depthWrite = false; m.side = THREE.DoubleSide;
+      // HORIZON HAZE: the scene fog cannot touch a sky (it would grey the whole dome at 1 km), yet the fogged water
+      // table / far ground meet it in a hard line at the horizon. The PC hides that seam with its horizon shroud;
+      // here the dome itself fades into the fog colour over the last few degrees above the horizon.
+      m.onBeforeCompile = (sh) => {
+        sh.uniforms.uHzColor = domeHaze.color; sh.uniforms.uHzStrength = domeHaze.strength;
+        sh.vertexShader = 'varying vec3 vDomeDir;\n' + sh.vertexShader.replace('#include <worldpos_vertex>',
+          '#include <worldpos_vertex>\n vec4 _dwp = modelMatrix * vec4(transformed, 1.0); vDomeDir = _dwp.xyz - cameraPosition;');
+        sh.fragmentShader = 'varying vec3 vDomeDir; uniform vec3 uHzColor; uniform float uHzStrength;\n' + sh.fragmentShader.replace('#include <dithering_fragment>',
+          '#include <dithering_fragment>\n { float _el = normalize(vDomeDir).y; float _h = 1.0 - smoothstep(-0.06, 0.12, _el); gl_FragColor.rgb = mix(gl_FragColor.rgb, uHzColor, _h * uHzStrength); }');
+      };
+      m.needsUpdate = true;
+    }
   }
-  return tex;
+  if (tex) {
+    const env = tex.clone();              // the mesh keeps its transformed map; the IBL gets a plain copy
+    env.mapping = THREE.EquirectangularReflectionMapping;
+    env.colorSpace = THREE.SRGBColorSpace;
+    env.repeat.set(1, 1); env.offset.set(0, 0);
+    env.needsUpdate = true;
+    return { tex: env, domes };
+  }
+  return { tex: null, domes };
 }
 
 // Owns scene.background / scene.environment: a baked dome when one is present, else the procedural sky.
@@ -73,21 +115,34 @@ export function makeSkyEnv(renderer, scene, roomEnvTexture) {
   const pmrem = new THREE.PMREMGenerator(renderer);
   pmrem.compileEquirectangularShader();
   const cache = new Map(); // texture → pmrem RT
-  let current = null;
-  function useDome(tex) {
+  let current = null, domes = [];
+  // `tex` lights the world (PMREM → scene.environment); the dome MESHES draw the sky, so scene.background stays null.
+  function useDome(tex, domeMeshes) {
+    domes = domeMeshes || [];
     if (!tex) { current = null; scene.background = null; scene.environment = roomEnvTexture || null; return false; }
     if (current === tex) return true;
     let rt = cache.get(tex);
     if (!rt) { rt = pmrem.fromEquirectangular(tex); cache.set(tex, rt); }
-    scene.background = tex;
-    scene.backgroundBlurriness = 0;
+    scene.background = null;
     scene.environment = rt.texture;
     current = tex;
     return true;
   }
+  function setVisible(on) { for (const d of domes) d.visible = !!on; }
+  const _cw = new THREE.Vector3();
+  function follow(camera) {
+    if (!domes.length) return;
+    camera.getWorldPosition(_cw);
+    for (const d of domes) {
+      const c = d.userData.__domeCentre; if (!c) continue;
+      if (d.parent) d.parent.worldToLocal(_cw.clone()); // parents are identity here; keep the world position
+      d.position.copy(_cw).sub(c);
+    }
+  }
   return {
-    useDome,
+    useDome, setVisible, follow,
     get active() { return current; },
+    get domes() { return domes; },
     dispose() { for (const rt of cache.values()) rt.dispose(); cache.clear(); pmrem.dispose(); }
   };
 }
@@ -170,9 +225,31 @@ export function makeLights() {
   u['turbidity'].value = 8; u['rayleigh'].value = 2.2; u['mieCoefficient'].value = 0.005; u['mieDirectionalG'].value = 0.8;
   const sun = new THREE.DirectionalLight(0xfff4e0, 2.2);
   sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0005;
+  // NO SHADOWS (found 2026-09-03): the shadow camera was never configured, so it kept three.js's default ±5-unit
+  // orthographic box with far = 500 while the sun stood 8000 units out — a 2048² map was rendered every frame and
+  // covered nothing. The box is sized per tier (TIERS.shadowHalf) and FOLLOWS the viewer in `followShadow`.
+  sun.shadow.normalBias = 0.04;
+  sun.shadow.camera.near = 1; sun.shadow.camera.far = 2600;
   const hemi = new THREE.HemisphereLight(0xbfd8ff, 0x4a3f33, 0.6);
   const stars = makeStars(1400); stars.visible = false;
   return { sky, sun, hemi, stars };
+}
+// Per frame: an orthographic shadow box of ±half metres centred a little ahead of the viewer, snapped to the map's
+// texel pitch so edges don't crawl as you walk. The light sits 1200 m up-sun of the focus so the whole box is inside
+// near/far. Off when the tier has no shadows.
+const _sfwd = new THREE.Vector3(), _sfocus = new THREE.Vector3();
+export function followShadow(L, camera, half, sunDir) {
+  const sun = L.sun;
+  if (!sun.castShadow || !(half > 0)) return;
+  const cam = sun.shadow.camera;
+  if (cam.right !== half) { cam.left = -half; cam.right = half; cam.top = half; cam.bottom = -half; cam.updateProjectionMatrix(); }
+  _sfwd.set(0, 0, -1).applyQuaternion(camera.quaternion);
+  _sfocus.copy(camera.position).addScaledVector(_sfwd, half * 0.45);
+  const texel = (2 * half) / Math.max(256, sun.shadow.mapSize.x);
+  _sfocus.x = Math.round(_sfocus.x / texel) * texel; _sfocus.y = Math.round(_sfocus.y / texel) * texel; _sfocus.z = Math.round(_sfocus.z / texel) * texel;
+  sun.position.copy(_sfocus).addScaledVector(sunDir, 1200);
+  sun.target.position.copy(_sfocus);
+  sun.target.updateMatrixWorld();
 }
 export function applyState(s, L, renderer, scene, fogOn = true) {
   L.sky.material.uniforms['sunPosition'].value.copy(s.sunDir);
@@ -184,6 +261,7 @@ export function applyState(s, L, renderer, scene, fogOn = true) {
     if (scene.fog && scene.fog.isFogExp2) { scene.fog.color.copy(s.fogColor); scene.fog.density = s.fogDensity; }
     else scene.fog = new THREE.FogExp2(s.fogColor.getHex(), s.fogDensity);
   } else scene.fog = null;
+  setDomeHaze(scene.fog);
   // Stars at night — including over a baked night dome (the bake carries the sky's colour, but the
   // moon and stars are drawn objects, not the sky material, so a night bake is honestly near-black).
   L.stars.visible = s.night > 0.35;
@@ -248,11 +326,13 @@ export function buildAnchors(list, parent, maxLights = 48) {
   root.userData.flames = flames;
   return root;
 }
-export function tickAnchors(root, t) {
+// `night` 0..1: a fire's LIGHT is barely visible under a daytime sun (the PC frame shows the flame, not a red wash
+// over the ground); the glow sprite always shows. Measured 2026-09-03: at 15:21 the hearth painted half the frame red.
+export function tickAnchors(root, t, night = 1) {
   const flames = root && root.userData && root.userData.flames; if (!flames) return;
   for (const f of flames) {
     const n = 0.86 + 0.14 * Math.sin(t * 9.1 + f.phase) * Math.sin(t * 3.7 + f.phase * 1.3) + 0.06 * Math.sin(t * 23 + f.phase);
-    if (f.light.visible) f.light.intensity = f.base * n;
+    if (f.light.visible) f.light.intensity = f.base * n * (0.22 + 0.78 * Math.min(1, Math.max(0, night)));
     f.sprite.scale.setScalar(f.scale * (0.92 + 0.08 * n));
   }
 }
@@ -644,13 +724,22 @@ export function makeMaterialKit() {
     else { mesh.material.dispose(); mesh.material = mat; }
     return true;
   }
+  // The exported leaf/grass materials carry a DAYTIME emissive floor (so they are never black in a bare viewer);
+  // at night the PC darkens its foliage to the ambient ratio, floored at 18 %. Mirror that here.
+  let _nightMul = 1;
+  function setNight(n) {
+    const mul = 1 - 0.82 * Math.min(1, Math.max(0, n || 0));
+    if (Math.abs(mul - _nightMul) < 0.005) return;
+    _nightMul = mul;
+    for (const m of windMaterials) m.emissiveIntensity = mul;
+  }
   function tick(dt) {
     uWindTime.value += dt;
     const t = uWindTime.value;
     for (let i = 0; i < lavaMats.length; i++) lavaMats[i].emissiveIntensity = 1.3 + Math.sin(t * 0.8 + i) * 0.5;
   }
   function reset() { windMaterials.length = 0; lavaMats.length = 0; }
-  return { uWindTime, uWindStrength, windMaterials, lavaMats, patchFoliage, upgradeLiquid, tick, reset };
+  return { uWindTime, uWindStrength, windMaterials, lavaMats, patchFoliage, upgradeLiquid, tick, reset, setNight };
 }
 
 // ── Weather (rain / snow / storm / fog / dust / ash) ────────────────────────
@@ -1052,9 +1141,9 @@ export function steamLink(source) {
 // frame rate in the app. Here nothing sizes itself — every effect registers with makeTier and reads
 // its numbers from the row below; a new effect adds a column, never a private constant.
 export const TIERS = {
-  high:   { label: 'Desktop', pixelRatio: 2.0, shadows: true,  shadowMap: 2048, msaa: 4, bloom: true,  shafts: true,  weather: 1.0,  sprayPerFall: 220, fallsMax: 24, sheetRows: 28, foam: true,  voices: 12, canopies: 6, wisps: 8, fireLights: 48, lanternLights: 16, creatures: 48, birdRoutes: 6, perched: 24 },
-  laptop: { label: 'Laptop',  pixelRatio: 1.5, shadows: true,  shadowMap: 1024, msaa: 2, bloom: true,  shafts: false, weather: 0.55, sprayPerFall: 90,  fallsMax: 12, sheetRows: 20, foam: true,  voices: 8,  canopies: 4, wisps: 8, fireLights: 20, lanternLights: 8,  creatures: 16, birdRoutes: 4, perched: 12 },
-  lite:   { label: 'Phone',   pixelRatio: 1.0, shadows: false, shadowMap: 512,  msaa: 0, bloom: false, shafts: false, weather: 0.30, sprayPerFall: 36,  fallsMax: 6,  sheetRows: 12, foam: false, voices: 5,  canopies: 3, wisps: 8, fireLights: 6,  lanternLights: 3,  creatures: 6,  birdRoutes: 2, perched: 6 },
+  high:   { label: 'Desktop', pixelRatio: 2.0, shadows: true,  shadowMap: 2048, shadowHalf: 150, msaa: 4, bloom: true,  shafts: true,  weather: 1.0,  sprayPerFall: 220, fallsMax: 24, sheetRows: 28, foam: true,  voices: 12, canopies: 6, wisps: 8, fireLights: 48, lanternLights: 16, creatures: 48, birdRoutes: 6, perched: 24 },
+  laptop: { label: 'Laptop',  pixelRatio: 1.5, shadows: true,  shadowMap: 1024, shadowHalf: 100, msaa: 2, bloom: true,  shafts: false, weather: 0.55, sprayPerFall: 90,  fallsMax: 12, sheetRows: 20, foam: true,  voices: 8,  canopies: 4, wisps: 8, fireLights: 20, lanternLights: 8,  creatures: 16, birdRoutes: 4, perched: 12 },
+  lite:   { label: 'Phone',   pixelRatio: 1.0, shadows: false, shadowMap: 512,  shadowHalf: 0,   msaa: 0, bloom: false, shafts: false, weather: 0.30, sprayPerFall: 36,  fallsMax: 6,  sheetRows: 12, foam: false, voices: 5,  canopies: 3, wisps: 8, fireLights: 6,  lanternLights: 3,  creatures: 6,  birdRoutes: 2, perched: 6 },
 };
 // Heuristic: what the device says about itself. Returns { name, why } so the HUD can show the reason.
 export function guessTier(renderer) {
