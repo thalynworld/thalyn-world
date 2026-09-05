@@ -1085,20 +1085,23 @@ export function makeSoundscape(baseUrl = 'audio/') {
     else if (canopies && canopies.length && Array.isArray(canopies[0].center)) p = new THREE.Vector3(canopies[0].center[0], canopies[0].center[1] + 7, canopies[0].center[2]);
     else p = new THREE.Vector3(0, 12, 0);
     makerSong = { voice: String(song.voice || 'Thrush'), midi: song.midi.slice(), start: (song.start || []).slice(), duration: (song.duration || []).slice(),
-                  tonic: (song.tonic | 0), level: Math.max(1, Math.min(3, song.level | 0 || 1)), title: song.title || '' };
+                  tonic: (song.tonic | 0), level: Math.max(1, Math.min(3, song.level | 0 || 1)), title: song.title || '',
+                  degrees: (Array.isArray(song.scaleDegrees) && song.scaleDegrees.length >= 5) ? song.scaleDegrees.slice() : [0, 2, 4, 7, 9] };
     songVoice = voice('song', p, { ref: 8, max: 220, roll: 0.8, build(v) { v.want = 1; } });
     sources.push(songVoice);
     songTimer = 8;   // a beat after the world arrives
   }
   // A pentatonic DEGREE step in the song's key (+2 = a third up, +3 = a fifth up, +5 = the octave) — the same
   // rule as the app's BirdVoiceSynth.Step, so the forest's harmony is consonant by construction.
-  const PENTA = [0, 2, 4, 7, 9];
+  // The song's own scale (major pentatonic, major, or natural minor — whatever the singer used) rides in
+  // extras.thalyn.song.scaleDegrees; a step is a whole DEGREE of that scale, as in the app's BirdVoiceSynth.Step.
   function pentaStep(midi, tonic, degrees) {
+    const D = (makerSong && makerSong.degrees) || [0, 2, 4, 7, 9], n = D.length;
     const rel = Math.round(midi - tonic), oct = Math.floor(rel / 12), pc = rel - oct * 12;
     let idx = 0, best = 99;
-    for (let d = 0; d < 5; d++) { const dd = Math.abs(PENTA[d] - pc); if (dd < best) { best = dd; idx = d; } }
-    const target = idx + degrees, os = Math.floor(target / 5);
-    return tonic + (oct + os) * 12 + PENTA[target - os * 5];
+    for (let d = 0; d < n; d++) { const dd = Math.abs(D[d] - pc); if (dd < best) { best = dd; idx = d; } }
+    const target = idx + degrees, os = Math.floor(target / n);
+    return tonic + (oct + os) * 12 + D[target - os * n];
   }
   function songEnd(s) { let e = 0; for (let i = 0; i < s.midi.length; i++) e = Math.max(e, (+s.start[i] || 0) + (+s.duration[i] || 0.15)); return e; }
   // One voice of the answer: the notes (shifted by `deg` degrees), from `delay`, at `gain`, in `v`'s voice.
@@ -1120,8 +1123,9 @@ export function makeSoundscape(baseUrl = 'audio/') {
       // THE FOREST (the app's BirdVoiceSynth.Chorus, in Web Audio): two canon voices a third and a fifth up,
       // an owl drone on the tonic, a flourish up the scale as the lead ends, and a held final chord.
       const canonA = (v === 'Thrush' || v === 'Echo') ? 'Chirrup' : 'Thrush';
-      singPart(s, t0, 0.45, 0.72, canonA, 2);
-      singPart(s, t0, 0.9, 0.6, 'Thrush', 3);
+      const third = 2, fifth = (s.degrees && s.degrees.length === 5) ? 3 : 4;   // a fifth is +3 degrees in the pentatonic, +4 in a seven-note scale
+      singPart(s, t0, 0.45, 0.72, canonA, third);
+      singPart(s, t0, 0.9, 0.6, 'Thrush', fifth);
       const end = songEnd(s), droneMidi = 72 + (((s.tonic - 72) % 12) + 12) % 12;
       toneAt(440 * Math.pow(2, (droneMidi - 69) / 12), t0 + 0.2, Math.min(2.4, Math.max(0.8, end * 0.55)), 'Owl', 0.5);
       toneAt(440 * Math.pow(2, (droneMidi - 69) / 12), t0 + Math.max(0.9, end * 0.6), Math.min(2.4, Math.max(0.8, end * 0.5 + 0.6)), 'Owl', 0.5);
@@ -1129,8 +1133,8 @@ export function makeSoundscape(baseUrl = 'audio/') {
       for (let k = 1; k <= 5; k++) { toneAt(440 * Math.pow(2, (pentaStep(last, s.tonic, k) - 69) / 12), t, 0.075, 'Chirrup', 0.8); t += 0.09; }
       const chordAt = t + 0.25, root = s.tonic + Math.round((last - s.tonic) / 12) * 12;
       toneAt(440 * Math.pow(2, (root - 69) / 12), chordAt, 1.1, v === 'Crow' ? 'Thrush' : v, 0.75);
-      toneAt(440 * Math.pow(2, (pentaStep(root, s.tonic, 2) - 69) / 12), chordAt + 0.06, 1.0, canonA, 0.6);
-      toneAt(440 * Math.pow(2, (pentaStep(root, s.tonic, 3) - 69) / 12), chordAt + 0.12, 1.2, 'Thrush', 0.55);
+      toneAt(440 * Math.pow(2, (pentaStep(root, s.tonic, third) - 69) / 12), chordAt + 0.06, 1.0, canonA, 0.6);
+      toneAt(440 * Math.pow(2, (pentaStep(root, s.tonic, fifth) - 69) / 12), chordAt + 0.12, 1.2, 'Thrush', 0.55);
     }
     songSung++;
   }
