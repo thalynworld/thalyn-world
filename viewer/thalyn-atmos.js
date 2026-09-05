@@ -1084,23 +1084,53 @@ export function makeSoundscape(baseUrl = 'audio/') {
     if (Array.isArray(song.pos) && song.pos.length >= 3 && song.pos.every(Number.isFinite)) p = new THREE.Vector3(song.pos[0], song.pos[1], song.pos[2]);
     else if (canopies && canopies.length && Array.isArray(canopies[0].center)) p = new THREE.Vector3(canopies[0].center[0], canopies[0].center[1] + 7, canopies[0].center[2]);
     else p = new THREE.Vector3(0, 12, 0);
-    makerSong = { voice: String(song.voice || 'Thrush'), midi: song.midi.slice(), start: (song.start || []).slice(), duration: (song.duration || []).slice() };
+    makerSong = { voice: String(song.voice || 'Thrush'), midi: song.midi.slice(), start: (song.start || []).slice(), duration: (song.duration || []).slice(),
+                  tonic: (song.tonic | 0), level: Math.max(1, Math.min(3, song.level | 0 || 1)), title: song.title || '' };
     songVoice = voice('song', p, { ref: 8, max: 220, roll: 0.8, build(v) { v.want = 1; } });
     sources.push(songVoice);
     songTimer = 8;   // a beat after the world arrives
   }
+  // A pentatonic DEGREE step in the song's key (+2 = a third up, +3 = a fifth up, +5 = the octave) — the same
+  // rule as the app's BirdVoiceSynth.Step, so the forest's harmony is consonant by construction.
+  const PENTA = [0, 2, 4, 7, 9];
+  function pentaStep(midi, tonic, degrees) {
+    const rel = Math.round(midi - tonic), oct = Math.floor(rel / 12), pc = rel - oct * 12;
+    let idx = 0, best = 99;
+    for (let d = 0; d < 5; d++) { const dd = Math.abs(PENTA[d] - pc); if (dd < best) { best = dd; idx = d; } }
+    const target = idx + degrees, os = Math.floor(target / 5);
+    return tonic + (oct + os) * 12 + PENTA[target - os * 5];
+  }
+  function songEnd(s) { let e = 0; for (let i = 0; i < s.midi.length; i++) e = Math.max(e, (+s.start[i] || 0) + (+s.duration[i] || 0.15)); return e; }
+  // One voice of the answer: the notes (shifted by `deg` degrees), from `delay`, at `gain`, in `v`'s voice.
+  function singPart(s, t0, delay, gain, v, deg) {
+    for (let i = 0; i < s.midi.length; i++) {
+      const st = t0 + delay + (+s.start[i] || i * 0.25), dur = Math.max(0.05, +s.duration[i] || 0.15);
+      if (v === 'Crow') { croakAt(st, dur, gain); continue; }
+      let midi = deg ? pentaStep(s.midi[i], s.tonic, deg) : s.midi[i];
+      if (v === 'Glitch' && Math.random() < 0.35) midi += Math.random() < 0.5 ? 12 : -12;
+      toneAt(440 * Math.pow(2, (midi - 69) / 12), st, dur, v, gain);
+    }
+  }
   function singMaker() {
     if (!ctx || !makerSong || !songVoice || !songVoice.built) return;
     const s = makerSong, v = s.voice, t0 = ctx.currentTime + 0.05;
-    const passes = v === 'Echo' ? [[0, 1], [0.9, 0.4]] : [[0, 1]];
-    for (const [delay, gain] of passes) {
-      for (let i = 0; i < s.midi.length; i++) {
-        const st = t0 + delay + (+s.start[i] || i * 0.25), dur = Math.max(0.05, +s.duration[i] || 0.15);
-        if (v === 'Crow') { croakAt(st, dur, gain); continue; }
-        let midi = s.midi[i];
-        if (v === 'Glitch' && Math.random() < 0.35) midi += Math.random() < 0.5 ? 12 : -12;
-        toneAt(440 * Math.pow(2, (midi - 69) / 12), st, dur, v, gain);
-      }
+    singPart(s, t0, 0, 1, v, 0);
+    if (v === 'Echo') singPart(s, t0, 0.9, 0.4, v, 0);
+    if (s.level >= 3) {
+      // THE FOREST (the app's BirdVoiceSynth.Chorus, in Web Audio): two canon voices a third and a fifth up,
+      // an owl drone on the tonic, a flourish up the scale as the lead ends, and a held final chord.
+      const canonA = (v === 'Thrush' || v === 'Echo') ? 'Chirrup' : 'Thrush';
+      singPart(s, t0, 0.45, 0.72, canonA, 2);
+      singPart(s, t0, 0.9, 0.6, 'Thrush', 3);
+      const end = songEnd(s), droneMidi = 72 + (((s.tonic - 72) % 12) + 12) % 12;
+      toneAt(440 * Math.pow(2, (droneMidi - 69) / 12), t0 + 0.2, Math.min(2.4, Math.max(0.8, end * 0.55)), 'Owl', 0.5);
+      toneAt(440 * Math.pow(2, (droneMidi - 69) / 12), t0 + Math.max(0.9, end * 0.6), Math.min(2.4, Math.max(0.8, end * 0.5 + 0.6)), 'Owl', 0.5);
+      const last = s.midi[s.midi.length - 1]; let t = t0 + end + 0.15;
+      for (let k = 1; k <= 5; k++) { toneAt(440 * Math.pow(2, (pentaStep(last, s.tonic, k) - 69) / 12), t, 0.075, 'Chirrup', 0.8); t += 0.09; }
+      const chordAt = t + 0.25, root = s.tonic + Math.round((last - s.tonic) / 12) * 12;
+      toneAt(440 * Math.pow(2, (root - 69) / 12), chordAt, 1.1, v === 'Crow' ? 'Thrush' : v, 0.75);
+      toneAt(440 * Math.pow(2, (pentaStep(root, s.tonic, 2) - 69) / 12), chordAt + 0.06, 1.0, canonA, 0.6);
+      toneAt(440 * Math.pow(2, (pentaStep(root, s.tonic, 3) - 69) / 12), chordAt + 0.12, 1.2, 'Thrush', 0.55);
     }
     songSung++;
   }
@@ -1186,6 +1216,8 @@ export function makeSoundscape(baseUrl = 'audio/') {
       else { if (master && ctx) ramp(master, 0, 0.4); if (el) { el.pause(); el = null; elTone = ''; } }
     },
     get song() { return makerSong ? makerSong.midi.length : 0; },   // THE LISTENING WOOD — notes in the maker's tune (0 = none)
+    get songTitle() { return makerSong ? makerSong.title : ''; },
+    get songLevel() { return makerSong ? makerSong.level : 0; },
     singMaker,
     get enabled() { return enabled; },
     setVolume(v) { volume = clamp(+v, 0, 1); if (enabled && master) ramp(master, volume, 0.2); },

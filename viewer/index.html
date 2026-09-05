@@ -460,7 +460,8 @@ function applyThalynBlock(tx) {
     const nLights = lanterns.build(lv ? lv.lights : null); lanterns.setNight(state.night);
     const song = tx.song && tx.song.present ? tx.song : null;   // THE LISTENING WOOD — the maker's hummed tune, notes only
     audio.setWorld({ waterfalls: lv ? lv.waterfalls : [], liquids: tx.liquids || [], canopies: lv ? lv.canopies : [], anchors: tx.anchors || [], song });
-    if (lv) console.info('[thalyn] living: ' + nFalls + ' waterfall(s) built of ' + ((lv.waterfalls || []).length) + ', ' + ((lv.canopies || []).length) + ' canopy zone(s), ' + nLights + ' lantern/bulb light(s), ' + audio.sources + ' sound source(s), ' + nFauna.creatures + ' creature(s) + ' + nFauna.birds + ' bird(s)' + (song ? ', the maker\'s tune (' + audio.song + ' notes, ' + song.voice + ')' : ''));
+    if (lv) console.info('[thalyn] living: ' + nFalls + ' waterfall(s) built of ' + ((lv.waterfalls || []).length) + ', ' + ((lv.canopies || []).length) + ' canopy zone(s), ' + nLights + ' lantern/bulb light(s), ' + audio.sources + ' sound source(s), ' + nFauna.creatures + ' creature(s) + ' + nFauna.birds + ' bird(s)' + (song ? ', the maker\'s tune (' + audio.song + ' notes, ' + song.voice + ', level ' + audio.songLevel + (audio.songTitle ? ', "' + audio.songTitle + '"' : '') + ')' : ''));
+    if (song && audio.songTitle) setTimeout(() => toast('This wood sings "' + audio.songTitle + '" — turn Sound on to hear it'), 2500);
     // A165 · the world's own cinema screen: stood for a shared session where the maker put it (the host may still move it).
     const cs = tx.cinema;
     cinemaSeed = (cs && cs.present && Array.isArray(cs.position) && cs.position.length === 3)
