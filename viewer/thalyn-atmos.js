@@ -1069,11 +1069,75 @@ export function makeSoundscape(baseUrl = 'audio/') {
     o.connect(g); g.connect(v.gain); o.start(t); am.start(t); o.stop(t + dur + 0.02); am.stop(t + dur + 0.02);
   }
 
-  function clearWorld() { for (const v of sources) v.free(); sources.length = 0; }
-  // world = { waterfalls: [...living.waterfalls], liquids: [...extras.liquids (app frame — X is negated here)], canopies: [...] }
+  // ── THE LISTENING WOOD (2026-09-05): the maker's tune ────────────────────────────────────────
+  // In the app the maker held Shift+E and hummed; a bird answered. The export carries ONLY the notes the
+  // bird sang (extras.thalyn.song — MIDI pitch + timing + the voice + where it sang from; never audio).
+  // Here a positional voice in that spot sings it a beat after the world loads and then every couple of
+  // minutes: "shared worlds sing their maker's tune via the viewer's audio block" (master brief §17).
+  // Rendering is the same recipe as the app's BirdVoiceSynth — sine + a downward chirp on every onset, a
+  // trill on long notes, a crow = noise croaks, an owl = slow soft hoots — so both sides sing the same bird.
+  let makerSong = null, songVoice = null, songTimer = 0, songSung = 0;
+  function setMakerSong(song, canopies) {
+    makerSong = null; songVoice = null; songSung = 0;
+    if (!song || !Array.isArray(song.midi) || song.midi.length === 0) return;
+    let p;
+    if (Array.isArray(song.pos) && song.pos.length >= 3 && song.pos.every(Number.isFinite)) p = new THREE.Vector3(song.pos[0], song.pos[1], song.pos[2]);
+    else if (canopies && canopies.length && Array.isArray(canopies[0].center)) p = new THREE.Vector3(canopies[0].center[0], canopies[0].center[1] + 7, canopies[0].center[2]);
+    else p = new THREE.Vector3(0, 12, 0);
+    makerSong = { voice: String(song.voice || 'Thrush'), midi: song.midi.slice(), start: (song.start || []).slice(), duration: (song.duration || []).slice() };
+    songVoice = voice('song', p, { ref: 8, max: 220, roll: 0.8, build(v) { v.want = 1; } });
+    sources.push(songVoice);
+    songTimer = 8;   // a beat after the world arrives
+  }
+  function singMaker() {
+    if (!ctx || !makerSong || !songVoice || !songVoice.built) return;
+    const s = makerSong, v = s.voice, t0 = ctx.currentTime + 0.05;
+    const passes = v === 'Echo' ? [[0, 1], [0.9, 0.4]] : [[0, 1]];
+    for (const [delay, gain] of passes) {
+      for (let i = 0; i < s.midi.length; i++) {
+        const st = t0 + delay + (+s.start[i] || i * 0.25), dur = Math.max(0.05, +s.duration[i] || 0.15);
+        if (v === 'Crow') { croakAt(st, dur, gain); continue; }
+        let midi = s.midi[i];
+        if (v === 'Glitch' && Math.random() < 0.35) midi += Math.random() < 0.5 ? 12 : -12;
+        toneAt(440 * Math.pow(2, (midi - 69) / 12), st, dur, v, gain);
+      }
+    }
+    songSung++;
+  }
+  function toneAt(f, st, dur, v, gain) {
+    const o = ctx.createOscillator(); o.type = 'sine';
+    const chirp = v === 'Chirrup' ? 1.35 : v === 'Glitch' ? 1.5 : v === 'Owl' ? 0.95 : 1.10;
+    const glide = v === 'Owl' ? 0.12 : 0.02;
+    o.frequency.setValueAtTime(f * chirp, st); o.frequency.exponentialRampToValueAtTime(f, st + Math.min(dur * 0.5, glide));
+    const trill = (v === 'Chirrup' || v === 'Glitch') ? dur > 0.12 : (v !== 'Owl' && dur > 0.25);
+    let lfo = null, lg = null;
+    if (trill) { lfo = ctx.createOscillator(); lfo.frequency.value = (v === 'Chirrup' || v === 'Glitch') ? 30 : 7; lg = ctx.createGain(); lg.gain.value = f * ((v === 'Chirrup' || v === 'Glitch') ? 0.025 : 0.008); lfo.connect(lg); lg.connect(o.frequency); lfo.start(st + 0.04); lfo.stop(st + dur + 0.05); }
+    const attack = v === 'Owl' ? 0.06 : 0.006, release = v === 'Owl' ? 0.12 : 0.04, peak = 0.22 * gain * (v === 'Echo' ? 0.7 : 1);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, st); g.gain.linearRampToValueAtTime(peak, st + attack);
+    g.gain.setValueAtTime(peak * 0.8, st + Math.max(attack, dur - release)); g.gain.exponentialRampToValueAtTime(0.001, st + dur);
+    let head = o;
+    if (v === 'Echo' || v === 'Owl') { const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = v === 'Owl' ? 1800 : 3200; o.connect(lp); head = lp; }
+    head.connect(g); g.connect(songVoice.gain); o.start(st); o.stop(st + dur + 0.05);
+  }
+  function croakAt(st, dur, gain) {
+    const n = ctx.createBufferSource(); n.buffer = whiteBuf; n.loop = true;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1600;
+    const am = ctx.createOscillator(); am.type = 'square'; am.frequency.value = 80 + Math.random() * 30;
+    const amg = ctx.createGain(); amg.gain.value = 0.35; am.connect(amg);
+    const body = ctx.createGain(); body.gain.value = 0.65; amg.connect(body.gain);
+    const env = ctx.createGain(); const d = Math.min(0.26, Math.max(0.1, dur)), peak = 0.3 * gain;
+    env.gain.setValueAtTime(0, st); env.gain.linearRampToValueAtTime(peak, st + 0.012); env.gain.exponentialRampToValueAtTime(0.001, st + d);
+    n.connect(lp); lp.connect(body); body.connect(env); env.connect(songVoice.gain);
+    n.start(st); am.start(st); n.stop(st + d + 0.05); am.stop(st + d + 0.05);
+  }
+
+  function clearWorld() { for (const v of sources) v.free(); sources.length = 0; makerSong = null; songVoice = null; }
+  // world = { waterfalls: [...living.waterfalls], liquids: [...extras.liquids (app frame — X is negated here)], canopies: [...], song: extras.thalyn.song }
   function setWorld(world) {
     clearWorld();
     if (!world) return;
+    setMakerSong(world.song, world.canopies);
     for (const w of (world.waterfalls || []).slice(0, 24)) addWaterfall(w);
     for (const l of (world.liquids || [])) {
       if (!l || l.type !== 'water' || !Array.isArray(l.centerXZ) || !Array.isArray(l.sizeXZ)) continue;
@@ -1099,6 +1163,7 @@ export function makeSoundscape(baseUrl = 'audio/') {
       L.upX.setTargetAtTime(_u.x, t, 0.04); L.upY.setTargetAtTime(_u.y, t, 0.04); L.upZ.setTargetAtTime(_u.z, t, 0.04);
     } else { L.setPosition(_p.x, _p.y, _p.z); L.setOrientation(_f.x, _f.y, _f.z, _u.x, _u.y, _u.z); }
     chirpBudget = 6; // per frame — keeps a dense grove from scheduling hundreds of oscillators at once
+    if (makerSong && songVoice) { songTimer -= dt; if (songTimer <= 0) { singMaker(); songTimer = 100 + Math.random() * 60; } }   // the maker's tune, then every couple of minutes
     for (const v of sources) if (v.update) v.update(dt, _p);
     // Voice cap: nearest N audible, the rest ramped to silence.
     tickT += dt;
@@ -1117,9 +1182,11 @@ export function makeSoundscape(baseUrl = 'audio/') {
   return {
     setEnabled(v) {
       enabled = !!v;
-      if (enabled) { refresh(); for (const s of sources) s.attach(); }
+      if (enabled) { refresh(); for (const s of sources) s.attach(); if (makerSong && !songSung) songTimer = Math.min(songTimer, 3); }
       else { if (master && ctx) ramp(master, 0, 0.4); if (el) { el.pause(); el = null; elTone = ''; } }
     },
+    get song() { return makerSong ? makerSong.midi.length : 0; },   // THE LISTENING WOOD — notes in the maker's tune (0 = none)
+    singMaker,
     get enabled() { return enabled; },
     setVolume(v) { volume = clamp(+v, 0, 1); if (enabled && master) ramp(master, volume, 0.2); },
     setVoiceCap(n) { voiceCap = Math.max(1, n | 0); },
