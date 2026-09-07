@@ -1077,9 +1077,22 @@ export function makeSoundscape(baseUrl = 'audio/') {
   // Rendering is the same recipe as the app's BirdVoiceSynth — sine + a downward chirp on every onset, a
   // trill on long notes, a crow = noise croaks, an owl = slow soft hoots — so both sides sing the same bird.
   let makerSong = null, songVoice = null, songTimer = 0, songSung = 0;
-  function setMakerSong(song, canopies) {
-    makerSong = null; songVoice = null; songSung = 0;
-    if (!song || !Array.isArray(song.midi) || song.midi.length === 0) return;
+  // W10 (2026-09-07) · a shared world may carry the song RENDERED by the app (`?song=<https url to song.wav>`,
+  // the orchestra the maker actually heard) — the glb still carries the notes. When the WAV is present it is
+  // what the positional voice sings; the synth above is the fallback while it downloads or if it fails.
+  let songUrl = null, songBytes = null, songBuf = null, songFetch = null, songFailed = false;
+  function fetchSong(url) {
+    songUrl = url; songBytes = null; songBuf = null; songFailed = false;
+    songFetch = fetch(url).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+      .then(b => { if (songUrl === url) songBytes = b; })
+      .catch(e => { if (songUrl === url) songFailed = true; console.warn('[thalyn] song fetch failed (CORS?) — the notes sing instead', e); });
+  }
+  function setMakerSong(song, canopies, wavUrl) {
+    makerSong = null; songVoice = null; songSung = 0; songUrl = null; songBytes = null; songBuf = null; songFailed = false;
+    const notes = !!(song && Array.isArray(song.midi) && song.midi.length);
+    if (!notes && !wavUrl) return;
+    if (wavUrl) fetchSong(String(wavUrl));
+    if (!notes) song = { midi: [], voice: 'Thrush' };
     let p;
     if (Array.isArray(song.pos) && song.pos.length >= 3 && song.pos.every(Number.isFinite)) p = new THREE.Vector3(song.pos[0], song.pos[1], song.pos[2]);
     else if (canopies && canopies.length && Array.isArray(canopies[0].center)) p = new THREE.Vector3(canopies[0].center[0], canopies[0].center[1] + 7, canopies[0].center[2]);
@@ -1114,9 +1127,29 @@ export function makeSoundscape(baseUrl = 'audio/') {
       toneAt(440 * Math.pow(2, (midi - 69) / 12), st, dur, v, gain);
     }
   }
+  // The rendered song through the same positional voice (its own gain: an app render sits near full scale,
+  // the synth birds peak at 0.22).
+  function playSongBuffer(t0) {
+    const src = ctx.createBufferSource(); src.buffer = songBuf;
+    const g = ctx.createGain(); g.gain.value = 0.45;
+    src.connect(g); g.connect(songVoice.gain); src.start(t0);
+    songSung++;
+    return true;
+  }
   function singMaker() {
     if (!ctx || !makerSong || !songVoice || !songVoice.built) return;
     const s = makerSong, v = s.voice, t0 = ctx.currentTime + 0.05;
+    if (songUrl && !songFailed) {
+      if (songBuf) { playSongBuffer(t0); return; }
+      if (songBytes && !songBuf) {   // decode once, then sing it now — the notes cover only the first wait
+        const bytes = songBytes; songBytes = null;
+        ctx.decodeAudioData(bytes.slice(0)).then(b => { if (songUrl) { songBuf = b; playSongBuffer(ctx.currentTime + 0.05); } })
+          .catch(e => { songFailed = true; console.warn('[thalyn] song decode failed — the notes sing instead', e); });
+        return;
+      }
+      if (!s.midi.length) { songTimer = 4; return; }   // WAV still on its way and no notes to fall back on: try again shortly
+    }
+    if (!s.midi.length) return;
     singPart(s, t0, 0, 1, v, 0);
     if (v === 'Echo') singPart(s, t0, 0.9, 0.4, v, 0);
     if (s.level >= 3) {
@@ -1166,12 +1199,12 @@ export function makeSoundscape(baseUrl = 'audio/') {
     n.start(st); am.start(st); n.stop(st + d + 0.05); am.stop(st + d + 0.05);
   }
 
-  function clearWorld() { for (const v of sources) v.free(); sources.length = 0; makerSong = null; songVoice = null; }
-  // world = { waterfalls: [...living.waterfalls], liquids: [...extras.liquids (app frame — X is negated here)], canopies: [...], song: extras.thalyn.song }
+  function clearWorld() { for (const v of sources) v.free(); sources.length = 0; makerSong = null; songVoice = null; songUrl = null; songBytes = null; songBuf = null; }
+  // world = { waterfalls: [...living.waterfalls], liquids: [...extras.liquids (app frame — X is negated here)], canopies: [...], song: extras.thalyn.song, songUrl: ?song= (W10, optional) }
   function setWorld(world) {
     clearWorld();
     if (!world) return;
-    setMakerSong(world.song, world.canopies);
+    setMakerSong(world.song, world.canopies, world.songUrl);
     for (const w of (world.waterfalls || []).slice(0, 24)) addWaterfall(w);
     for (const l of (world.liquids || [])) {
       if (!l || l.type !== 'water' || !Array.isArray(l.centerXZ) || !Array.isArray(l.sizeXZ)) continue;
@@ -1222,6 +1255,7 @@ export function makeSoundscape(baseUrl = 'audio/') {
     get song() { return makerSong ? makerSong.midi.length : 0; },   // THE LISTENING WOOD — notes in the maker's tune (0 = none)
     get songTitle() { return makerSong ? makerSong.title : ''; },
     get songLevel() { return makerSong ? makerSong.level : 0; },
+    get songRendered() { return !!(songUrl && !songFailed); },   // W10 — a rendered song.wav rides ?song= (true until it fails)
     singMaker,
     get enabled() { return enabled; },
     setVolume(v) { volume = clamp(+v, 0, 1); if (enabled && master) ramp(master, volume, 0.2); },

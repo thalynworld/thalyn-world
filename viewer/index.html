@@ -374,6 +374,8 @@ const waterfalls = TA.makeWaterfalls(scene);
 const fauna = TF.makeFauna(scene, () => loader, (x, z, fromY) => groundAt(x, z, fromY), 'creatures/');
 const lanterns = TA.makeLanterns(scene);      // string-light bulbs, hung lanterns, water lights — the app's glow points
 let fileWeather = '', weatherOverride = '', currentModelURL = null;
+// W10 · ?song=<https url to song.wav>: the maker's tune RENDERED in the app (the glb carries notes only).
+let currentSongURL = null;
 const _sunV = new THREE.Vector3();
 function setWeather() { weather.set(weatherOverride || fileWeather); apply(); }
 // World details: everything the file says about itself, in one flat panel.
@@ -459,9 +461,10 @@ function applyThalynBlock(tx) {
     const nFauna = fauna.build(lv ? lv.fauna : null, { tone: tx.tone, night: state.night, liquids: tx.liquids || [], worldRadius: wbF ? wbF.radius : worldRadius, center: wbF ? wbF.center : null });
     const nLights = lanterns.build(lv ? lv.lights : null); lanterns.setNight(state.night);
     const song = tx.song && tx.song.present ? tx.song : null;   // THE LISTENING WOOD — the maker's hummed tune, notes only
-    audio.setWorld({ waterfalls: lv ? lv.waterfalls : [], liquids: tx.liquids || [], canopies: lv ? lv.canopies : [], anchors: tx.anchors || [], song });
+    audio.setWorld({ waterfalls: lv ? lv.waterfalls : [], liquids: tx.liquids || [], canopies: lv ? lv.canopies : [], anchors: tx.anchors || [], song, songUrl: currentSongURL });
     if (lv) console.info('[thalyn] living: ' + nFalls + ' waterfall(s) built of ' + ((lv.waterfalls || []).length) + ', ' + ((lv.canopies || []).length) + ' canopy zone(s), ' + nLights + ' lantern/bulb light(s), ' + audio.sources + ' sound source(s), ' + nFauna.creatures + ' creature(s) + ' + nFauna.birds + ' bird(s)' + (song ? ', the maker\'s tune (' + audio.song + ' notes, ' + song.voice + ', level ' + audio.songLevel + (audio.songTitle ? ', "' + audio.songTitle + '"' : '') + ')' : ''));
     if (song && audio.songTitle) setTimeout(() => toast('This wood sings "' + audio.songTitle + '" — turn Sound on to hear it'), 2500);
+    else if (currentSongURL) setTimeout(() => toast("This wood sings its maker's song — turn Sound on to hear it"), 2500);
     // A165 · the world's own cinema screen: stood for a shared session where the maker put it (the host may still move it).
     const cs = tx.cinema;
     cinemaSeed = (cs && cs.present && Array.isArray(cs.position) && cs.position.length === 3)
@@ -758,6 +761,7 @@ function shareURL() {
   if (name) u.searchParams.set('name', String(name).slice(0, 80));
   const cr = pendingThalyn && pendingThalyn.creator;
   if (cr) u.searchParams.set('by', cr);
+  if (currentSongURL) u.searchParams.set('song', currentSongURL);   // W10 · the rendered song rides the share link
   return u.toString();
 }
 $('b-share-w').onclick = () => {
@@ -1027,6 +1031,8 @@ function safeURL(raw) {
 const params = new URLSearchParams(location.search);
 $('cta').href = TA.steamLink(parent && parent !== window ? 'demo_embed' : 'viewer');
 if (params.get('cta') === '0') $('cta').style.display = 'none';
+const songQ = params.get('song');   // W10 · read BEFORE the model loads: setWorld runs when the manifest arrives
+if (songQ) { const s = safeURL(songQ); if (s) currentSongURL = s; else toast('That song link is not allowed.'); }
 const qp = params.get('model');
 if (qp) { const s = safeURL(qp); if (s) loadFromURL(s); else toast('That world link is not allowed.'); }
 const sessionParam = params.get('session');
