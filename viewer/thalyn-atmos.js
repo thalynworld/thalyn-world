@@ -1080,7 +1080,8 @@ export function makeSoundscape(baseUrl = 'audio/') {
   // W10 (2026-09-07) · a shared world may carry the song RENDERED by the app (`?song=<https url to song.wav>`,
   // the orchestra the maker actually heard) — the glb still carries the notes. When the WAV is present it is
   // what the positional voice sings; the synth above is the fallback while it downloads or if it fails.
-  let songUrl = null, songBytes = null, songBuf = null, songFetch = null, songFailed = false;
+  let songUrl = null, songBytes = null, songBuf = null, songFetch = null, songFailed = false, songWaited = 0;
+  const SONG_WAIT_MAX = 45;   // seconds to hold for the WAV before the notes sing instead
   function fetchSong(url) {
     songUrl = url; songBytes = null; songBuf = null; songFailed = false;
     songFetch = fetch(url).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
@@ -1088,7 +1089,7 @@ export function makeSoundscape(baseUrl = 'audio/') {
       .catch(e => { if (songUrl === url) songFailed = true; console.warn('[thalyn] song fetch failed (CORS?) — the notes sing instead', e); });
   }
   function setMakerSong(song, canopies, wavUrl) {
-    makerSong = null; songVoice = null; songSung = 0; songUrl = null; songBytes = null; songBuf = null; songFailed = false;
+    makerSong = null; songVoice = null; songSung = 0; songUrl = null; songBytes = null; songBuf = null; songFailed = false; songWaited = 0;
     const notes = !!(song && Array.isArray(song.midi) && song.midi.length);
     if (!notes && !wavUrl) return;
     if (wavUrl) fetchSong(String(wavUrl));
@@ -1127,13 +1128,17 @@ export function makeSoundscape(baseUrl = 'audio/') {
       toneAt(440 * Math.pow(2, (midi - 69) / 12), st, dur, v, gain);
     }
   }
-  // The rendered song through the same positional voice (its own gain: an app render sits near full scale,
-  // the synth birds peak at 0.22).
+  // The rendered song FLAT through the master (2026-09-08, founder heard nothing on the phone): the WAV is already a
+  // finished stereo mix — panned by where each bird sat and rolled off from where the maker stood — so sending it
+  // through the positional voice spatialised it twice, thinned it with the HRTF panner's inverse rolloff (0.16 at
+  // 60 m) and, worse, subjected it to the voice CAP: on a phone tier the song voice lost its seat to the nearest
+  // waterfalls and shores and was ramped to SILENCE. The notes' fallback still sings from the bird's spot.
   function playSongBuffer(t0) {
     const src = ctx.createBufferSource(); src.buffer = songBuf;
-    const g = ctx.createGain(); g.gain.value = 0.45;
-    src.connect(g); g.connect(songVoice.gain); src.start(t0);
+    const g = ctx.createGain(); g.gain.value = 0.85;
+    src.connect(g); g.connect(master); src.start(t0);
     songSung++;
+    console.info('[thalyn] the maker\'s song plays (rendered, ' + songBuf.duration.toFixed(0) + ' s)');
     return true;
   }
   function singMaker() {
@@ -1141,13 +1146,17 @@ export function makeSoundscape(baseUrl = 'audio/') {
     const s = makerSong, v = s.voice, t0 = ctx.currentTime + 0.05;
     if (songUrl && !songFailed) {
       if (songBuf) { playSongBuffer(t0); return; }
-      if (songBytes && !songBuf) {   // decode once, then sing it now — the notes cover only the first wait
+      if (songBytes && !songBuf) {   // decode once, then play it the moment it is ready
         const bytes = songBytes; songBytes = null;
         ctx.decodeAudioData(bytes.slice(0)).then(b => { if (songUrl) { songBuf = b; playSongBuffer(ctx.currentTime + 0.05); } })
           .catch(e => { songFailed = true; console.warn('[thalyn] song decode failed — the notes sing instead', e); });
         return;
       }
-      if (!s.midi.length) { songTimer = 4; return; }   // WAV still on its way and no notes to fall back on: try again shortly
+      // The WAV is still on its way: HOLD for it (poll every 2 s) rather than sing the notes first — the first
+      // sing used to be the synth bird and the real song only came round two minutes later (2026-09-08).
+      if (songWaited < SONG_WAIT_MAX) { songWaited += 2; songTimer = 2; return; }
+      if (!s.midi.length) { songTimer = 30; return; }
+      console.warn('[thalyn] the rendered song did not arrive in ' + SONG_WAIT_MAX + ' s — the notes sing instead this time');
     }
     if (!s.midi.length) return;
     singPart(s, t0, 0, 1, v, 0);
