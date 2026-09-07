@@ -1085,7 +1085,7 @@ export function makeSoundscape(baseUrl = 'audio/') {
   function fetchSong(url) {
     songUrl = url; songBytes = null; songBuf = null; songFailed = false;
     songFetch = fetch(url).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
-      .then(b => { if (songUrl === url) songBytes = b; })
+      .then(b => { if (songUrl === url) { songBytes = b; if (!songSung) songTimer = Math.min(songTimer, 0.5); } })
       .catch(e => { if (songUrl === url) songFailed = true; console.warn('[thalyn] song fetch failed (CORS?) — the notes sing instead', e); });
   }
   function setMakerSong(song, canopies, wavUrl) {
@@ -1141,24 +1141,25 @@ export function makeSoundscape(baseUrl = 'audio/') {
     console.info('[thalyn] the maker\'s song plays (rendered, ' + songBuf.duration.toFixed(0) + ' s)');
     return true;
   }
+  // Returns true when a song was started (the tick then waits a couple of minutes); false = try again in `songTimer` s.
   function singMaker() {
-    if (!ctx || !makerSong || !songVoice || !songVoice.built) return;
+    if (!ctx || !makerSong || !songVoice || !songVoice.built) { songTimer = 1; return false; }
     const s = makerSong, v = s.voice, t0 = ctx.currentTime + 0.05;
     if (songUrl && !songFailed) {
-      if (songBuf) { playSongBuffer(t0); return; }
+      if (songBuf) { playSongBuffer(t0); return true; }
       if (songBytes && !songBuf) {   // decode once, then play it the moment it is ready
         const bytes = songBytes; songBytes = null;
         ctx.decodeAudioData(bytes.slice(0)).then(b => { if (songUrl) { songBuf = b; playSongBuffer(ctx.currentTime + 0.05); } })
-          .catch(e => { songFailed = true; console.warn('[thalyn] song decode failed — the notes sing instead', e); });
-        return;
+          .catch(e => { songFailed = true; songTimer = 1; console.warn('[thalyn] song decode failed — the notes sing instead', e); });
+        return true;
       }
       // The WAV is still on its way: HOLD for it (poll every 2 s) rather than sing the notes first — the first
       // sing used to be the synth bird and the real song only came round two minutes later (2026-09-08).
-      if (songWaited < SONG_WAIT_MAX) { songWaited += 2; songTimer = 2; return; }
-      if (!s.midi.length) { songTimer = 30; return; }
+      if (songWaited < SONG_WAIT_MAX) { songWaited += 2; songTimer = 2; return false; }
+      if (!s.midi.length) { songTimer = 30; return false; }
       console.warn('[thalyn] the rendered song did not arrive in ' + SONG_WAIT_MAX + ' s — the notes sing instead this time');
     }
-    if (!s.midi.length) return;
+    if (!s.midi.length) return false;
     singPart(s, t0, 0, 1, v, 0);
     if (v === 'Echo') singPart(s, t0, 0.9, 0.4, v, 0);
     if (s.level >= 3) {
@@ -1179,6 +1180,7 @@ export function makeSoundscape(baseUrl = 'audio/') {
       toneAt(440 * Math.pow(2, (pentaStep(root, s.tonic, fifth) - 69) / 12), chordAt + 0.12, 1.2, 'Thrush', 0.55);
     }
     songSung++;
+    return true;
   }
   function toneAt(f, st, dur, v, gain) {
     const o = ctx.createOscillator(); o.type = 'sine';
@@ -1239,7 +1241,7 @@ export function makeSoundscape(baseUrl = 'audio/') {
       L.upX.setTargetAtTime(_u.x, t, 0.04); L.upY.setTargetAtTime(_u.y, t, 0.04); L.upZ.setTargetAtTime(_u.z, t, 0.04);
     } else { L.setPosition(_p.x, _p.y, _p.z); L.setOrientation(_f.x, _f.y, _f.z, _u.x, _u.y, _u.z); }
     chirpBudget = 6; // per frame — keeps a dense grove from scheduling hundreds of oscillators at once
-    if (makerSong && songVoice) { songTimer -= dt; if (songTimer <= 0) { singMaker(); songTimer = 100 + Math.random() * 60; } }   // the maker's tune, then every couple of minutes
+    if (makerSong && songVoice) { songTimer -= dt; if (songTimer <= 0) { if (singMaker()) songTimer = 100 + Math.random() * 60; } }   // the maker's tune, then every couple of minutes; a "not yet" keeps its own short timer
     for (const v of sources) if (v.update) v.update(dt, _p);
     // Voice cap: nearest N audible, the rest ramped to silence.
     tickT += dt;
