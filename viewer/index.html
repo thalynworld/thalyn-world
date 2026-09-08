@@ -468,7 +468,7 @@ function applyThalynBlock(tx) {
     audio.setWorld({ waterfalls: lv ? lv.waterfalls : [], liquids: tx.liquids || [], canopies: lv ? lv.canopies : [], anchors: tx.anchors || [], song, songUrl: currentSongURL });
     if (lv) console.info('[thalyn] living: ' + nFalls + ' waterfall(s) built of ' + ((lv.waterfalls || []).length) + ', ' + ((lv.canopies || []).length) + ' canopy zone(s), ' + nLights + ' lantern/bulb light(s), ' + audio.sources + ' sound source(s), ' + nFauna.creatures + ' creature(s) + ' + nFauna.birds + ' bird(s)' + (song ? ', the maker\'s tune (' + audio.song + ' notes, ' + song.voice + ', level ' + audio.songLevel + (audio.songTitle ? ', "' + audio.songTitle + '"' : '') + ')' : ''));
     if (song && audio.songTitle) setTimeout(() => toast('This wood sings "' + audio.songTitle + '" — turn Sound on to hear it'), 2500);
-    else if (currentSongURL) setTimeout(() => toast("This wood sings its maker's song — turn Sound on to hear it"), 2500);
+    else if (currentSongURL) setTimeout(() => { if (!$('t-sound').checked) toast("This wood sings its maker's song — tap anywhere to hear it"); }, 2500);
     // A165 · the world's own cinema screen: stood for a shared session where the maker put it (the host may still move it).
     const cs = tx.cinema;
     cinemaSeed = (cs && cs.present && Array.isArray(cs.position) && cs.position.length === 3)
@@ -662,6 +662,7 @@ function loadFromURLNow(url, name, shareUrl) {
       currentModelURL = shareUrl || url;
       $('b-share-w').style.display = ''; $('b-together').style.display = '';
       findPostcard(currentModelURL);
+      armSoundOnFirstGesture(); if (!$('t-sound').checked) toast(currentSongURL ? 'Tap anywhere to hear this world — and its maker's song' : 'Tap anywhere to hear this world');
       ingest(gltf); frameWorld(); toast('Loaded ' + (name || '') ); $('empty').style.display = 'none';
       postUp({ type: 'thalyn:loaded', label: name || '', meshes: meshCount }); },
     ev => { if (bar && ev && ev.total) bar.style.width = Math.min(96, Math.round(ev.loaded / ev.total * 100)) + '%';
@@ -756,6 +757,18 @@ $('t-cinema').onchange = e => { post.setEnabled(e.target.checked); };
 $('r-weather').onchange = e => { weatherOverride = e.target.value; setWeather(); toast(weatherOverride ? 'Weather: ' + e.target.options[e.target.selectedIndex].text : 'Weather: as exported'); };
 $('r-look').onchange = e => { post.setLook(e.target.value); post.setNight(state.night); toast('Look: ' + e.target.options[e.target.selectedIndex].text); };
 // ── Sound (starts only on this gesture — browsers require it) ────────────────
+// ★ W10.1 (founder 2026-09-08: "sound on by default so they are greeted by the maker's melody, else they might not know
+// how to turn it on"): a browser will not start audio before a tap, so the FIRST tap, click or key anywhere is the
+// gesture — it ticks Sound on and the wood starts (the maker's song plays the moment it has landed). Once only.
+let soundArmed = false;
+function armSoundOnFirstGesture() {
+  if (soundArmed) return; soundArmed = true;
+  const go = () => {
+    window.removeEventListener('pointerdown', go, true); window.removeEventListener('keydown', go, true);
+    if (!$('t-sound').checked) { $('t-sound').checked = true; $('t-sound').onchange({ target: $('t-sound') }); }
+  };
+  window.addEventListener('pointerdown', go, true); window.addEventListener('keydown', go, true);
+}
 $('t-sound').onchange = e => {
   audio.setEnabled(e.target.checked);
   if (e.target.checked) { audio.setVolume(parseFloat($('r-vol').value)); audio.setScene(state.tone, state.night, weather.key, kit.uWindStrength.value); $('s-sound').textContent = state.tone; toast(audio.sources ? 'Sound on — falls, shores and birds from where they are' : 'Sound on — the bed follows the world'); }
