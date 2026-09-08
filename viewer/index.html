@@ -466,6 +466,7 @@ function applyThalynBlock(tx) {
     const nLights = lanterns.build(lv ? lv.lights : null); lanterns.setNight(state.night);
     const song = tx.song && tx.song.present ? tx.song : null;   // THE LISTENING WOOD — the maker's hummed tune, notes only
     audio.setWorld({ waterfalls: lv ? lv.waterfalls : [], liquids: tx.liquids || [], canopies: lv ? lv.canopies : [], anchors: tx.anchors || [], song, songUrl: currentSongURL });
+    trunkField.set(lv ? lv.trunks : null); if (trunkField.count) console.info('[thalyn] ' + trunkField.count + ' trunk(s) block the walk');
     if (lv) console.info('[thalyn] living: ' + nFalls + ' waterfall(s) built of ' + ((lv.waterfalls || []).length) + ', ' + ((lv.canopies || []).length) + ' canopy zone(s), ' + nLights + ' lantern/bulb light(s), ' + audio.sources + ' sound source(s), ' + nFauna.creatures + ' creature(s) + ' + nFauna.birds + ' bird(s)' + (song ? ', the maker\'s tune (' + audio.song + ' notes, ' + song.voice + ', level ' + audio.songLevel + (audio.songTitle ? ', "' + audio.songTitle + '"' : '') + ')' : ''));
     if (song && audio.songTitle) setTimeout(() => toast('This wood sings "' + audio.songTitle + '" — turn Sound on to hear it'), 2500);
     else if (currentSongURL) setTimeout(() => { if (!$('t-sound').checked) toast("This wood sings its maker's song — tap anywhere to hear it"); }, 2500);
@@ -538,7 +539,7 @@ function clearWorld() {
   waterfalls.clear();
   fauna.clear();
   lanterns.clear();
-  audio.setWorld(null);
+  audio.setWorld(null); trunkField.set(null);
 }
 
 // Dispose the old world AND zero the HUD readouts, so a fully-failed load doesn't leave stale counts.
@@ -650,8 +651,10 @@ function loadFromURL(url, name) { preferLite(url).then(u => loadFromURLNow(u, na
 // one, ask by NAME (one HEAD) so this viewer's own Share link carries the picture too.
 async function findPostcard(url) {
   if (currentThumbURL || !/World_web\.glb(\?.*)?$/i.test(url)) return;
-  const img = url.replace(/World_web\.glb(\?.*)?$/i, 'postcard.png');
-  try { const r = await fetch(img, { method: 'HEAD' }); if (r.ok) { currentThumbURL = img; console.info('[thalyn] postcard found beside the world'); } } catch (e) {}
+  for (const name of ['postcard.jpg', 'postcard.png']) {   // A308: JPEG since Sep-8; PNG for the shares before it
+    const img = url.replace(/World_web\.glb(\?.*)?$/i, name);
+    try { const r = await fetch(img, { method: 'HEAD' }); if (r.ok) { currentThumbURL = img; console.info('[thalyn] postcard found beside the world (' + name + ')'); return; } } catch (e) {}
+  }
 }
 function loadFromURLNow(url, name, shareUrl) {
   toast('Loading ' + (name || url) + ' …');
@@ -718,6 +721,7 @@ async function loadFiles(fileList) {
 
 // ── Walk mode ────────────────────────────────────────────────────────────────
 let waterProbe = () => null;   // A171 · rebuilt from extras.thalyn.liquids on every world (the walker swims where the bed lies under water)
+const trunkField = TA.makeTrunkField();   // A308 · the trees you cannot walk through (living.trunks)
 const walk = TA.makeWalk(camera, document.body, groundAt, (on, why) => {
   if (on && (why === 'swim' || why === 'walk')) { if (why === 'swim') toast('Swimming — you float at the surface, half pace'); return; }   // A171 · a swim/walk change, not an enter/exit
   document.body.classList.toggle('walking', on);
@@ -727,7 +731,7 @@ const walk = TA.makeWalk(camera, document.body, groundAt, (on, why) => {
   if (on) toast(coarsePointer ? 'Left thumb walks · right thumb looks · push far to run' : 'WASD to walk · Shift to run · E/Q up/down · F back to ground · Esc or V to leave');
   else if (why === 'refused') toast('Pointer lock refused — try V again in a second');
   else { const fwd = new THREE.Vector3(); camera.getWorldDirection(fwd); controls.target.copy(camera.position).addScaledVector(fwd, 30); controls.update(); }
-}, { touch: coarsePointer, waterAt: (x, z) => waterProbe(x, z) });
+}, { touch: coarsePointer, waterAt: (x, z) => waterProbe(x, z), blockAt: (x, z) => trunkField.resolve(x, z) });
 if (coarsePointer) $('b-walk').textContent = 'Walk';
 function toggleWalk() {
   if (walk.active) { walk.exit(); return; }

@@ -486,6 +486,42 @@ export function makePost(renderer, scene, camera) {
 // groundAt(x, z, fromY) → y or null. onState(walking) is called on lock/unlock.
 // opts.touch = true → no pointer lock: the left half of the screen is a thumb-stick (drag to walk, push far
 // to run), the right half looks (drag). The stick is drawn by this module (two rings) and only while walking.
+// A308 (founder 2026-09-08: "respect things like trees in the walk — I cannot simply walk through them"). The glb's
+// living.trunks is a flat [x, z, x, z, …] of every gathered tree's ground point (glTF frame, already X-negated by the
+// exporter, the same frame every other position here uses). Bucketed on an 8 m grid so a step tests a handful of
+// trunks, never thousands. resolve(x, z) pushes a point out of any trunk circle it stands in — a slide, not a stop.
+export function makeTrunkField(radius = 0.45) {
+  const CELL = 8; let cells = new Map(), count = 0;
+  const key = (cx, cz) => cx + ',' + cz;
+  function set(flat) {
+    cells = new Map(); count = 0;
+    if (!Array.isArray(flat)) return;
+    for (let i = 0; i + 1 < flat.length; i += 2) {
+      const x = +flat[i], z = +flat[i + 1]; if (!isFinite(x) || !isFinite(z)) continue;
+      const k = key(Math.floor(x / CELL), Math.floor(z / CELL));
+      let c = cells.get(k); if (!c) { c = []; cells.set(k, c); }
+      c.push(x, z); count++;
+    }
+  }
+  function resolve(x, z) {
+    if (!count) return null;
+    const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+    let ox = x, oz = z, moved = false;
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+      const c = cells.get(key(cx + dx, cz + dz)); if (!c) continue;
+      for (let i = 0; i < c.length; i += 2) {
+        const tx = c[i], tz = c[i + 1];
+        let ddx = ox - tx, ddz = oz - tz; const d2 = ddx * ddx + ddz * ddz;
+        if (d2 >= radius * radius) continue;
+        const d = Math.sqrt(d2) || 1e-4; if (d < 1e-4) { ddx = 1e-4; ddz = 0; }
+        ox = tx + ddx / d * radius; oz = tz + ddz / d * radius; moved = true;
+      }
+    }
+    return moved ? { x: ox, z: oz } : null;
+  }
+  return { set, resolve, get count() { return count; } };
+}
+
 export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
   const EYE = 1.7;
   const touch = !!opts.touch;
@@ -589,6 +625,8 @@ export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
         _right.set(-_fwd.z, 0, _fwd.x);
         camera.position.addScaledVector(_fwd, f / n * speed * dt).addScaledVector(_right, r / n * speed * dt);
       } else { ctl.moveForward(f / n * speed * dt); ctl.moveRight(r / n * speed * dt); }
+      // A308 · trunks: slide out of any tree you stepped into (a walker on the ground only — flying passes over).
+      if (!fly && opts.blockAt) { const b = opts.blockAt(camera.position.x, camera.position.z); if (b) { camera.position.x = b.x; camera.position.z = b.z; } }
     }
     if (u) { fly = true; walkY += u * speed * dt; }
     if (!fly) {
