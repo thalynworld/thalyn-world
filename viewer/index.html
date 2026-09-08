@@ -662,7 +662,7 @@ function loadFromURLNow(url, name, shareUrl) {
       currentModelURL = shareUrl || url;
       $('b-share-w').style.display = ''; $('b-together').style.display = '';
       findPostcard(currentModelURL);
-      armSoundOnFirstGesture(); if (!$('t-sound').checked) toast(currentSongURL ? 'Tap anywhere to hear this world — and its maker's song' : 'Tap anywhere to hear this world');
+      armSoundOnFirstGesture(); if (!$('t-sound').checked) toast(currentSongURL ? "Tap anywhere to hear this world — and its maker's song" : "Tap anywhere to hear this world");
       ingest(gltf); frameWorld(); toast('Loaded ' + (name || '') ); $('empty').style.display = 'none';
       postUp({ type: 'thalyn:loaded', label: name || '', meshes: meshCount }); },
     ev => { if (bar && ev && ev.total) bar.style.width = Math.min(96, Math.round(ev.loaded / ev.total * 100)) + '%';
