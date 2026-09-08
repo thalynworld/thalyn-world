@@ -36,7 +36,9 @@
     backdrop-filter: blur(10px); text-align: center; display: none; }
   #share-panel.show { display: block; }
   #share-panel h2 { margin: 0 0 10px; font: 600 15px Georgia, serif; color: var(--gold); }
-  #share-qr { background: #fff; border-radius: 8px; padding: 8px; display: inline-block; }
+  #share-qr { background: #fff; border-radius: 8px; padding: 8px; display: inline-block; max-width: 100%; box-sizing: border-box; }
+  /* W10.1: the share link now carries the postcard too, so its QR is a denser symbol — it fits the card instead of poking out. */
+  #share-qr img { display: block; max-width: 100%; height: auto; image-rendering: pixelated; }
   #share-link { width: 100%; margin: 10px 0 6px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line);
     background: rgba(255,255,255,0.05); color: #e8efe9; font-size: 11px; font-family: ui-monospace, Consolas, monospace; }
   #share-panel button { width: 48%; margin: 4px 1%; padding: 7px; border-radius: 8px; cursor: pointer;
