@@ -376,6 +376,8 @@ const lanterns = TA.makeLanterns(scene);      // string-light bulbs, hung lanter
 let fileWeather = '', weatherOverride = '', currentModelURL = null;
 // W10 · ?song=<https url to song.wav>: the maker's tune RENDERED in the app (the glb carries notes only).
 let currentSongURL = null;
+// W10.1 · the world's postcard (postcard.png beside World_web.glb, or ?img=): the picture a pasted share link unfurls with.
+let currentThumbURL = null;
 const _sunV = new THREE.Vector3();
 function setWeather() { weather.set(weatherOverride || fileWeather); apply(); }
 // World details: everything the file says about itself, in one flat panel.
@@ -642,6 +644,13 @@ async function preferLite(url) {
   return url;
 }
 function loadFromURL(url, name) { preferLite(url).then(u => loadFromURLNow(u, name, url)); }
+// W10.1 · the app puts postcard.png beside World_web.glb (the Discord unfurl picture). Unless ?img= already named
+// one, ask by NAME (one HEAD) so this viewer's own Share link carries the picture too.
+async function findPostcard(url) {
+  if (currentThumbURL || !/World_web\.glb(\?.*)?$/i.test(url)) return;
+  const img = url.replace(/World_web\.glb(\?.*)?$/i, 'postcard.png');
+  try { const r = await fetch(img, { method: 'HEAD' }); if (r.ok) { currentThumbURL = img; console.info('[thalyn] postcard found beside the world'); } } catch (e) {}
+}
 function loadFromURLNow(url, name, shareUrl) {
   toast('Loading ' + (name || url) + ' …');
   const bar = document.querySelector('#loadbar > i');
@@ -650,6 +659,7 @@ function loadFromURLNow(url, name, shareUrl) {
       if (bar) { bar.style.width = '100%'; setTimeout(() => { bar.style.width = '0'; }, 600); }
       currentModelURL = shareUrl || url;
       $('b-share-w').style.display = ''; $('b-together').style.display = '';
+      findPostcard(currentModelURL);
       ingest(gltf); frameWorld(); toast('Loaded ' + (name || '') ); $('empty').style.display = 'none';
       postUp({ type: 'thalyn:loaded', label: name || '', meshes: meshCount }); },
     ev => { if (bar && ev && ev.total) bar.style.width = Math.min(96, Math.round(ev.loaded / ev.total * 100)) + '%';
@@ -762,6 +772,7 @@ function shareURL() {
   const cr = pendingThalyn && pendingThalyn.creator;
   if (cr) u.searchParams.set('by', cr);
   if (currentSongURL) u.searchParams.set('song', currentSongURL);   // W10 · the rendered song rides the share link
+  if (currentThumbURL) u.searchParams.set('img', currentThumbURL);  // W10.1 · and the postcard: the unfurl shows THIS world
   return u.toString();
 }
 $('b-share-w').onclick = () => {
@@ -1033,6 +1044,8 @@ $('cta').href = TA.steamLink(parent && parent !== window ? 'demo_embed' : 'viewe
 if (params.get('cta') === '0') $('cta').style.display = 'none';
 const songQ = params.get('song');   // W10 · read BEFORE the model loads: setWorld runs when the manifest arrives
 if (songQ) { const s = safeURL(songQ); if (s) currentSongURL = s; else toast('That song link is not allowed.'); }
+const imgQ = params.get('img');   // W10.1 · the postcard the share link named (else found by name beside the glb)
+if (imgQ) { const s = safeURL(imgQ); if (s) currentThumbURL = s; }
 const qp = params.get('model');
 if (qp) { const s = safeURL(qp); if (s) loadFromURL(s); else toast('That world link is not allowed.'); }
 const sessionParam = params.get('session');
