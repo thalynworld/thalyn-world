@@ -656,6 +656,35 @@ async function findPostcard(url) {
     try { const r = await fetch(img, { method: 'HEAD' }); if (r.ok) { currentThumbURL = img; console.info('[thalyn] postcard found beside the world (' + name + ')'); return; } } catch (e) {}
   }
 }
+// ── ML harvest · the share-page view beacon (2026-09-08, COORDINATION_ML_HARVEST_CLIENT_SPEC §4) ──
+// How OTHERS react to a shared world is the second, independent label on it — the first being that the
+// maker shared it at all. This counts one view per world per browser session and nothing else: no id is
+// stored, no response is read, no cookie is set, and a page that fails to load a world counts nothing.
+//
+// ⚠ WHY A *SIMPLE* REQUEST. Prod Thalyn:AllowedOrigins is EMPTY, so a normal cross-origin fetch from
+// thalyn.world cannot READ the reply — but a simple request (no custom headers, no preflight) still
+// LANDS on the server, and /api/share/view is public, always answers 204, and needs no answer here.
+// sendBeacon first because it survives the tab closing; fetch(no-cors, keepalive) is the fallback.
+//
+// The server only counts a world it was told about: /api/feedback/signal "share" stores
+// HMAC(secret, "share:"+worldId) on the anonymous sample, and this beacon lands on that token. A world
+// nobody chose to share therefore counts nothing — the share signal IS the consent that it is public.
+// Deliberately NOT in workers/og-share.js: humans are 302'd here and would be counted twice, and a
+// crawler unfurl is not a view.
+const THALYN_API_BASE = 'https://api.thalyn.world';
+function beaconShareView(modelUrl) {
+  try {
+    const m = /\/worlds\/[^/]+\/([^/]+)\/World_web(?:_lite)?\.glb/i.exec(modelUrl || '');
+    if (!m) return;                                          // not a Thalyn share-bucket URL → nothing to count
+    const key = 'thalyn_viewed_' + m[1];
+    if (sessionStorage.getItem(key)) return;                 // one view per world per browser session
+    sessionStorage.setItem(key, '1');
+    const url = THALYN_API_BASE + '/api/share/view?worldId=' + encodeURIComponent(m[1]);
+    if (!(navigator.sendBeacon && navigator.sendBeacon(url)))
+      fetch(url, { method: 'POST', mode: 'no-cors', keepalive: true }).catch(() => {});
+  } catch (e) {}
+}
+
 function loadFromURLNow(url, name, shareUrl) {
   toast('Loading ' + (name || url) + ' …');
   const bar = document.querySelector('#loadbar > i');
@@ -667,6 +696,7 @@ function loadFromURLNow(url, name, shareUrl) {
       findPostcard(currentModelURL);
       armSoundOnFirstGesture(); if (!$('t-sound').checked) toast(currentSongURL ? "Tap anywhere to hear this world — and its maker's song" : "Tap anywhere to hear this world");
       ingest(gltf); frameWorld(); toast('Loaded ' + (name || '') ); $('empty').style.display = 'none';
+      beaconShareView(currentModelURL);   // ML harvest §4 — a view, counted only on a world that LOADED
       postUp({ type: 'thalyn:loaded', label: name || '', meshes: meshCount }); },
     ev => { if (bar && ev && ev.total) bar.style.width = Math.min(96, Math.round(ev.loaded / ev.total * 100)) + '%';
             else if (bar && ev && ev.loaded) bar.style.width = Math.min(96, Math.round(ev.loaded / 2097152)) + '%'; },
