@@ -330,6 +330,15 @@ main,.site-footer,.thalyn-mark{position:relative;z-index:1;}
 .hero-stamp{font-family:var(--font-display);font-size:clamp(1rem,2.4vw,1.35rem);
   font-weight:600;color:var(--gold-base);letter-spacing:0.04em;line-height:1.4;
   margin:0 0 2.2rem;}
+/* The category line (2026-09-11 "What is Thalyn" pass) — sits directly under the
+   plain-answer threshold, kicker weight, FLAT gold. Type-qualified like the
+   mirrors so no container rule can outrank it. */
+p.hero-category{font-family:var(--font-display);font-size:clamp(0.82rem,1.7vw,0.98rem);
+  font-weight:600;color:var(--gold-base);letter-spacing:0.08em;text-transform:uppercase;
+  margin:0 auto 1.6rem;line-height:1.5;}
+/* A body-weight line under a centred .hook (the six-moods line on /core/). */
+p.hook-sub{font-size:1.05rem;font-weight:300;font-style:italic;color:var(--parchment-dim);
+  max-width:620px;margin:1.1rem auto 0;line-height:1.6;text-align:center;}
 .hero .tw-wrap{margin-bottom:1.5rem;}
 /* The kicker + stamp added ~137px to the hero, which is min-height:100vh — on a
    1280x720 laptop that pushed the CTA row to the fold. Tighten the vertical
@@ -342,6 +351,7 @@ main,.site-footer,.thalyn-mark{position:relative;z-index:1;}
   .hero-kicker{margin-bottom:0.7rem;}
   .hero-myth-next{margin-bottom:1.2rem;}
   .hero .tw-wrap{margin-bottom:0.9rem;}
+  p.hero-category{margin-bottom:1rem;}
   .hero-stamp{margin-bottom:1.4rem;}
 }
 
