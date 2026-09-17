@@ -646,7 +646,31 @@ async function preferLite(url) {
   try { const r = await fetch(lite, { method: 'HEAD' }); if (r.ok) { console.info('[thalyn] phone tier: loading the lighter copy'); return lite; } } catch (e) {}
   return url;
 }
-function loadFromURL(url, name) { preferLite(url).then(u => loadFromURLNow(u, name, url)); }
+// The share MODERATION marker (server ask 2026-09-17): a muted tune or a removed world leaves
+// moderation.json beside World_web.glb. 404 = untouched (every share today). Never anything but status/songMuted/at.
+async function readModeration(url) {
+  if (!/World_web\.glb(\?.*)?$/i.test(url)) return null;
+  try {
+    const r = await fetch(url.replace(/World_web\.glb(\?.*)?$/i, 'moderation.json'), { cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return { removed: j.status === 'removed', songMuted: j.songMuted === true, at: j.at || '' };
+  } catch (e) { return null; }
+}
+const EMPTY_DEFAULT_HTML = $('empty').innerHTML;
+function showRemovedScreen() {
+  $('empty').innerHTML = '<div class="big">This world was removed</div>'
+    + '<div>It was taken down at its maker’s or a rights holder’s request.</div>';
+  $('empty').style.display = '';
+}
+function loadFromURL(url, name) {
+  readModeration(url).then(mod => {
+    if (mod && mod.removed) { showRemovedScreen(); postUp({ type: 'thalyn:removed' }); return; }
+    if ($('empty').innerHTML !== EMPTY_DEFAULT_HTML) $('empty').innerHTML = EMPTY_DEFAULT_HTML;
+    if (mod && mod.songMuted) { currentSongURL = null; setTimeout(() => toast('The tune on this world was muted on request.'), 2500); }
+    preferLite(url).then(u => loadFromURLNow(u, name, url));
+  });
+}
 // W10.1 · the app puts postcard.png beside World_web.glb (the Discord unfurl picture). Unless ?img= already named
 // one, ask by NAME (one HEAD) so this viewer's own Share link carries the picture too.
 async function findPostcard(url) {
