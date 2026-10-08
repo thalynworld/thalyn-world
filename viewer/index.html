@@ -284,10 +284,11 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import * as TA from './thalyn-atmos.js?v=20261008a';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
+import * as TA from './thalyn-atmos.js?v=20261008b';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
 import * as TG from './thalyn-together.js';
 import * as TF from './thalyn-fauna.js';
 import * as TGR from './thalyn-grass.js?v=20261008a';   // A5386 · the grass field grown from extras.thalyn.grass
+import * as TIV from './thalyn-ivy.js?v=20261008a';     // A5389 · the ivy's cells + the game's distance LOD (bump on change)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const $ = id => document.getElementById(id);
@@ -379,6 +380,10 @@ const lanterns = TA.makeLanterns(scene);      // string-light bulbs, hung lanter
 // A5386 · GRASS AS DATA: a world exported since 2026-10-08 carries what the app's GrassField was fed (extras.thalyn.grass)
 // instead of ~15 M baked triangles; the field is regrown here around the camera, the tier sets radius × density.
 const grass = TGR.makeGrass(scene);
+// A5389 · IVY: the merged Overgrowth mesh is split back into the game's cells (frustum + tier distance cull) and thins
+// with distance by the per-card key the export writes (COLOR_0.a of World_web) — only what the game itself thins.
+const ivy = TIV.makeIvy();
+let loadingLite = false;   // the file being ingested is World_web_lite.glb (its simplifier already took the Low share)
 let grassFor = null;   // the block the field was built from (applyThalynBlock runs twice per load)
 function buildGrass(tx) {
   if (!tx || grassFor === tx || !walkMeshes.length) return;
@@ -561,6 +566,7 @@ function clearWorld() {
   fauna.clear();
   lanterns.clear();
   grass.clear(); grassFor = null;
+  ivy.clear();
   audio.setWorld(null); trunkField.set(null);
 }
 
@@ -611,6 +617,7 @@ function ingest(gltf) {
   const bakedLights = [];
   gltf.scene.traverse(o => { if (o.isLight) bakedLights.push(o); });
   bakedLights.forEach(l => l.parent && l.parent.remove(l));
+  if (ivy.adopt(gltf.scene, { lite: loadingLite, fakeKeys: paramsEarly.get('ivytest') === '1' })) ivy.setBudget(tier.table, tier.name);
   const tx = TA.readBlock(gltf);
   if (tx && tx.atmosphere && !pendingAtmos && !TA.hasBlock(tx)) applyAtmosphere(tx.atmosphere);
   worldRoot.add(gltf.scene);
@@ -623,7 +630,7 @@ function ingest(gltf) {
 function rebuildWalkMeshes() {
   walkMeshes.length = 0;
   worldRoot.updateMatrixWorld(true);
-  worldRoot.traverse(o => { if (o.isMesh && !o.userData.__liquid && !o.userData.__skyDome && TA.isGroundMesh(o)) walkMeshes.push({ mesh: o, box: new THREE.Box3().setFromObject(o) }); });
+  worldRoot.traverse(o => { if (o.isMesh && !o.userData.__liquid && !o.userData.__skyDome && !o.userData.__ivy && TA.isGroundMesh(o)) walkMeshes.push({ mesh: o, box: new THREE.Box3().setFromObject(o) }); });
 }
 
 function frameWorld(honourShot = true) {
@@ -735,6 +742,7 @@ function loadFromURLNow(url, name, shareUrl) {
   toast('Loading ' + (name || url) + ' …');
   const bar = document.querySelector('#loadbar > i');
   if (bar) bar.style.width = '2%';
+  loadingLite = /World_web_lite\.glb(\?.*)?$/i.test(url);
   loader.load(url, gltf => {
       if (bar) { bar.style.width = '100%'; setTimeout(() => { bar.style.width = '0'; }, 600); }
       currentModelURL = shareUrl || url;
@@ -785,6 +793,7 @@ async function loadFiles(fileList) {
   let done = 0;
   for (const f of files) {
     const url = URL.createObjectURL(f);
+    loadingLite = /_lite\.glb$/i.test(f.name || '');
     await new Promise(res => fl.load(url, g => { ingest(g); done++; toast(`Loaded ${done}/${files.length}`); URL.revokeObjectURL(url); res(); },
       undefined, e => { console.error(f.name, e); done++; URL.revokeObjectURL(url); res(); }));
   }
@@ -943,6 +952,7 @@ tier.on((t, name) => {
   fauna.setBudget(t);
   lanterns.setBudget(t);
   grass.setBudget(t, name);
+  ivy.setBudget(t, name);
   audio.setVoiceCap(t.voices);
   post.setQuality(t);
   if (anchorRoot && pendingThalyn) { anchorRoot.parent && anchorRoot.parent.remove(anchorRoot); anchorRoot = TA.buildAnchors(pendingThalyn.anchors, worldRoot, t.fireLights); }
@@ -1166,11 +1176,12 @@ renderer.setAnimationLoop(() => {
     lanterns.setNight(state.night); lanterns.tick(dt, camera);
     waterfalls.setLight(Math.max(0.08, 1 - state.night * 0.92) * Math.min(1, 0.4 + state.sunIntensity / 2.2 * weather.sunDim));
   }
+  ivy.tick(camera);
   grass.tick(dt, camera, { animate: !reduceMotion.matches, sunDir: state.sunDir, sunColor: L.sun.color, sunIntensity: skyOn ? L.sun.intensity : 0, night: state.night });
   audio.tick(dt, camera);
   if (together) together.tick(dt);
   else if (soloScreen) soloScreen.tick(dt);
-  if (perf) perf.tick(dt, { tier: tier.name, falls: waterfalls.awake + '/' + waterfalls.count + ' (' + waterfalls.particles + ' spray)', lanterns: lanterns.lit + '/' + lanterns.count + ' lit', fauna: fauna.awake + '/' + fauna.count + ' · ' + fauna.birds + ' birds', weather: weather.particles + ' drops', grass: grass.layers ? grass.blades.toLocaleString() + ' tufts · ' + (grass.tris / 1e6).toFixed(2) + ' M tris' + (grass.pending ? ' (+' + grass.pending + ' tiles)' : '') : 'none', voices: audio.voices + '/' + audio.sources, together: together ? (together.peers.length + 1) + ' here · ' + together.rtt.toFixed(0) + ' ms' : 'off' });
+  if (perf) perf.tick(dt, { tier: tier.name, falls: waterfalls.awake + '/' + waterfalls.count + ' (' + waterfalls.particles + ' spray)', lanterns: lanterns.lit + '/' + lanterns.count + ' lit', fauna: fauna.awake + '/' + fauna.count + ' · ' + fauna.birds + ' birds', weather: weather.particles + ' drops', grass: grass.layers ? grass.blades.toLocaleString() + ' tufts · ' + (grass.tris / 1e6).toFixed(2) + ' M tris' + (grass.pending ? ' (+' + grass.pending + ' tiles)' : '') : 'none', ivy: ivy.text, voices: audio.voices + '/' + audio.sources, together: together ? (together.peers.length + 1) + ' here · ' + together.rtt.toFixed(0) + ' ms' : 'off' });
   // Sun shafts: aim the radial pass at the sun's screen position; fade out off-screen / at night / in weather.
   _sunV.copy(state.sunDir).multiplyScalar(2000).add(camera.position).project(camera);
   const shaftsOn = skyOn && weather.shaftsOk && state.sunDir.y > 0.04 && state.night < 0.5

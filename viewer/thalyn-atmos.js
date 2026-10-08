@@ -1328,10 +1328,13 @@ export function steamLink(source) {
 // its numbers from the row below; a new effect adds a column, never a private constant.
 // ★ A5386 grass (thalyn-grass.js): radius × density × the distance past which a tuft drops to its 4-triangle far form.
 // Desktop = the app's own field (SpeciesCoordinator grassCullDistance 60 m, the High density cap).
+// ★ A5389 ivy (thalyn-ivy.js): ivyCull = the game's cell sleep distance, Overgrowth SleepBeyondM 150 m × TierReachMul
+// (1 / 0.85 / 0.6); ivyKeep = 1 − TierTriMul (0 / 0.4 / 0.65): Medium/Low build 60 % / 35 % of the cards. The 60 → 130 m
+// thinning itself is the game's on every tier.
 export const TIERS = {
-  high:   { label: 'Desktop', pixelRatio: 2.0, shadows: true,  shadowMap: 2048, shadowHalf: 150, msaa: 4, bloom: true,  shafts: true,  weather: 1.0,  sprayPerFall: 220, fallsMax: 24, sheetRows: 28, foam: true,  voices: 12, canopies: 6, wisps: 8, fireLights: 48, lanternLights: 16, creatures: 48, birdRoutes: 6, perched: 24, grassRadius: 60, grassDensity: 1.0,  grassLod: 15 },
-  laptop: { label: 'Laptop',  pixelRatio: 1.5, shadows: true,  shadowMap: 1024, shadowHalf: 100, msaa: 2, bloom: true,  shafts: false, weather: 0.55, sprayPerFall: 90,  fallsMax: 12, sheetRows: 20, foam: true,  voices: 8,  canopies: 4, wisps: 8, fireLights: 20, lanternLights: 8,  creatures: 16, birdRoutes: 4, perched: 12, grassRadius: 40, grassDensity: 0.6,  grassLod: 10 },
-  lite:   { label: 'Phone',   pixelRatio: 1.0, shadows: false, shadowMap: 512,  shadowHalf: 0,   msaa: 0, bloom: false, shafts: false, weather: 0.30, sprayPerFall: 36,  fallsMax: 6,  sheetRows: 12, foam: false, voices: 5,  canopies: 3, wisps: 8, fireLights: 6,  lanternLights: 3,  creatures: 6,  birdRoutes: 2, perched: 6,  grassRadius: 25, grassDensity: 0.35, grassLod: 6 },
+  high:   { label: 'Desktop', pixelRatio: 2.0, shadows: true,  shadowMap: 2048, shadowHalf: 150, msaa: 4, bloom: true,  shafts: true,  weather: 1.0,  sprayPerFall: 220, fallsMax: 24, sheetRows: 28, foam: true,  voices: 12, canopies: 6, wisps: 8, fireLights: 48, lanternLights: 16, creatures: 48, birdRoutes: 6, perched: 24, grassRadius: 60, grassDensity: 1.0,  grassLod: 15, ivyCull: 150, ivyKeep: 0 },
+  laptop: { label: 'Laptop',  pixelRatio: 1.5, shadows: true,  shadowMap: 1024, shadowHalf: 100, msaa: 2, bloom: true,  shafts: false, weather: 0.55, sprayPerFall: 90,  fallsMax: 12, sheetRows: 20, foam: true,  voices: 8,  canopies: 4, wisps: 8, fireLights: 20, lanternLights: 8,  creatures: 16, birdRoutes: 4, perched: 12, grassRadius: 40, grassDensity: 0.6,  grassLod: 10, ivyCull: 127.5, ivyKeep: 0.4 },
+  lite:   { label: 'Phone',   pixelRatio: 1.0, shadows: false, shadowMap: 512,  shadowHalf: 0,   msaa: 0, bloom: false, shafts: false, weather: 0.30, sprayPerFall: 36,  fallsMax: 6,  sheetRows: 12, foam: false, voices: 5,  canopies: 3, wisps: 8, fireLights: 6,  lanternLights: 3,  creatures: 6,  birdRoutes: 2, perched: 6,  grassRadius: 25, grassDensity: 0.35, grassLod: 6, ivyCull: 90, ivyKeep: 0.65 },
 };
 // Heuristic: what the device says about itself. Returns { name, why } so the HUD can show the reason.
 export function guessTier(renderer) {
