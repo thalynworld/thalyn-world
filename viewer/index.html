@@ -284,9 +284,10 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import * as TA from './thalyn-atmos.js?v=20260908c';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
+import * as TA from './thalyn-atmos.js?v=20261008a';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
 import * as TG from './thalyn-together.js';
 import * as TF from './thalyn-fauna.js';
+import * as TGR from './thalyn-grass.js?v=20261008a';   // A5386 · the grass field grown from extras.thalyn.grass
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const $ = id => document.getElementById(id);
@@ -375,6 +376,25 @@ const waterfalls = TA.makeWaterfalls(scene);
 // (loader + ground probe are declared further down and only used once a world has loaded — hence the closures).
 const fauna = TF.makeFauna(scene, () => loader, (x, z, fromY) => groundAt(x, z, fromY), 'creatures/');
 const lanterns = TA.makeLanterns(scene);      // string-light bulbs, hung lanterns, water lights — the app's glow points
+// A5386 · GRASS AS DATA: a world exported since 2026-10-08 carries what the app's GrassField was fed (extras.thalyn.grass)
+// instead of ~15 M baked triangles; the field is regrown here around the camera, the tier sets radius × density.
+const grass = TGR.makeGrass(scene);
+let grassFor = null;   // the block the field was built from (applyThalynBlock runs twice per load)
+function buildGrass(tx) {
+  if (!tx || grassFor === tx || !walkMeshes.length) return;
+  grassFor = tx;
+  if (!(tx.grass && tx.grass.present)) { grass.clear(); return; }   // an older export: its baked grass (if any) stays as it is
+  // Roots stand on the TERRAIN only (the export names its material Thalyn_Terrain_Baked) — never on a roof or a rock.
+  const isTerrain = m => m && /^Thalyn_Terrain/i.test(m.name || '');
+  const terrain = walkMeshes.filter(e => (Array.isArray(e.mesh.material) ? e.mesh.material : [e.mesh.material]).some(isTerrain));
+  const kind = terrain.length ? terrain.length + ' terrain mesh(es)' : 'every ground mesh (no Thalyn_Terrain_Baked material found)';
+  // A file that still carries the baked grass (World.glb, the Blender copy) would draw it twice — hide the baked blades.
+  let baked = 0;
+  worldRoot.traverse(o => { if (o.isMesh && (Array.isArray(o.material) ? o.material : [o.material]).some(m => m && /^Grass_.*_gltf$/i.test(m.name || ''))) { o.visible = false; baked++; } });
+  if (baked) console.info('[thalyn-grass] ' + baked + ' baked grass mesh(es) in this file hidden — the field grows from the data instead');
+  grass.build(tx, TA.makeGroundProbe(terrain.length ? terrain : walkMeshes), kind);
+  grass.setBudget(tier.table, tier.name);
+}
 let fileWeather = '', weatherOverride = '', currentModelURL = null;
 // W10 · ?song=<https url to song.wav>: the maker's tune RENDERED in the app (the glb carries notes only).
 let currentSongURL = null;
@@ -478,6 +498,7 @@ function applyThalynBlock(tx) {
     if (together) together.setCinemaSeed(cinemaSeed);
     syncSoloScreen();
     waterProbe = TA.makeWaterProbe(tx.liquids || []);   // A171 · swimming
+    buildGrass(tx);                                       // A5386 · needs the walk meshes, so it builds on the frameWorld pass
     // HUD: world name · tone · clock · weather, the postcard code, the shot.
     const name = String(tx.worldName || tx.sceneName || 'Thalyn world').slice(0, 40);
     $('w-row').style.display = '';
@@ -539,6 +560,7 @@ function clearWorld() {
   waterfalls.clear();
   fauna.clear();
   lanterns.clear();
+  grass.clear(); grassFor = null;
   audio.setWorld(null); trunkField.set(null);
 }
 
@@ -920,6 +942,7 @@ tier.on((t, name) => {
   waterfalls.setBudget(t);
   fauna.setBudget(t);
   lanterns.setBudget(t);
+  grass.setBudget(t, name);
   audio.setVoiceCap(t.voices);
   post.setQuality(t);
   if (anchorRoot && pendingThalyn) { anchorRoot.parent && anchorRoot.parent.remove(anchorRoot); anchorRoot = TA.buildAnchors(pendingThalyn.anchors, worldRoot, t.fireLights); }
@@ -1143,10 +1166,11 @@ renderer.setAnimationLoop(() => {
     lanterns.setNight(state.night); lanterns.tick(dt, camera);
     waterfalls.setLight(Math.max(0.08, 1 - state.night * 0.92) * Math.min(1, 0.4 + state.sunIntensity / 2.2 * weather.sunDim));
   }
+  grass.tick(dt, camera, { animate: !reduceMotion.matches, sunDir: state.sunDir, sunColor: L.sun.color, sunIntensity: skyOn ? L.sun.intensity : 0, night: state.night });
   audio.tick(dt, camera);
   if (together) together.tick(dt);
   else if (soloScreen) soloScreen.tick(dt);
-  if (perf) perf.tick(dt, { tier: tier.name, falls: waterfalls.awake + '/' + waterfalls.count + ' (' + waterfalls.particles + ' spray)', lanterns: lanterns.lit + '/' + lanterns.count + ' lit', fauna: fauna.awake + '/' + fauna.count + ' · ' + fauna.birds + ' birds', weather: weather.particles + ' drops', voices: audio.voices + '/' + audio.sources, together: together ? (together.peers.length + 1) + ' here · ' + together.rtt.toFixed(0) + ' ms' : 'off' });
+  if (perf) perf.tick(dt, { tier: tier.name, falls: waterfalls.awake + '/' + waterfalls.count + ' (' + waterfalls.particles + ' spray)', lanterns: lanterns.lit + '/' + lanterns.count + ' lit', fauna: fauna.awake + '/' + fauna.count + ' · ' + fauna.birds + ' birds', weather: weather.particles + ' drops', grass: grass.layers ? grass.blades.toLocaleString() + ' tufts · ' + (grass.tris / 1e6).toFixed(2) + ' M tris' + (grass.pending ? ' (+' + grass.pending + ' tiles)' : '') : 'none', voices: audio.voices + '/' + audio.sources, together: together ? (together.peers.length + 1) + ' here · ' + together.rtt.toFixed(0) + ' ms' : 'off' });
   // Sun shafts: aim the radial pass at the sun's screen position; fade out off-screen / at night / in weather.
   _sunV.copy(state.sunDir).multiplyScalar(2000).add(camera.position).project(camera);
   const shaftsOn = skyOn && weather.shaftsOk && state.sunDir.y > 0.04 && state.night < 0.5
