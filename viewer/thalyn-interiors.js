@@ -31,7 +31,8 @@ export const INTERIOR_BUDGET = {
 };
 // ★ A5401 · INDOORS I1 — the walk's knobs, one row per tier (PROVISIONAL: the lead folds these into the TIERS row as columns at merge;
 // until then they live here and travel on the interiors object as `knobs`).
-//   bvhSliceMs     0 = build a building's BVH on the main thread at load (desktop); > 0 = idle slices of at most that many ms (phone)
+//   bvhSliceMs     0 = build a building's BVH on the main thread at load; > 0 = idle slices of at most that many ms (every tier since the storey
+//                  split, A5399: one 2.25 M skyspire was a 464 ms main-thread block on desktop; its slices are ≤ ~22 ms each)
 //   stepUpM        the floor ray starts this far above the feet (a stair riser you can climb; a ceiling above it is never a floor)
 //   fallGuardM     no floor within this far under the feet ⇒ keep the last floor (a gap in a mesh never drops you)
 //   wallRayM       the three horizontal wall rays' reach beyond the move, from chest height
@@ -40,8 +41,8 @@ export const INTERIOR_BUDGET = {
 //   chestM         chest height above the feet for the wall rays
 export const INDOOR_DEFAULTS = {
   lite:   { bvhSliceMs: 16, stepUpM: 0.6, fallGuardM: 3, wallRayM: 0.45, wallSpreadDeg: 35, wallRadiusM: 0.25, chestM: 1.2 },
-  laptop: { bvhSliceMs: 0,  stepUpM: 0.6, fallGuardM: 3, wallRayM: 0.45, wallSpreadDeg: 35, wallRadiusM: 0.25, chestM: 1.2 },
-  high:   { bvhSliceMs: 0,  stepUpM: 0.6, fallGuardM: 3, wallRayM: 0.45, wallSpreadDeg: 35, wallRadiusM: 0.25, chestM: 1.2 },
+  laptop: { bvhSliceMs: 8,  stepUpM: 0.6, fallGuardM: 3, wallRayM: 0.45, wallSpreadDeg: 35, wallRadiusM: 0.25, chestM: 1.2 },
+  high:   { bvhSliceMs: 8,  stepUpM: 0.6, fallGuardM: 3, wallRayM: 0.45, wallSpreadDeg: 35, wallRadiusM: 0.25, chestM: 1.2 },
 };
 // ★ A5397 · PERF P2 · B2 THE STOREY BAND — fallback when the tier row carries no band columns (TIERS bandBelowM / bandAboveM /
 // bandCapTris, thalyn-atmos.js). A shown building draws only the meshes whose world Y range meets [camY − below, camY + above]

@@ -284,13 +284,13 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import * as TA from './thalyn-atmos.js?v=20261009s1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
+import * as TA from './thalyn-atmos.js?v=20261009s2';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
 import * as TG from './thalyn-together.js';
 import * as TF from './thalyn-fauna.js';
 import * as TGR from './thalyn-grass.js?v=20261008a';   // A5386 · the grass field grown from extras.thalyn.grass
 import * as TIV from './thalyn-ivy.js?v=20261009m1';     // A5389 · the ivy's cells + the game's distance LOD (bump on change)
-import * as TIN from './thalyn-interiors.js?v=20261009s1';   // A5392 · building interiors lazy-loaded by distance (extras.thalyn.interiors)
-import * as TIND from './thalyn-indoors.js?v=20261009s1';    // A5401 · I1 walking indoors: floor not roof · stairs · walls · doors walked through (⚠ its own import of thalyn-interiors.js carries the SAME ?v= — bump both together)
+import * as TIN from './thalyn-interiors.js?v=20261009s2';   // A5392 · building interiors lazy-loaded by distance (extras.thalyn.interiors)
+import * as TIND from './thalyn-indoors.js?v=20261009s2';    // A5401 · I1 walking indoors: floor not roof · stairs · walls · doors walked through (⚠ its own import of thalyn-interiors.js carries the SAME ?v= — bump both together)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const $ = id => document.getElementById(id);
