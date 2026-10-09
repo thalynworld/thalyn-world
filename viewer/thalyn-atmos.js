@@ -618,6 +618,7 @@ export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
       if (Math.hypot(jx, jy) > 0.08) { f = -jy; r = jx; run = Math.hypot(jx, jy) > 0.85; }
     }
     const speed = (run ? 12 : 5) * (swimming ? 0.5 : 1);
+    const ox = camera.position.x, oz = camera.position.z;   // A5401 · I1: the wall rays start where the step began (no tunnelling at low fps)
     if (f || r) {
       const n = Math.max(1, Math.hypot(f, r));
       if (touch) {
@@ -627,10 +628,14 @@ export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
       } else { ctl.moveForward(f / n * speed * dt); ctl.moveRight(r / n * speed * dt); }
       // A308 · trunks: slide out of any tree you stepped into (a walker on the ground only — flying passes over).
       if (!fly && opts.blockAt) { const b = opts.blockAt(camera.position.x, camera.position.z); if (b) { camera.position.x = b.x; camera.position.z = b.z; } }
+      // A5401 · I1 · walls INSIDE a resident building (3 chest-height rays, slide along the hit normal — the blockAt contract); null outdoors.
+      if (!fly && opts.indoor) { const w = opts.indoor.wall(ox, oz, camera.position.x, camera.position.z, walkY - EYE); if (w) { camera.position.x = w.x; camera.position.z = w.z; } }
     }
     if (u) { fly = true; walkY += u * speed * dt; }
     if (!fly) {
-      const g = groundAt(camera.position.x, camera.position.z, camera.position.y + 3);
+      // A5401 · I1 · floor, not roof: inside a resident building the floor ray starts at feet + step height (undefined ⇒ outdoors, as before).
+      const gi = opts.indoor ? opts.indoor.floor(camera.position.x, walkY - EYE, camera.position.z) : undefined;
+      const g = gi !== undefined ? gi : groundAt(camera.position.x, camera.position.z, camera.position.y + 3);
       // A171 · SWIMMING (founder 2026-09-02: "there's no water to swim in, only the surface"): where the bed lies
       // under a liquid surface you float, chest-deep, and move at half pace — the app's own swim. Deeper than
       // the eye's reach the ground is left alone (the surface carries you); wading is just walking.
@@ -698,6 +703,32 @@ export function makeGroundProbe(entries) {
     }
     return best;
   };
+}
+
+// A5401 · I1 · the landing dip: build the walk meshes' BVHs in idle time right after rebuildWalkMeshes() instead of on the first step
+// (the ground probe below still builds lazily any it meets first). Same threshold as the probe; a newer call cancels an older one.
+let _walkBvhGen = 0;
+export function prebuildWalkBVH(entries) {
+  const gen = ++_walkBvhGen, list = [], seen = new Set();
+  for (const e of entries) { const g = e.mesh && e.mesh.geometry; if (g && !seen.has(g) && g.attributes.position && g.attributes.position.count > 3000) { seen.add(g); list.push(g); } }
+  if (!list.length) return;
+  const idle = typeof requestIdleCallback === 'function' ? cb => requestIdleCallback(cb, { timeout: 1000 })
+                                                       : cb => setTimeout(() => cb({ didTimeout: true, timeRemaining: () => 8 }), 32);
+  let i = 0, ms = 0, tris = 0, slices = 0, built = 0; const t0 = performance.now();
+  const step = dl => {
+    if (gen !== _walkBvhGen) return;   // a new world: its own call carries on
+    slices++;
+    do {
+      const g = list[i++];
+      if (g.boundsTree) continue;      // the first step got there first
+      const t = performance.now();
+      try { g.computeBoundsTree(); built++; tris += g.index ? g.index.count / 3 : g.attributes.position.count / 3; } catch (err) { /* linear fallback */ }
+      ms += performance.now() - t;
+    } while (i < list.length && (dl.didTimeout || dl.timeRemaining() > 1));
+    if (i < list.length) idle(step);
+    else console.info(`[thalyn-walk] walk bvh prebuilt ${built}/${list.length} mesh(es) · ${(tris / 1e6).toFixed(2)} M tris in ${ms.toFixed(0)} ms over ${slices} idle slice(s), ${(performance.now() - t0).toFixed(0)} ms after load`);
+  };
+  idle(step);
 }
 
 // ── Shared material patches (foliage relight + wind, animated liquids) ──────

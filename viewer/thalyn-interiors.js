@@ -27,6 +27,20 @@ export const INTERIOR_BUDGET = {
   laptop: { max: 2, radius: 60 },
   high:   { max: 4, radius: 120 },
 };
+// ★ A5401 · INDOORS I1 — the walk's knobs, one row per tier (PROVISIONAL: the lead folds these into the TIERS row as columns at merge;
+// until then they live here and travel on the interiors object as `knobs`).
+//   bvhSliceMs     0 = build a building's BVH on the main thread at load (desktop); > 0 = idle slices of at most that many ms (phone)
+//   stepUpM        the floor ray starts this far above the feet (a stair riser you can climb; a ceiling above it is never a floor)
+//   fallGuardM     no floor within this far under the feet ⇒ keep the last floor (a gap in a mesh never drops you)
+//   wallRayM       the three horizontal wall rays' reach beyond the move, from chest height
+//   wallSpreadDeg  the two side rays' angle off the move direction
+//   wallRadiusM    how far from a wall the walker is kept (a 0.9 m doorway leaves 0.4 m)
+//   chestM         chest height above the feet for the wall rays
+export const INDOOR_DEFAULTS = {
+  lite:   { bvhSliceMs: 16, stepUpM: 0.6, fallGuardM: 3, wallRayM: 0.45, wallSpreadDeg: 35, wallRadiusM: 0.25, chestM: 1.2 },
+  laptop: { bvhSliceMs: 0,  stepUpM: 0.6, fallGuardM: 3, wallRayM: 0.45, wallSpreadDeg: 35, wallRadiusM: 0.25, chestM: 1.2 },
+  high:   { bvhSliceMs: 0,  stepUpM: 0.6, fallGuardM: 3, wallRayM: 0.45, wallSpreadDeg: 35, wallRadiusM: 0.25, chestM: 1.2 },
+};
 export const PREFETCH_M = 30;     // start loading this far before the radius
 export const HYSTERESIS_M = 8;    // shown/hidden and the far eviction line wobble this much less at a boundary
 
@@ -50,9 +64,30 @@ export function readInteriorsBlock(block) {
       id: b.id, file: b.file, building: String(b.building || b.node || b.file),
       center: b.center.slice(0, 3), extents: b.extents.slice(0, 3).map(v => Math.abs(v)),
       tris: Number(b.tris) || 0, bytes: Number(b.bytes) || 0, storeys: Number(b.storeys) || 0, index: i,
+      doors: readDoorBoxes(b.doors),          // A5401 · I1: partition door-leaf boxes (absent on old exports ⇒ [])
     });
   });
   return out.length ? out : null;
+}
+
+// A5401 · I1: door-leaf boxes { id, center:[x,y,z], extents:[hx,hy,hz] } (glTF frame, as the interiors rows) → a clean list
+// { id, min:[x,y,z], max:[x,y,z] }. Accepts an array or { doors:[…] }; bad rows dropped; missing ⇒ [].
+export function readDoorBoxes(list) {
+  const arr = Array.isArray(list) ? list : (list && Array.isArray(list.doors) ? list.doors : []);
+  const num3 = a => Array.isArray(a) && a.length >= 3 && a.slice(0, 3).every(v => typeof v === 'number' && isFinite(v));
+  const out = [];
+  for (const d of arr) {
+    if (!d || !num3(d.center) || !num3(d.extents)) continue;
+    const c = d.center, e = d.extents.map(v => Math.abs(v));
+    out.push({ id: d.id != null ? String(d.id) : '', min: [c[0] - e[0], c[1] - e[1], c[2] - e[2]], max: [c[0] + e[0], c[1] + e[1], c[2] + e[2]] });
+  }
+  return out;
+}
+export function inDoorBox(boxes, p, pad = 0.05) {
+  for (const b of boxes) {
+    if (p.x >= b.min[0] - pad && p.x <= b.max[0] + pad && p.y >= b.min[1] - pad && p.y <= b.max[1] + pad && p.z >= b.min[2] - pad && p.z <= b.max[2] + pad) return true;
+  }
+  return false;
 }
 
 // THE DECISION. Pure: no side effects, no three.js.
@@ -142,6 +177,71 @@ export function makeInteriors(opts) {
   let _camV = null;
 
   const residentText = () => `resident ${st.resident.size}/${budget.max}`;
+  const knobs = () => INDOOR_DEFAULTS[tierName] || INDOOR_DEFAULTS.high;
+
+  // ★ A5401 · INDOORS I1 — the building's mesh list (world AABB + Y range) and its BVH, built ONCE at load (never per step, never per
+  // storey band). PERF's B2 band READS L.meshes and flips mesh.visible only; evict()/clear() are the only places that dispose.
+  function triCountOf(gg) { return gg.index ? gg.index.count / 3 : (gg.attributes.position ? gg.attributes.position.count / 3 : 0); }
+  function indexMeshes(g) {
+    g.updateMatrixWorld(true);
+    const list = [];
+    g.traverse(o => {
+      if (!o.isMesh || !o.geometry || !o.geometry.attributes || !o.geometry.attributes.position) return;
+      let box = null;
+      try {
+        if (o.isInstancedMesh && o.computeBoundingBox) { o.computeBoundingBox(); box = o.boundingBox.clone().applyMatrix4(o.matrixWorld); }
+        else { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); box = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld); }
+      } catch (e) { return; }
+      list.push({ mesh: o, box, yMin: box.min.y, yMax: box.max.y });
+    });
+    return list;
+  }
+  function buildBvh(key, L, u) {
+    const geos = [], seen = new Set();
+    for (const m of L.meshes) { const gg = m.mesh.geometry; if (gg && !seen.has(gg)) { seen.add(gg); geos.push(gg); } }
+    L.bvh = { ready: false, ms: 0, tris: 0, slices: 0 };
+    const slice = knobs().bvhSliceMs, t0 = performance.now();
+    let i = 0;
+    const one = gg => {
+      const t = performance.now();
+      try { if (!gg.boundsTree && typeof gg.computeBoundsTree === 'function') gg.computeBoundsTree(); } catch (e) { /* linear raycast for this one */ }
+      L.bvh.ms += performance.now() - t; L.bvh.tris += triCountOf(gg);
+    };
+    const done = () => {
+      L.bvh.ready = true;
+      console.info(`[thalyn-walk] bvh '${u.building}' ${Math.round(L.bvh.tris).toLocaleString()} tris in ${L.bvh.ms.toFixed(0)} ms` +
+        (slice > 0 ? ` (${L.bvh.slices} idle slice(s) ≤ ${slice} ms, ${(performance.now() - t0).toFixed(0)} ms wall)` : ' (main thread)') + ` · ${L.meshes.length} mesh(es) · ${(u.doors || []).length} door box(es)`);
+    };
+    if (!(slice > 0)) { for (const gg of geos) one(gg); done(); return; }
+    // three-mesh-bvh 0.7.6's bundle carries no worker generator ⇒ the phone builds in idle slices (iOS Safari has no requestIdleCallback: a timer stands in)
+    const idle = typeof requestIdleCallback === 'function' ? cb => requestIdleCallback(cb, { timeout: 500 })
+                                                         : cb => setTimeout(() => cb({ didTimeout: true, timeRemaining: () => slice }), 16);
+    const step = dl => {
+      if (loaded.get(key) !== L) return;   // evicted (or the world changed) while slicing
+      const s0 = performance.now(); L.bvh.slices++;
+      do { one(geos[i++]); } while (i < geos.length && performance.now() - s0 < slice && (dl.didTimeout || dl.timeRemaining() > 1));
+      if (i < geos.length) idle(step); else done();
+    };
+    if (geos.length) idle(step); else done();
+  }
+  function disposeBvh(L) {
+    if (!L || !L.meshes) return;
+    for (const m of L.meshes) { const gg = m.mesh.geometry; try { if (gg && gg.boundsTree && gg.disposeBoundsTree) gg.disposeBoundsTree(); } catch (e) {} }
+    L.meshes = null;
+  }
+  // The read API: the SHOWN resident building whose box holds p (distToBox == 0; the smallest box when boxes nest), else null.
+  // A hidden building (root.visible false — outside its radius) is absent: no floor, no walls (spec §3 rule 3).
+  function residentFor(p) {
+    let best = null, bestVol = Infinity;
+    for (const [k, L] of loaded) {
+      if (!L.root.visible || !L.meshes) continue;
+      const u = unitByKey.get(k); if (!u || distToBox(p, u.center, u.extents) > 0) continue;
+      const vol = u.extents[0] * u.extents[1] * u.extents[2];
+      if (vol < bestVol) { bestVol = vol; best = { key: k, unit: u, building: u.building, root: L.root, meshes: L.meshes, doors: u.doors || [],
+                                                   bvhReady: !!(L.bvh && L.bvh.ready), bvhMs: L.bvh ? L.bvh.ms : 0 }; }
+    }
+    return best;
+  }
 
   function setSource(s) { source = s || null; }
 
@@ -195,8 +295,10 @@ export function makeInteriors(opts) {
         if (my !== epoch) { disposeTree(g); return; }
       }
       root.add(g);
-      loaded.set(u.key, { root: g, tris });
+      const L = { root: g, tris, meshes: indexMeshes(g), bvh: null };   // ★ A5401 · I1: mesh list once, BVH once (sliced on a phone)
+      loaded.set(u.key, L);
       st.resident.set(u.key, tickN);
+      buildBvh(u.key, L, u);
       console.info(`[thalyn-interiors] loaded '${u.building}' ${Math.round(tris).toLocaleString()} tris in ${(performance.now() - t0).toFixed(0)} ms · ${residentText()}`);
     } catch (e) {
       st.failed.add(u.key);
@@ -210,7 +312,7 @@ export function makeInteriors(opts) {
   function evict(key, why) {
     const L = loaded.get(key);
     loaded.delete(key); st.resident.delete(key); st.shown.delete(key);
-    if (L) disposeTree(L.root);
+    if (L) { disposeBvh(L); disposeTree(L.root); }   // ★ A5401: the BVH goes with its building
     const u = unitByKey.get(key);
     console.info(`[thalyn-interiors] evicted '${u ? u.building : key}' (${why}) · ${residentText()}`);
   }
@@ -238,7 +340,7 @@ export function makeInteriors(opts) {
 
   function clear() {
     epoch++;
-    for (const k of [...loaded.keys()]) { const L = loaded.get(k); if (L) disposeTree(L.root); }
+    for (const k of [...loaded.keys()]) { const L = loaded.get(k); if (L) { disposeBvh(L); disposeTree(L.root); } }
     loaded.clear(); st.resident.clear(); st.loading.clear(); st.failed.clear(); st.shown.clear();
     units = null; unitByKey = new Map(); source = null; frame = 0;
   }
@@ -247,8 +349,11 @@ export function makeInteriors(opts) {
   function forEachMaterial(fn) { root.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m && fn(m)); }); }
 
   return {
-    adopt, setSource, setBudget, tick, clear, forEachMaterial,
+    adopt, setSource, setBudget, tick, clear, forEachMaterial, residentFor,
     get count() { return units ? units.length : 0; },
+    get tier() { return tierName; },
+    get knobs() { return knobs(); },
+    get doorBoxCount() { return units ? units.reduce((s, u) => s + (u.doors ? u.doors.length : 0), 0) : 0; },
     get resident() { return st.resident.size; },
     get text() {
       if (!units) return 'none';
