@@ -289,6 +289,7 @@ import * as TG from './thalyn-together.js';
 import * as TF from './thalyn-fauna.js';
 import * as TGR from './thalyn-grass.js?v=20261008a';   // A5386 · the grass field grown from extras.thalyn.grass
 import * as TIV from './thalyn-ivy.js?v=20261008a';     // A5389 · the ivy's cells + the game's distance LOD (bump on change)
+import * as TIN from './thalyn-interiors.js?v=20261009a';   // A5392 · building interiors lazy-loaded by distance (extras.thalyn.interiors)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const $ = id => document.getElementById(id);
@@ -544,12 +545,34 @@ const loader = new GLTFLoader();
 loader.setKTX2Loader(ktx2);
 loader.setDRACOLoader(draco);
 loader.setMeshoptDecoder(MeshoptDecoder);
+// A5392 · meshopt decoding off the main thread (GLTFLoader takes decodeGltfBufferAsync when the decoder has it): an interior
+// that streams in while you walk must not decode on the frame. One decoder module-wide, so the world load uses it too.
+try { if (MeshoptDecoder.useWorkers) MeshoptDecoder.useWorkers(2); } catch (e) { console.warn('[thalyn] meshopt workers unavailable (main-thread decode)', e); }
 
 // ── World root + load ────────────────────────────────────────────────────────
 let worldRoot = new THREE.Group();
 scene.add(worldRoot);
 const walkMeshes = [];
 const groundAt = TA.makeGroundProbe(walkMeshes);
+// A5392 · INTERIORS AS LAZY UNITS: World_web leaves building interiors out (A5391) and lists them in extras.thalyn.interiors;
+// they load per building by camera distance under their OWN root — not under worldRoot, so framing, the walk/ground probe
+// (walkMeshes) and the grass never see a piece that may be evicted later. Interiors cast no sun shadow (the shell does).
+const interiorsRoot = new THREE.Group(); interiorsRoot.name = 'Thalyn_Interiors';
+scene.add(interiorsRoot);
+const interiors = TIN.makeInteriors({
+  root: interiorsRoot, getLoader: () => loader, renderer, camera, scene,
+  prepare: g => {
+    const lights = [];
+    g.traverse(o => {
+      if (o.isLight) { lights.push(o); return; }
+      if (!o.isMesh) return;
+      o.castShadow = false; o.receiveShadow = true;
+      const gg = o.geometry;
+      if (gg && gg.attributes.position && !gg.attributes.normal) { try { gg.computeVertexNormals(); } catch (e) {} }
+    });
+    lights.forEach(l => l.parent && l.parent.remove(l));   // as ingest(): the viewer lights the world itself
+  },
+});
 
 function clearWorld() {
   scene.remove(worldRoot);
@@ -567,6 +590,7 @@ function clearWorld() {
   lanterns.clear();
   grass.clear(); grassFor = null;
   ivy.clear();
+  interiors.clear();
   audio.setWorld(null); trunkField.set(null);
 }
 
@@ -619,6 +643,7 @@ function ingest(gltf) {
   bakedLights.forEach(l => l.parent && l.parent.remove(l));
   if (ivy.adopt(gltf.scene, { lite: loadingLite, fakeKeys: paramsEarly.get('ivytest') === '1' })) ivy.setBudget(tier.table, tier.name);
   const tx = TA.readBlock(gltf);
+  if (tx && tx.interiors && interiors.adopt(tx.interiors)) interiors.setBudget(tier.table, tier.name);   // A5392 · the source was set by the caller
   if (tx && tx.atmosphere && !pendingAtmos && !TA.hasBlock(tx)) applyAtmosphere(tx.atmosphere);
   worldRoot.add(gltf.scene);
   if (sky.tex) { skyEnv.useDome(sky.tex, sky.domes); L.sky.visible = false; }
@@ -749,6 +774,7 @@ function loadFromURLNow(url, name, shareUrl) {
       $('b-share-w').style.display = ''; $('b-together').style.display = '';
       findPostcard(currentModelURL);
       armSoundOnFirstGesture(); if (!$('t-sound').checked) toast(currentSongURL ? "Tap anywhere to hear this world — and its maker's song" : "Tap anywhere to hear this world");
+      interiors.setSource({ url });   // A5392 · Interiors_NNN_web.glb sit beside the file just loaded (full or lite)
       ingest(gltf); frameWorld(); toast('Loaded ' + (name || '') ); $('empty').style.display = 'none';
       beaconShareView(currentModelURL);   // ML harvest §4 — a view, counted only on a world that LOADED
       postUp({ type: 'thalyn:loaded', label: name || '', meshes: meshCount }); },
@@ -775,9 +801,15 @@ async function loadFiles(fileList) {
     try { const j = JSON.parse(await jsonFile.text()); applyAtmosphere(j.atmosphere || j); }
     catch (e) { console.warn('[atmos] json parse', e); }
   }
-  const files = all.filter(f => /\.(glb|gltf)$/i.test(f.name));
+  // A5392 · a dropped export folder carries the packed interiors (Interiors_NNN_web.glb) beside World_web.glb: they are
+  // HELD, not ingested — the interiors module loads them by distance from the world's extras.thalyn.interiors list.
+  const INTERIOR_WEB = /^Interiors_\d+_web\.glb$/i;
+  let files = all.filter(f => /\.(glb|gltf)$/i.test(f.name) && !INTERIOR_WEB.test(f.name));
+  let held = all.filter(f => INTERIOR_WEB.test(f.name));
+  if (!files.length && held.length) { files = held; held = []; }   // only interiors dropped: show them, as before
   if (!files.length) return;
   resetWorld();
+  interiors.setSource({ files: new Map(held.map(f => [f.name, f])) });
   $('empty').style.display = 'none';
   // Map sibling files (so a .gltf + its .bin/textures dropped together resolve).
   const byName = new Map(files.map(f => [f.name, f]));
@@ -796,6 +828,16 @@ async function loadFiles(fileList) {
     loadingLite = /_lite\.glb$/i.test(f.name || '');
     await new Promise(res => fl.load(url, g => { ingest(g); done++; toast(`Loaded ${done}/${files.length}`); URL.revokeObjectURL(url); res(); },
       undefined, e => { console.error(f.name, e); done++; URL.revokeObjectURL(url); res(); }));
+  }
+  // A world that did not list its interiors (an export from before A5391, or a hand-picked set): load the held files as
+  // ordinary parts, exactly as a drop always did.
+  if (held.length && !interiors.count) {
+    console.info('[thalyn-interiors] ' + held.length + ' Interiors_*_web.glb dropped but the world lists none — loading them as ordinary parts');
+    for (const f of held) {
+      const url = URL.createObjectURL(f);
+      await new Promise(res => fl.load(url, g => { ingest(g); done++; URL.revokeObjectURL(url); res(); },
+        undefined, e => { console.error(f.name, e); URL.revokeObjectURL(url); res(); }));
+    }
   }
   siblingURLs.forEach(u => URL.revokeObjectURL(u)); // free .bin/texture blob URLs created by the URL modifier
   frameWorld();
@@ -906,6 +948,7 @@ const TONEMAPS = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping,
 function setToneMapping(mode) {
   renderer.toneMapping = TONEMAPS[mode] ?? THREE.ACESFilmicToneMapping;
   worldRoot.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m) m.needsUpdate = true; }); });
+  interiors.forEachMaterial(m => { m.needsUpdate = true; });   // A5392 · resident interiors live outside worldRoot
 }
 $('r-tone').onchange = e => setToneMapping(e.target.value);
 $('r-exp').oninput = e => { state.exposure = parseFloat(e.target.value); renderer.toneMappingExposure = state.exposure; };
@@ -953,6 +996,7 @@ tier.on((t, name) => {
   lanterns.setBudget(t);
   grass.setBudget(t, name);
   ivy.setBudget(t, name);
+  interiors.setBudget(t, name);
   audio.setVoiceCap(t.voices);
   post.setQuality(t);
   if (anchorRoot && pendingThalyn) { anchorRoot.parent && anchorRoot.parent.remove(anchorRoot); anchorRoot = TA.buildAnchors(pendingThalyn.anchors, worldRoot, t.fireLights); }
@@ -1177,11 +1221,12 @@ renderer.setAnimationLoop(() => {
     waterfalls.setLight(Math.max(0.08, 1 - state.night * 0.92) * Math.min(1, 0.4 + state.sunIntensity / 2.2 * weather.sunDim));
   }
   ivy.tick(camera);
+  interiors.tick(camera);
   grass.tick(dt, camera, { animate: !reduceMotion.matches, sunDir: state.sunDir, sunColor: L.sun.color, sunIntensity: skyOn ? L.sun.intensity : 0, night: state.night });
   audio.tick(dt, camera);
   if (together) together.tick(dt);
   else if (soloScreen) soloScreen.tick(dt);
-  if (perf) perf.tick(dt, { tier: tier.name, falls: waterfalls.awake + '/' + waterfalls.count + ' (' + waterfalls.particles + ' spray)', lanterns: lanterns.lit + '/' + lanterns.count + ' lit', fauna: fauna.awake + '/' + fauna.count + ' · ' + fauna.birds + ' birds', weather: weather.particles + ' drops', grass: grass.layers ? grass.blades.toLocaleString() + ' tufts · ' + (grass.tris / 1e6).toFixed(2) + ' M tris' + (grass.pending ? ' (+' + grass.pending + ' tiles)' : '') : 'none', ivy: ivy.text, voices: audio.voices + '/' + audio.sources, together: together ? (together.peers.length + 1) + ' here · ' + together.rtt.toFixed(0) + ' ms' : 'off' });
+  if (perf) perf.tick(dt, { tier: tier.name, falls: waterfalls.awake + '/' + waterfalls.count + ' (' + waterfalls.particles + ' spray)', lanterns: lanterns.lit + '/' + lanterns.count + ' lit', fauna: fauna.awake + '/' + fauna.count + ' · ' + fauna.birds + ' birds', weather: weather.particles + ' drops', grass: grass.layers ? grass.blades.toLocaleString() + ' tufts · ' + (grass.tris / 1e6).toFixed(2) + ' M tris' + (grass.pending ? ' (+' + grass.pending + ' tiles)' : '') : 'none', ivy: ivy.text, interiors: interiors.text, voices: audio.voices + '/' + audio.sources, together: together ? (together.peers.length + 1) + ' here · ' + together.rtt.toFixed(0) + ' ms' : 'off' });
   // Sun shafts: aim the radial pass at the sun's screen position; fade out off-screen / at night / in weather.
   _sunV.copy(state.sunDir).multiplyScalar(2000).add(camera.position).project(camera);
   const shaftsOn = skyOn && weather.shaftsOk && state.sunDir.y > 0.04 && state.night < 0.5
