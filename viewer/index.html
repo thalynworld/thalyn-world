@@ -284,13 +284,13 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import * as TA from './thalyn-atmos.js?v=20261009m1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
+import * as TA from './thalyn-atmos.js?v=20261009p2';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
 import * as TG from './thalyn-together.js';
 import * as TF from './thalyn-fauna.js';
 import * as TGR from './thalyn-grass.js?v=20261008a';   // A5386 · the grass field grown from extras.thalyn.grass
 import * as TIV from './thalyn-ivy.js?v=20261009m1';     // A5389 · the ivy's cells + the game's distance LOD (bump on change)
-import * as TIN from './thalyn-interiors.js?v=20261009m1';   // A5392 · building interiors lazy-loaded by distance (extras.thalyn.interiors)
-import * as TIND from './thalyn-indoors.js?v=20261009m1';    // A5401 · I1 walking indoors: floor not roof · stairs · walls · doors walked through (⚠ its own import of thalyn-interiors.js carries the SAME ?v= — bump both together)
+import * as TIN from './thalyn-interiors.js?v=20261009p2';   // A5392 · building interiors lazy-loaded by distance (extras.thalyn.interiors)
+import * as TIND from './thalyn-indoors.js?v=20261009p2';    // A5401 · I1 walking indoors: floor not roof · stairs · walls · doors walked through (⚠ its own import of thalyn-interiors.js carries the SAME ?v= — bump both together)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const $ = id => document.getElementById(id);
@@ -303,7 +303,15 @@ const coarsePointer = matchMedia('(pointer: coarse)').matches;
 // ── Renderer / scene / camera ────────────────────────────────────────────────
 const canvas = $('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+// ★ A5397 · B4 the fill cap: pixel ratio = min(dpr, tier pixelRatio, tier maxBufferW / innerWidth) — the drawing buffer is
+// never wider than the tier's maxBufferW (2560 desktop). Applied at boot (the Desktop row until the tier resolves), on tier
+// apply and on every resize; the composer's own ratio follows (EffectComposer freezes the renderer's ratio at construction).
+let prRow = TA.TIERS.high;
+function cappedPixelRatio(row) {
+  const r = row || TA.TIERS.high, maxW = r.maxBufferW > 0 ? r.maxBufferW : Infinity;
+  return Math.max(0.5, Math.min(devicePixelRatio || 1, r.pixelRatio || 2, maxW / Math.max(1, innerWidth)));
+}
+renderer.setPixelRatio(cappedPixelRatio(prRow));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
@@ -1047,6 +1055,9 @@ function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add
 post = TA.makePost(renderer, scene, camera);
 function resizeToViewport() {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  const pr = cappedPixelRatio(prRow);   // A5397 · B4: the cap moves with the window width
+  if (renderer.getPixelRatio() !== pr) renderer.setPixelRatio(pr);
+  if (post.composer && post.composer.setPixelRatio && post.composer._pixelRatio !== pr) post.composer.setPixelRatio(pr);
   renderer.setSize(innerWidth, innerHeight);
   post.resize(innerWidth, innerHeight);
 }
@@ -1059,7 +1070,7 @@ resizeToViewport();
 const paramsEarly = new URLSearchParams(location.search);
 const tier = TA.makeTier(renderer, paramsEarly.get('q') || (() => { try { return localStorage.getItem('thalyn.viewer.q') || ''; } catch (e) { return ''; } })());
 tier.on((t, name) => {
-  renderer.setPixelRatio(Math.min(devicePixelRatio, t.pixelRatio));
+  prRow = t; renderer.setPixelRatio(cappedPixelRatio(t));   // A5397 · B4 (resizeToViewport below re-applies it + the composer's)
   renderer.shadowMap.enabled = t.shadows; L.sun.castShadow = t.shadows;
   if (L.sun.shadow.mapSize.x !== t.shadowMap) { L.sun.shadow.mapSize.set(t.shadowMap, t.shadowMap); if (L.sun.shadow.map) { L.sun.shadow.map.dispose(); L.sun.shadow.map = null; } }
   weather.setBudget(t.weather);

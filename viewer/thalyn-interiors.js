@@ -20,7 +20,8 @@
 // Console proof lines:
 //   [thalyn-interiors] loaded '<building>' <tris> tris in <ms> ms · resident a/b
 //   [thalyn-interiors] evicted '<building>' (<why>) · resident a/b
-// and `text` (the ?perf=1 row): resident a/b · tris · shown · loading.
+//   [thalyn-interiors] band '<building>' y <lo>…<hi> (cam <y>, storey <n>) shows <tris> of <tris> tris · a/b mesh(es)   (A5397 · B2)
+// and `text` (the ?perf=1 row): resident a/b · tris · shown · shown tris (after the band) · loading.
 
 export const INTERIOR_BUDGET = {
   lite:   { max: 1, radius: 30 },
@@ -41,6 +42,45 @@ export const INDOOR_DEFAULTS = {
   laptop: { bvhSliceMs: 0,  stepUpM: 0.6, fallGuardM: 3, wallRayM: 0.45, wallSpreadDeg: 35, wallRadiusM: 0.25, chestM: 1.2 },
   high:   { bvhSliceMs: 0,  stepUpM: 0.6, fallGuardM: 3, wallRayM: 0.45, wallSpreadDeg: 35, wallRadiusM: 0.25, chestM: 1.2 },
 };
+// ★ A5397 · PERF P2 · B2 THE STOREY BAND — fallback when the tier row carries no band columns (TIERS bandBelowM / bandAboveM /
+// bandCapTris, thalyn-atmos.js). A shown building draws only the meshes whose world Y range meets [camY − below, camY + above]
+// plus the storey the camera is in and its two neighbours. bandCapTris is INFORMATIONAL (spec §C residentInteriorTris =
+// min(tris, bandCap)) — the band never hides more to meet it; the band log says when a band is over it.
+export const BAND_DEFAULTS = { bandBelowM: 7, bandAboveM: 12, bandCapTris: 350000 };
+export const BAND_MOVE_M = 0.5;   // a band pass runs only when the camera moved more than this in Y since the last one (per building)
+
+// Triangles a mesh entry draws (the same count `load()` sums into L.tris — instancing not multiplied, so shown ≤ resident).
+export function meshTris(m) {
+  const gg = m && m.mesh && m.mesh.geometry;
+  if (!gg) return 0;
+  return gg.index ? gg.index.count / 3 : (gg.attributes && gg.attributes.position ? gg.attributes.position.count / 3 : 0);
+}
+
+// THE BAND. Pure: no three.js, no side effects. Decides which of a building's meshes are shown for a camera height.
+//   meshes   [{ yMin, yMax, … }]   (L.meshes; the whole-mesh world box, instanced meshes included)
+//   camY     the camera's world Y
+//   unit     { center:[x,y,z], extents:[hx,hy,hz], storeys }   (the interiors row; storeys 0 ⇒ one per 3 m, as INDOORS' storeyOf)
+//   band     { bandBelowM, bandAboveM }
+// Returns { lo, hi, storey, on: boolean[] } — on[i] ⇔ [yMin, yMax] meets [lo, hi], where [lo, hi] is the union of the band
+// and the camera's storey ± 1 (both contain camY, so the union is one interval).
+export function planBand(meshes, camY, unit, band) {
+  const below = band && band.bandBelowM != null ? band.bandBelowM : BAND_DEFAULTS.bandBelowM;
+  const above = band && band.bandAboveM != null ? band.bandAboveM : BAND_DEFAULTS.bandAboveM;
+  let lo = camY - below, hi = camY + above, storey = -1;
+  if (unit && unit.center && unit.extents) {
+    const base = unit.center[1] - unit.extents[1], h = 2 * unit.extents[1];
+    if (h > 0) {
+      const n = unit.storeys > 0 ? unit.storeys : Math.max(1, Math.round(h / 3)), sh = h / n;
+      storey = Math.min(n - 1, Math.max(0, Math.floor((camY - base) / sh + 1e-3)));
+      lo = Math.min(lo, base + (storey - 1) * sh);
+      hi = Math.max(hi, base + (storey + 2) * sh);
+    }
+  }
+  const on = new Array(meshes.length);
+  for (let i = 0; i < meshes.length; i++) { const m = meshes[i]; on[i] = m.yMax >= lo && m.yMin <= hi; }
+  return { lo, hi, storey, on };
+}
+
 export const PREFETCH_M = 30;     // start loading this far before the radius
 export const HYSTERESIS_M = 8;    // shown/hidden and the far eviction line wobble this much less at a boundary
 
@@ -170,6 +210,8 @@ export function makeInteriors(opts) {
   let units = null, unitByKey = new Map();
   let source = null;            // { url } (siblings resolved by URL) or { files: Map(name → File) } (a dropped folder)
   let budget = { ...INTERIOR_BUDGET.high }, tierName = 'high';
+  let tierRow = null, bandEpoch = 0;              // A5397 · the tier row (band + indoor knob columns) and a re-band trigger on tier change
+  const bandOf = new WeakMap();                   // L → { camY, epoch, shown, total, meshesOn, loggedShown } — dies with the building
   // ★ A5396 · B3 (landing dip): the FIRST interior load waits until the frame EMA is under TIERS.interiorFirstEmaMs for
   // interiorFirstCalmS (or interiorFirstCapS at most) — one 15–20 MB decode must not land on the landing frames.
   // A tiny frame clock of its own (measured between tick() calls) — no global state.
@@ -181,7 +223,46 @@ export function makeInteriors(opts) {
   let _camV = null;
 
   const residentText = () => `resident ${st.resident.size}/${budget.max}`;
-  const knobs = () => INDOOR_DEFAULTS[tierName] || INDOOR_DEFAULTS.high;
+  // A5397 · the indoor knobs are TIERS columns now (thalyn-atmos.js); INDOOR_DEFAULTS stays the fallback per key (identical numbers).
+  const KNOB_KEYS = ['bvhSliceMs', 'stepUpM', 'fallGuardM', 'wallRayM', 'wallSpreadDeg', 'wallRadiusM', 'chestM'];
+  let knobCache = null;
+  const knobs = () => {
+    if (knobCache) return knobCache;
+    const d = INDOOR_DEFAULTS[tierName] || INDOOR_DEFAULTS.high, k = { ...d };
+    if (tierRow) for (const n of KNOB_KEYS) if (typeof tierRow[n] === 'number' && isFinite(tierRow[n])) k[n] = tierRow[n];
+    return (knobCache = k);
+  };
+  const bandKnobs = () => ({
+    bandBelowM: tierRow && typeof tierRow.bandBelowM === 'number' ? tierRow.bandBelowM : BAND_DEFAULTS.bandBelowM,
+    bandAboveM: tierRow && typeof tierRow.bandAboveM === 'number' ? tierRow.bandAboveM : BAND_DEFAULTS.bandAboveM,
+    bandCapTris: tierRow && typeof tierRow.bandCapTris === 'number' ? tierRow.bandCapTris : BAND_DEFAULTS.bandCapTris,
+  });
+
+  // ★ A5397 · B2 — one band pass for a shown building: flips mesh.visible ONLY (never remove/dispose — evict is INDOORS-owned).
+  // Runs when the camera moved > BAND_MOVE_M in Y since this building's last pass (or the tier changed, or it never ran).
+  function bandPass(k, L, camY) {
+    if (!L.meshes || !L.meshes.length) return;
+    const prev = bandOf.get(L);
+    if (prev && prev.epoch === bandEpoch && Math.abs(camY - prev.camY) <= BAND_MOVE_M) return;
+    const u = unitByKey.get(k), bk = bandKnobs();
+    const plan = planBand(L.meshes, camY, u, bk);
+    let shown = 0, total = 0, meshesOn = 0;
+    for (let i = 0; i < L.meshes.length; i++) {
+      const m = L.meshes[i], t = meshTris(m), on = plan.on[i];
+      total += t;
+      if (on) { shown += t; meshesOn++; }
+      if (m.mesh.visible !== on) m.mesh.visible = on;
+    }
+    const nx = { camY, epoch: bandEpoch, shown, total, meshesOn, loggedShown: prev ? prev.loggedShown : -1 };
+    // one line when the shown set changes notably (>= 5 % of the building, or the first pass) — never per frame
+    if (nx.loggedShown < 0 || Math.abs(shown - nx.loggedShown) >= Math.max(1000, 0.05 * total)) {
+      nx.loggedShown = shown;
+      console.info(`[thalyn-interiors] band '${u ? u.building : k}' y ${plan.lo.toFixed(1)}…${plan.hi.toFixed(1)} (cam ${camY.toFixed(1)}, storey ${plan.storey}) shows ` +
+        `${Math.round(shown).toLocaleString()} of ${Math.round(total).toLocaleString()} tris · ${meshesOn}/${L.meshes.length} mesh(es)` +
+        (shown > bk.bandCapTris ? ` · over bandCap ${Math.round(bk.bandCapTris).toLocaleString()}` : ''));
+    }
+    bandOf.set(L, nx);
+  }
 
   // ★ A5401 · INDOORS I1 — the building's mesh list (world AABB + Y range) and its BVH, built ONCE at load (never per step, never per
   // storey band). PERF's B2 band READS L.meshes and flips mesh.visible only; evict()/clear() are the only places that dispose.
@@ -266,6 +347,8 @@ export function makeInteriors(opts) {
 
   function setBudget(t, name) {
     tierName = name || tierName;
+    if (t) tierRow = t;
+    knobCache = null; bandEpoch++;   // A5397 · new tier => new knobs; every shown building re-bands on its next pass
     if (t && t.interiorFirstEmaMs) firstGate = { emaMs: t.interiorFirstEmaMs, calmS: t.interiorFirstCalmS || 1, capS: t.interiorFirstCapS || 6 };
     budget = { ...(INTERIOR_BUDGET[tierName] || INTERIOR_BUDGET.high) };
     if (units) console.info(`[thalyn-interiors] tier ${tierName}: ${budget.max} resident within ${budget.radius} m (prefetch +${PREFETCH_M} m)`);
@@ -352,6 +435,7 @@ export function makeInteriors(opts) {
       const on = plan.show.has(k);
       if (L.root.visible !== on) L.root.visible = on;
       if (on) st.shown.add(k); else st.shown.delete(k);
+      if (on) { try { bandPass(k, L, _cam.y); } catch (e) { console.warn('[thalyn-interiors] band failed (ignored)', e); } }   // A5397 · B2
     }
     if (gateOpen) for (const k of plan.load) load(unitByKey.get(k));   // async; the loading set guards duplicates (A5396: gated until the landing is calm)
   }
@@ -379,10 +463,13 @@ export function makeInteriors(opts) {
     get resident() { return st.resident.size; },
     get text() {
       if (!units) return 'none';
-      let tris = 0, shown = 0;
-      for (const [k, L] of loaded) { tris += L.tris; if (st.shown.has(k)) shown++; }
+      let tris = 0, shown = 0, shownTris = 0;
+      for (const [k, L] of loaded) {
+        tris += L.tris;
+        if (st.shown.has(k)) { shown++; const b = bandOf.get(L); shownTris += b ? b.shown : L.tris; }   // A5397 · SHOWN tris (after the band)
+      }
       const ld = [...st.loading].map(k => (unitByKey.get(k) || {}).building).filter(Boolean);
-      return `${residentText()} · ${(tris / 1e6).toFixed(2)} M tris · ${shown} shown of ${units.length}` +
+      return `${residentText()} · ${(tris / 1e6).toFixed(2)} M tris · ${shown} shown of ${units.length} · ${(shownTris / 1e6).toFixed(2)} M tris shown` +
         (ld.length ? ' · loading ' + ld.join(', ') : '') + (st.failed.size ? ' · ' + st.failed.size + ' failed' : '');
     },
   };
