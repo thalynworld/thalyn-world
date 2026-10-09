@@ -135,6 +135,10 @@ export function makeInteriors(opts) {
   let units = null, unitByKey = new Map();
   let source = null;            // { url } (siblings resolved by URL) or { files: Map(name → File) } (a dropped folder)
   let budget = { ...INTERIOR_BUDGET.high }, tierName = 'high';
+  // ★ A5396 · B3 (landing dip): the FIRST interior load waits until the frame EMA is under TIERS.interiorFirstEmaMs for
+  // interiorFirstCalmS (or interiorFirstCapS at most) — one 15–20 MB decode must not land on the landing frames.
+  // A tiny frame clock of its own (measured between tick() calls) — no global state.
+  let firstGate = { emaMs: 20, calmS: 1, capS: 6 }, gateOpen = false, gateHeld = false, gateT0 = 0, gateLast = 0, gateEma = 16.7, gateCalm = 0;
   const st = { resident: new Map(), loading: new Set(), failed: new Set(), shown: new Set() };
   const loaded = new Map();     // key → { root, tris }
   let epoch = 0, tickN = 0, frame = 0;
@@ -162,6 +166,7 @@ export function makeInteriors(opts) {
 
   function setBudget(t, name) {
     tierName = name || tierName;
+    if (t && t.interiorFirstEmaMs) firstGate = { emaMs: t.interiorFirstEmaMs, calmS: t.interiorFirstCalmS || 1, capS: t.interiorFirstCapS || 6 };
     budget = { ...(INTERIOR_BUDGET[tierName] || INTERIOR_BUDGET.high) };
     if (units) console.info(`[thalyn-interiors] tier ${tierName}: ${budget.max} resident within ${budget.radius} m (prefetch +${PREFETCH_M} m)`);
   }
@@ -218,6 +223,19 @@ export function makeInteriors(opts) {
   // Per frame from the render loop; does its work every 8th frame (the game housekeeps on a timer too).
   function tick(camera) {
     if (!units || !source) return;
+    if (!gateOpen && gateHeld) gateT0 = 0;   // the host is still landing the world (hidden while its shaders compile)
+    else if (!gateOpen) {
+      const now = performance.now();
+      if (!gateT0) { gateT0 = now; gateLast = now; gateCalm = 0; }
+      else { gateEma += (now - gateLast - gateEma) * 0.08; gateLast = now; }
+      if (gateEma < firstGate.emaMs) { if (!gateCalm) gateCalm = now; } else gateCalm = 0;
+      const calm = gateCalm && now - gateCalm >= firstGate.calmS * 1000, capped = now - gateT0 >= firstGate.capS * 1000;
+      if (calm || capped) {
+        gateOpen = true;
+        console.info(`[thalyn-interiors] first load released after ${((now - gateT0) / 1000).toFixed(1)} s — ` +
+          (calm ? `frame EMA ${gateEma.toFixed(1)} ms < ${firstGate.emaMs} ms for ${firstGate.calmS} s` : `cap ${firstGate.capS} s reached (EMA ${gateEma.toFixed(1)} ms)`));
+      }
+    }
     if ((frame++ & 7) !== 0) return;
     tickN++;
     // World position: in VR the camera rides the dolly, so its local position is not where it is.
@@ -233,7 +251,7 @@ export function makeInteriors(opts) {
       if (L.root.visible !== on) L.root.visible = on;
       if (on) st.shown.add(k); else st.shown.delete(k);
     }
-    for (const k of plan.load) load(unitByKey.get(k));   // async; the loading set guards duplicates
+    if (gateOpen) for (const k of plan.load) load(unitByKey.get(k));   // async; the loading set guards duplicates (A5396: gated until the landing is calm)
   }
 
   function clear() {
@@ -241,13 +259,17 @@ export function makeInteriors(opts) {
     for (const k of [...loaded.keys()]) { const L = loaded.get(k); if (L) disposeTree(L.root); }
     loaded.clear(); st.resident.clear(); st.loading.clear(); st.failed.clear(); st.shown.clear();
     units = null; unitByKey = new Map(); source = null; frame = 0;
+    gateOpen = false; gateT0 = 0; gateEma = 16.7; gateCalm = 0;   // A5396 · the next world's landing waits again
   }
 
   // Every material currently resident (tone-mapping changes flag them for recompile).
   function forEachMaterial(fn) { root.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m && fn(m)); }); }
 
+  // A5396 · the host holds the first-load gate while the world is hidden for compileAsync; the calm clock starts on release.
+  function holdFirstLoad(on) { gateHeld = !!on; }
+
   return {
-    adopt, setSource, setBudget, tick, clear, forEachMaterial,
+    adopt, setSource, setBudget, tick, clear, forEachMaterial, holdFirstLoad,
     get count() { return units ? units.length : 0; },
     get resident() { return st.resident.size; },
     get text() {

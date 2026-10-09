@@ -1331,10 +1331,15 @@ export function steamLink(source) {
 // ★ A5389 ivy (thalyn-ivy.js): ivyCull = the game's cell sleep distance, Overgrowth SleepBeyondM 150 m × TierReachMul
 // (1 / 0.85 / 0.6); ivyKeep = 1 − TierTriMul (0 / 0.4 / 0.65): Medium/Low build 60 % / 35 % of the cards. The 60 → 130 m
 // thinning itself is the game's on every tier.
+// ★ A5396 (perf P1, spec B1/B3): shadowHalf 150 → 120 / 100 → 80 (same map, sharper texel, fewer casters);
+// shadowMinHeight = the casters law — a mesh whose world AABB is shorter than this casts no sun shadow (ground cover,
+// strokes, small props; ivy cards and the terrain never cast). interiorFirst* = the first interior load waits until
+// the frame EMA is under EmaMs for CalmS seconds (or CapS at most) so it never lands on the landing frames;
+// worldCompileCapS = the longest the world stays hidden while compileAsync builds its shader programs (never fatal).
 export const TIERS = {
-  high:   { label: 'Desktop', pixelRatio: 2.0, shadows: true,  shadowMap: 2048, shadowHalf: 150, msaa: 4, bloom: true,  shafts: true,  weather: 1.0,  sprayPerFall: 220, fallsMax: 24, sheetRows: 28, foam: true,  voices: 12, canopies: 6, wisps: 8, fireLights: 48, lanternLights: 16, creatures: 48, birdRoutes: 6, perched: 24, grassRadius: 60, grassDensity: 1.0,  grassLod: 15, ivyCull: 150, ivyKeep: 0 },
-  laptop: { label: 'Laptop',  pixelRatio: 1.5, shadows: true,  shadowMap: 1024, shadowHalf: 100, msaa: 2, bloom: true,  shafts: false, weather: 0.55, sprayPerFall: 90,  fallsMax: 12, sheetRows: 20, foam: true,  voices: 8,  canopies: 4, wisps: 8, fireLights: 20, lanternLights: 8,  creatures: 16, birdRoutes: 4, perched: 12, grassRadius: 40, grassDensity: 0.6,  grassLod: 10, ivyCull: 127.5, ivyKeep: 0.4 },
-  lite:   { label: 'Phone',   pixelRatio: 1.0, shadows: false, shadowMap: 512,  shadowHalf: 0,   msaa: 0, bloom: false, shafts: false, weather: 0.30, sprayPerFall: 36,  fallsMax: 6,  sheetRows: 12, foam: false, voices: 5,  canopies: 3, wisps: 8, fireLights: 6,  lanternLights: 3,  creatures: 6,  birdRoutes: 2, perched: 6,  grassRadius: 25, grassDensity: 0.35, grassLod: 6, ivyCull: 90, ivyKeep: 0.65 },
+  high:   { label: 'Desktop', pixelRatio: 2.0, shadows: true,  shadowMap: 2048, shadowHalf: 120, shadowMinHeight: 1.5, msaa: 4, bloom: true,  shafts: true,  weather: 1.0,  sprayPerFall: 220, fallsMax: 24, sheetRows: 28, foam: true,  voices: 12, canopies: 6, wisps: 8, fireLights: 48, lanternLights: 16, creatures: 48, birdRoutes: 6, perched: 24, grassRadius: 60, grassDensity: 1.0,  grassLod: 15, ivyCull: 150, ivyKeep: 0, interiorFirstEmaMs: 20, interiorFirstCalmS: 1, interiorFirstCapS: 6, worldCompileCapS: 4 },
+  laptop: { label: 'Laptop',  pixelRatio: 1.5, shadows: true,  shadowMap: 1024, shadowHalf: 80,  shadowMinHeight: 1.5, msaa: 2, bloom: true,  shafts: false, weather: 0.55, sprayPerFall: 90,  fallsMax: 12, sheetRows: 20, foam: true,  voices: 8,  canopies: 4, wisps: 8, fireLights: 20, lanternLights: 8,  creatures: 16, birdRoutes: 4, perched: 12, grassRadius: 40, grassDensity: 0.6,  grassLod: 10, ivyCull: 127.5, ivyKeep: 0.4, interiorFirstEmaMs: 20, interiorFirstCalmS: 1, interiorFirstCapS: 6, worldCompileCapS: 5 },
+  lite:   { label: 'Phone',   pixelRatio: 1.0, shadows: false, shadowMap: 512,  shadowHalf: 0,   shadowMinHeight: 1.5, msaa: 0, bloom: false, shafts: false, weather: 0.30, sprayPerFall: 36,  fallsMax: 6,  sheetRows: 12, foam: false, voices: 5,  canopies: 3, wisps: 8, fireLights: 6,  lanternLights: 3,  creatures: 6,  birdRoutes: 2, perched: 6,  grassRadius: 25, grassDensity: 0.35, grassLod: 6, ivyCull: 90, ivyKeep: 0.65, interiorFirstEmaMs: 20, interiorFirstCalmS: 1, interiorFirstCapS: 6, worldCompileCapS: 8 },
 };
 // Heuristic: what the device says about itself. Returns { name, why } so the HUD can show the reason.
 export function guessTier(renderer) {
@@ -1577,12 +1582,35 @@ export function makePerfHud(renderer) {
   // The composer's passes each reset renderer.info — hold it for the whole frame and reset here instead.
   renderer.info.autoReset = false;
   let calls = 0, tris = 0;
+  // ★ A5396 · the landing + spin windows. The loop clamps dt to 100 ms and `worst` decays ×0.98, so neither can
+  // report a landing stall honestly later — these windows read the RAW clock between ticks and print ONE line each.
+  let lastNow = 0, tierName = '', landing = null, spinning = null;
+  const pct = (a, q) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[Math.min(b.length - 1, Math.floor(b.length * q))] : 0; };
   return {
     el,
+    // Call when the world has landed (after frameWorld); prints `[perf] landing …` 5 s later.
+    markLanding() { landing = { t0: performance.now(), ms: [] }; },
+    // Call when a 360° spin starts / ends; prints `[perf] spin worst …` at the end.
+    beginSpin() { spinning = { t0: performance.now(), worst: 0, n: 0 }; },
+    endSpin() {
+      if (!spinning) return;
+      console.info(`[perf] spin worst ${spinning.worst.toFixed(1)} ms · ${spinning.n} frames in ${((performance.now() - spinning.t0) / 1000).toFixed(1)} s · tris ${Math.round(tris).toLocaleString()} · draws ${calls} · dpr ${renderer.getPixelRatio().toFixed(2)} · tier ${tierName}`);
+      spinning = null;
+    },
     tick(dt, extra) {
+      const now = performance.now(), raw = lastNow ? now - lastNow : dt * 1000; lastNow = now;
+      if (extra && extra.tier) tierName = extra.tier;
       const ms = dt * 1000; ema += (ms - ema) * 0.08; worst = Math.max(worst, ms); frames++; acc += dt;
       samples.push(ms); if (samples.length > 600) samples.shift();
       calls = renderer.info.render.calls; tris = renderer.info.render.triangles; renderer.info.reset();
+      if (spinning) { spinning.worst = Math.max(spinning.worst, raw); spinning.n++; }
+      if (landing) {
+        landing.ms.push(raw);
+        if (now - landing.t0 >= 5000) {
+          console.info(`[perf] landing p95 ${pct(landing.ms, 0.95).toFixed(1)} ms worst ${Math.max(...landing.ms).toFixed(1)} ms · tris ${Math.round(tris).toLocaleString()} · draws ${calls} · dpr ${renderer.getPixelRatio().toFixed(2)} · tier ${tierName} · ${landing.ms.length} frames`);
+          landing = null;
+        }
+      }
       if (acc < 0.25) return; acc = 0;
       const sorted = [...samples].sort((a, b) => a - b), p95 = sorted[Math.floor(sorted.length * 0.95)] || ema;
       const inf = { calls, triangles: tris };

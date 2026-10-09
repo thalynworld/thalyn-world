@@ -284,12 +284,12 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import * as TA from './thalyn-atmos.js?v=20261008b';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
+import * as TA from './thalyn-atmos.js?v=20261009p1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
 import * as TG from './thalyn-together.js';
 import * as TF from './thalyn-fauna.js';
 import * as TGR from './thalyn-grass.js?v=20261008a';   // A5386 · the grass field grown from extras.thalyn.grass
-import * as TIV from './thalyn-ivy.js?v=20261008a';     // A5389 · the ivy's cells + the game's distance LOD (bump on change)
-import * as TIN from './thalyn-interiors.js?v=20261009a';   // A5392 · building interiors lazy-loaded by distance (extras.thalyn.interiors)
+import * as TIV from './thalyn-ivy.js?v=20261009p1';     // A5389 · the ivy's cells + the game's distance LOD (bump on change)
+import * as TIN from './thalyn-interiors.js?v=20261009p1';   // A5392 · building interiors lazy-loaded by distance (extras.thalyn.interiors)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const $ = id => document.getElementById(id);
@@ -616,16 +616,37 @@ function resetAtmosphere() {
   apply();
 }
 
+// ★ A5396 · B1 THE CASTERS LAW (spec §B1): the sun's shadow pass redrew nearly everything inside ±shadowHalf. A mesh
+// casts only if its world AABB is at least TIERS.shadowMinHeight tall (ground cover, strokes and small props cast none),
+// ivy cards cast none (thalyn-ivy.js), and the TERRAIN receives only — identified exactly as the grass identifies it
+// (its material is Thalyn_Terrain_*, buildGrass above), NOT by isGroundMesh (which is every non-foliage mesh: roofs, rocks).
+// Shadow flags only — walkMeshes / the ground probe never read castShadow. Re-applied on every tier change.
+const isTerrainMat = m => m && /^Thalyn_Terrain/i.test(m.name || '');
+const _castBox = new THREE.Box3(), _v3a = new THREE.Vector3();
+function applyCastersLaw(root, t) {
+  const minH = (t && t.shadowMinHeight) || 0;
+  root.traverse(o => {
+    if (!o.isMesh || o.userData.__castH === undefined) return;
+    o.castShadow = !o.userData.__ivy && !o.userData.__terrain && o.userData.__castH >= minH;
+  });
+}
+
 let meshCount = 0, triCount = 0;
 function ingest(gltf) {
   // A baked sky dome travels as an ordinary mesh so every viewer shows it; here it becomes the sky itself.
   const sky = TA.extractSkyDome(gltf.scene);
+  gltf.scene.updateMatrixWorld(true);   // A5396 · world AABBs for the casters law (worldRoot itself sits at the origin)
+  const minCastH = (tier.table && tier.table.shadowMinHeight) || 0;
   gltf.scene.traverse(o => {
     if (o.isMesh) {
       if (o.userData.__skyDome) return;   // the baked sky: drawn as-is, lit by nothing, counted nowhere
-      o.castShadow = true; o.receiveShadow = true;
       meshCount++;
       const g = o.geometry;
+      if (g && g.attributes.position && !g.boundingBox) { try { g.computeBoundingBox(); } catch (e) {} }
+      o.userData.__castH = g && g.boundingBox ? _castBox.copy(g.boundingBox).applyMatrix4(o.matrixWorld).getSize(_v3a).y : 0;
+      o.userData.__terrain = (Array.isArray(o.material) ? o.material : [o.material]).some(isTerrainMat);
+      o.castShadow = !o.userData.__terrain && o.userData.__castH >= minCastH;   // A5396 · B1 casters law
+      o.receiveShadow = true;
       // A mesh without normals is flat-shaded from screen derivatives, which go NaN on a flat quad — and one NaN pixel
       // through the bloom blur blacks out (or whites out) the frame. Real Thalyn exports carry normals; hand-made and
       // third-party GLBs may not. Compute them once here.
@@ -650,6 +671,33 @@ function ingest(gltf) {
   if (tx) applyThalynBlock(tx); // after the meshes are under worldRoot (water tint / anchors need them)
   $('s-meshes').textContent = meshCount.toLocaleString();
   $('s-tris').textContent = Math.round(triCount).toLocaleString();
+}
+
+// ★ A5396 · B3 THE LANDING DIP (shader half): build the world's shader programs with renderer.compileAsync (three r160,
+// KHR_parallel_shader_compile where the driver has it) while the world is HIDDEN, so the first framed frames do not
+// compile ~every material synchronously. Compiled against the composer's HDR target — the RenderPass draws the scene
+// there, so that is the program variant (no tone map, linear out) the frame will ask for. Never fatal; capped by
+// TIERS.worldCompileCapS. Resolves false when a newer load superseded this one.
+let compileEpoch = 0;
+async function compileWorld() {
+  const my = ++compileEpoch, root = worldRoot;
+  if (!renderer.compileAsync) return true;
+  const t0 = performance.now(), capS = (tier.table && tier.table.worldCompileCapS) || 4;
+  let mats = 0, timedOut = false, p;
+  root.traverse(o => { if (o.material) mats += Array.isArray(o.material) ? o.material.length : 1; });
+  root.visible = false; interiors.holdFirstLoad(true);   // the interiors' calm clock starts when the world shows
+  const prevRT = renderer.getRenderTarget();
+  try {
+    if (post && post.composer && post.composer.readBuffer) renderer.setRenderTarget(post.composer.readBuffer);
+    p = renderer.compileAsync(root, camera, scene);   // compile() runs synchronously inside; the promise waits for link
+  } catch (e) { p = Promise.reject(e); }
+  finally { renderer.setRenderTarget(prevRT); }
+  try {
+    await Promise.race([p, new Promise(res => setTimeout(() => { timedOut = true; res(); }, capS * 1000))]);
+    console.info(`[perf] world compileAsync ${(performance.now() - t0).toFixed(0)} ms · ${mats} material slot(s)` + (timedOut ? ` · CAPPED at ${capS} s (shown anyway)` : ''));
+  } catch (e) { console.warn('[perf] world compileAsync failed (ignored)', e); }
+  finally { root.visible = true; if (my === compileEpoch) interiors.holdFirstLoad(false); }
+  return my === compileEpoch;
 }
 
 function rebuildWalkMeshes() {
@@ -775,9 +823,14 @@ function loadFromURLNow(url, name, shareUrl) {
       findPostcard(currentModelURL);
       armSoundOnFirstGesture(); if (!$('t-sound').checked) toast(currentSongURL ? "Tap anywhere to hear this world — and its maker's song" : "Tap anywhere to hear this world");
       interiors.setSource({ url });   // A5392 · Interiors_NNN_web.glb sit beside the file just loaded (full or lite)
-      ingest(gltf); frameWorld(); toast('Loaded ' + (name || '') ); $('empty').style.display = 'none';
-      beaconShareView(currentModelURL);   // ML harvest §4 — a view, counted only on a world that LOADED
-      postUp({ type: 'thalyn:loaded', label: name || '', meshes: meshCount }); },
+      ingest(gltf);
+      compileWorld().then(fresh => {     // A5396 · B3: shader programs built BEFORE the first framed frame
+        if (!fresh) return;              // another world started loading meanwhile
+        frameWorld(); if (perf) perf.markLanding();
+        toast('Loaded ' + (name || '') ); $('empty').style.display = 'none';
+        beaconShareView(currentModelURL);   // ML harvest §4 — a view, counted only on a world that LOADED
+        postUp({ type: 'thalyn:loaded', label: name || '', meshes: meshCount });
+      }).catch(e => console.error(e)); },
     ev => { if (bar && ev && ev.total) bar.style.width = Math.min(96, Math.round(ev.loaded / ev.total * 100)) + '%';
             else if (bar && ev && ev.loaded) bar.style.width = Math.min(96, Math.round(ev.loaded / 2097152)) + '%'; },
     err => { console.error(err); if (bar) bar.style.width = '0'; toast('Failed: ' + (err?.message || err));
@@ -840,7 +893,8 @@ async function loadFiles(fileList) {
     }
   }
   siblingURLs.forEach(u => URL.revokeObjectURL(u)); // free .bin/texture blob URLs created by the URL modifier
-  frameWorld();
+  if (!(await compileWorld())) return;   // A5396 · B3 (a newer load superseded this one)
+  frameWorld(); if (perf) perf.markLanding();
   toast(`Loaded ${done} file(s) — ${meshCount.toLocaleString()} meshes`);
   postUp(meshCount ? { type: 'thalyn:loaded', label: '', meshes: meshCount }
                    : { type: 'thalyn:error', message: 'That file could not be loaded.' });
@@ -959,7 +1013,21 @@ addEventListener('keydown', e => {
   else if (e.code === 'KeyH') { setClean(!document.body.classList.contains('clean')); }
   else if (e.code === 'KeyT' && together && !e.repeat) { together.voice.setTalking(true); $('tg-ptt').classList.add('on'); }
   else if (e.code === 'KeyG' && together && !e.repeat) { together.wave(); toast('You waved'); }
+  else if (e.code === 'KeyP' && perf && !e.repeat && spinT0 < 0) startSpin();   // A5396 · ?perf=1 only
 });
+
+// ★ A5396 · THE SPIN (perf ruler, ?perf=1 only): P yaws the camera 360° in 4 s where it stands (orbit OR walk) and
+// prints `[perf] spin worst … ms` — the spec's "worst ms while spinning at the postcard spot".
+const SPIN_S = 4, _spinY = new THREE.Vector3(0, 1, 0), _spinOff = new THREE.Vector3();
+let spinT0 = -1, spinA = 0;
+function startSpin() { spinT0 = performance.now(); spinA = 0; perf.beginSpin(); toast('Perf: spinning 360° in ' + SPIN_S + ' s'); }
+function stepSpin(walking) {
+  if (spinT0 < 0) return;
+  const k = Math.min(1, (performance.now() - spinT0) / (SPIN_S * 1000)), a = k * Math.PI * 2, d = a - spinA; spinA = a;
+  if (walking) camera.rotateOnWorldAxis(_spinY, d);
+  else { _spinOff.subVectors(controls.target, camera.position).applyAxisAngle(_spinY, d); controls.target.copy(camera.position).add(_spinOff); }
+  if (k >= 1) { spinT0 = -1; perf.endSpin(); }
+}
 addEventListener('keyup', e => { walk.onKey(e, false); if (e.code === 'KeyT' && together) { together.voice.setTalking(false); $('tg-ptt').classList.remove('on'); } });
 
 // Panels on/off: the H key, the corner button, ?hidehud=1. Phones start with the panels hidden — the
@@ -997,6 +1065,7 @@ tier.on((t, name) => {
   grass.setBudget(t, name);
   ivy.setBudget(t, name);
   interiors.setBudget(t, name);
+  applyCastersLaw(worldRoot, t);   // A5396 · B1: the casters law reads this row's shadowMinHeight
   audio.setVoiceCap(t.voices);
   post.setQuality(t);
   if (anchorRoot && pendingThalyn) { anchorRoot.parent && anchorRoot.parent.remove(anchorRoot); anchorRoot = TA.buildAnchors(pendingThalyn.anchors, worldRoot, t.fireLights); }
@@ -1238,7 +1307,7 @@ renderer.setAnimationLoop(() => {
     stepXR(dt);
     renderer.render(scene, camera); // the cinematic pass doesn't run in a headset — raw stereo render
   } else {
-    if (walk.active) walk.step(dt); else controls.update();
+    if (walk.active) { walk.step(dt); stepSpin(true); } else { stepSpin(false); controls.update(); }
     post.render();
   }
 });

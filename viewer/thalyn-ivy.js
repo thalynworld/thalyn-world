@@ -140,7 +140,7 @@ export function makeIvy() {
       const cm = new THREE.Mesh(cg, m);
       cm.name = (mesh.name || 'Ivy') + '_cell' + c;
       cm.position.copy(mesh.position); cm.quaternion.copy(mesh.quaternion); cm.scale.copy(mesh.scale);
-      cm.castShadow = mesh.castShadow; cm.receiveShadow = mesh.receiveShadow;
+      cm.castShadow = false; cm.receiveShadow = mesh.receiveShadow;   // A5396 · B1 casters law: ivy cards cast no sun shadow (~0.8 M tris per shadow pass)
       cm.customDepthMaterial = d;
       cm.userData.__ivy = true;
       parent.add(cm);
