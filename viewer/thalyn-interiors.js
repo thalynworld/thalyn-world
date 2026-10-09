@@ -248,12 +248,15 @@ export function readDoorBoxes(list) {
   for (const d of arr) {
     if (!d || !num3(d.center) || !num3(d.extents)) continue;
     const c = d.center, e = d.extents.map(v => Math.abs(v));
-    out.push({ id: d.id != null ? String(d.id) : '', min: [c[0] - e[0], c[1] - e[1], c[2] - e[2]], max: [c[0] + e[0], c[1] + e[1], c[2] + e[2]] });
+    out.push({ id: d.id != null ? String(d.id) : '', min: [c[0] - e[0], c[1] - e[1], c[2] - e[2]], max: [c[0] + e[0], c[1] + e[1], c[2] + e[2]],
+               node: typeof d.glbNode === 'string' ? d.glbNode : '' });   // A5403 · I2: the leaf's node in the doors file (a swinging leaf is not walked through)
   }
   return out;
 }
-export function inDoorBox(boxes, p, pad = 0.05) {
+// A5403 · I2: `live` (optional Set of doors-file node names) = leaves the doors module swings — their boxes no longer pass (the leaf blocks itself).
+export function inDoorBox(boxes, p, pad = 0.05, live = null) {
   for (const b of boxes) {
+    if (live && b.node && live.has(b.node)) continue;
     if (p.x >= b.min[0] - pad && p.x <= b.max[0] + pad && p.y >= b.min[1] - pad && p.y <= b.max[1] + pad && p.z >= b.min[2] - pad && p.z <= b.max[2] + pad) return true;
   }
   return false;

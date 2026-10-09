@@ -15,6 +15,8 @@
 //                       hit's horizontal normal (a slide — the blockAt contract). Returns {x, z} or null.
 //   Door leaves: any floor/wall hit inside a door box (extras.thalyn.doors = shell leaves, interiors.buildings[].doors = partition
 //   leaves; written by the export since A5400) is ignored — a closed door is walked through. No field ⇒ no boxes (old exports).
+//   A5403 · I2: a leaf the doors module SWINGS (thalyn-doors.js, matched in the doors file) is not walked through — its box stops
+//   passing and the leaf blocks the walker itself while closed (doors.block in makeWalk). Unmatched rows keep the walk-through.
 //
 // Never `intersectObject(root, true)`: every cast iterates an explicit mesh list.
 // Console proof lines:
@@ -23,9 +25,9 @@
 //   [thalyn-walk] outside '<building>'                                              (on leaving)
 // (the per-building `[thalyn-walk] bvh '<b>' <tris> tris in <ms> ms` line is printed by thalyn-interiors.js when it builds.)
 import * as THREE from 'three';
-import { readDoorBoxes, inDoorBox } from './thalyn-interiors.js?v=20261009s2';
+import { readDoorBoxes, inDoorBox } from './thalyn-interiors.js?v=20261010d1';
 
-export function makeIndoorProbe(getInteriors, shellEntries) {
+export function makeIndoorProbe(getInteriors, shellEntries, getLiveDoors = null) {   // A5403 · I2: getLiveDoors() → the doors module's swinging leaves (Set)
   const ray = new THREE.Raycaster();
   ray.firstHitOnly = false;   // short rays, BVH-accelerated: every hit, nearest first, so a door leaf can be skipped to what lies past it
   const _o = new THREE.Vector3(), _d = new THREE.Vector3(), _n = new THREE.Vector3(), _nm = new THREE.Matrix3(), _im = new THREE.Matrix4();
@@ -48,7 +50,8 @@ export function makeIndoorProbe(getInteriors, shellEntries) {
   // The nearest hit on `mesh` along the current ray that is not inside a door box (or null).
   function firstSolid(mesh, doors) {
     const hits = ray.intersectObject(mesh, false);
-    for (const h of hits) if (!inDoorBox(doors, h.point)) return h;
+    const live = getLiveDoors ? getLiveDoors() : null;
+    for (const h of hits) if (!inDoorBox(doors, h.point, 0.05, live)) return h;
     return null;
   }
   function shellUnder(x, z, yLo, yHi, pad = 0) {

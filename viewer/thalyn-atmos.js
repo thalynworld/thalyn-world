@@ -630,6 +630,8 @@ export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
       if (!fly && opts.blockAt) { const b = opts.blockAt(camera.position.x, camera.position.z); if (b) { camera.position.x = b.x; camera.position.z = b.z; } }
       // A5401 · I1 · walls INSIDE a resident building (3 chest-height rays, slide along the hit normal — the blockAt contract); null outdoors.
       if (!fly && opts.indoor) { const w = opts.indoor.wall(ox, oz, camera.position.x, camera.position.z, walkY - EYE); if (w) { camera.position.x = w.x; camera.position.z = w.z; } }
+      // A5403 · I2 · a CLOSED door leaf (thalyn-doors.js) stops you, outdoors and in — past 50° open it lets you by (the game's BlockBelowDeg).
+      if (!fly && opts.doors) { const w = opts.doors.block(ox, oz, camera.position.x, camera.position.z, walkY - EYE); if (w) { camera.position.x = w.x; camera.position.z = w.z; } }
     }
     if (u) { fly = true; walkY += u * speed * dt; }
     if (!fly) {
@@ -645,8 +647,16 @@ export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
     } else if (keys.has('KeyF')) { fly = false; }
     camera.position.y += (walkY - camera.position.y) * Math.min(1, dt * (swimming ? 4 : 12));
   }
+  // A5403 · I2 · E OPENS THE DOOR YOU FACE (the app's E) — only when a door takes it; otherwise E flies as before (Space always flies).
+  // A press a door took is ignored until its key-up, so holding E after opening never starts a flight.
+  let eTaken = false;
   function onKey(e, down) {
     if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return false;
+    if (e.code === 'KeyE') {
+      if (!down) { eTaken = false; keys.delete(e.code); return true; }
+      if (eTaken) return true;
+      if (walking && !e.repeat && opts.doors && opts.doors.use()) { eTaken = true; keys.delete('KeyE'); return true; }
+    }
     if (down) keys.add(e.code); else keys.delete(e.code);
     return true;
   }

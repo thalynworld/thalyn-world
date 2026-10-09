@@ -284,13 +284,14 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import * as TA from './thalyn-atmos.js?v=20261009s2';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
+import * as TA from './thalyn-atmos.js?v=20261010d1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
 import * as TG from './thalyn-together.js';
 import * as TF from './thalyn-fauna.js';
 import * as TGR from './thalyn-grass.js?v=20261008a';   // A5386 · the grass field grown from extras.thalyn.grass
 import * as TIV from './thalyn-ivy.js?v=20261009m1';     // A5389 · the ivy's cells + the game's distance LOD (bump on change)
-import * as TIN from './thalyn-interiors.js?v=20261009s2';   // A5392 · building interiors lazy-loaded by distance (extras.thalyn.interiors)
-import * as TIND from './thalyn-indoors.js?v=20261009s2';    // A5401 · I1 walking indoors: floor not roof · stairs · walls · doors walked through (⚠ its own import of thalyn-interiors.js carries the SAME ?v= — bump both together)
+import * as TIN from './thalyn-interiors.js?v=20261010d1';   // A5392 · building interiors lazy-loaded by distance (extras.thalyn.interiors)
+import * as TIND from './thalyn-indoors.js?v=20261010d1';    // A5401 · I1 walking indoors: floor not roof · stairs · walls · doors walked through (⚠ its own import of thalyn-interiors.js carries the SAME ?v= — bump both together)
+import * as TDR from './thalyn-doors.js?v=20261010d1';       // A5403 · I2 doors that open: E / click / tap, a closed leaf blocks (extras.thalyn.doorsWeb + the door rows)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const $ = id => document.getElementById(id);
@@ -563,7 +564,7 @@ let worldRoot = new THREE.Group();
 scene.add(worldRoot);
 const walkMeshes = [];
 const groundAt = TA.makeGroundProbe(walkMeshes);
-const indoor = TIND.makeIndoorProbe(() => interiors, walkMeshes);   // A5401 · I1: consulted by the walk only inside a shown resident building (groundAt otherwise)
+const indoor = TIND.makeIndoorProbe(() => interiors, walkMeshes, () => doors.liveNodes);   // A5403 · I2: a swinging leaf is no longer walked through   // A5401 · I1: consulted by the walk only inside a shown resident building (groundAt otherwise)
 // A5392 · INTERIORS AS LAZY UNITS: World_web leaves building interiors out (A5391) and lists them in extras.thalyn.interiors;
 // they load per building by camera distance under their OWN root — not under worldRoot, so framing, the walk/ground probe
 // (walkMeshes) and the grass never see a piece that may be evicted later. Interiors cast no sun shadow (the shell does).
@@ -583,6 +584,23 @@ const interiors = TIN.makeInteriors({
     lights.forEach(l => l.parent && l.parent.remove(l));   // as ingest(): the viewer lights the world itself
   },
 });
+// ★ A5403 · I2 DOORS THAT OPEN: the export packs every door leaf, names kept, into extras.thalyn.doorsWeb.file beside the world (and
+// leaves them out of World_web); thalyn-doors.js hangs each on its hinge. E (walking, facing, within 2.5 m) / a click / a tap toggles.
+const doors = TDR.makeDoors({
+  scene, camera, getLoader: () => loader,
+  toast: m => toast(m), isWalking: () => typeof walk !== 'undefined' && walk.active, touch: coarsePointer,
+  prepare: g => {
+    const lights = [];
+    g.traverse(o => {
+      if (o.isLight) { lights.push(o); return; }
+      if (!o.isMesh) return;
+      o.castShadow = true; o.receiveShadow = true;   // a leaf is ≥ 1.5 m tall: it casts under the B1 casters law
+      const gg = o.geometry;
+      if (gg && gg.attributes.position && !gg.attributes.normal) { try { gg.computeVertexNormals(); } catch (e) {} }
+    });
+    lights.forEach(l => l.parent && l.parent.remove(l));
+  },
+});
 
 function clearWorld() {
   scene.remove(worldRoot);
@@ -600,7 +618,7 @@ function clearWorld() {
   lanterns.clear();
   grass.clear(); grassFor = null;
   ivy.clear();
-  interiors.clear(); indoor.reset();
+  interiors.clear(); indoor.reset(); doors.clear();
   audio.setWorld(null); trunkField.set(null);
 }
 
@@ -676,6 +694,7 @@ function ingest(gltf) {
   const tx = TA.readBlock(gltf);
   if (tx && tx.interiors && interiors.adopt(tx.interiors)) interiors.setBudget(tier.table, tier.name);   // A5392 · the source was set by the caller
   indoor.setDoors(tx ? tx.doors : null);   // A5401 · I1: shell door-leaf boxes (A5400 exports; absent ⇒ none)
+  if (tx && (tx.doorsWeb || tx.doors || tx.interiors)) doors.adopt(tx);   // A5403 · I2 (a second dropped part without a block never clears the world's doors)
   if (tx && tx.atmosphere && !pendingAtmos && !TA.hasBlock(tx)) applyAtmosphere(tx.atmosphere);
   worldRoot.add(gltf.scene);
   if (sky.tex) { skyEnv.useDome(sky.tex, sky.domes); L.sky.visible = false; }
@@ -835,6 +854,7 @@ function loadFromURLNow(url, name, shareUrl) {
       findPostcard(currentModelURL);
       armSoundOnFirstGesture(); if (!$('t-sound').checked) toast(currentSongURL ? "Tap anywhere to hear this world — and its maker's song" : "Tap anywhere to hear this world");
       interiors.setSource({ url });   // A5392 · Interiors_NNN_web.glb sit beside the file just loaded (full or lite)
+      doors.setSource({ url });       // A5403 · I2: the doors file sits there too (same ?v=)
       ingest(gltf);
       compileWorld().then(fresh => {     // A5396 · B3: shader programs built BEFORE the first framed frame
         if (!fresh) return;              // another world started loading meanwhile
@@ -875,6 +895,7 @@ async function loadFiles(fileList) {
   if (!files.length) return;
   resetWorld();
   interiors.setSource({ files: new Map(held.map(f => [f.name, f])) });
+  doors.setSource({ files: new Map(held.map(f => [f.name, f])) });   // A5403 · I2: the doors file is named like an interior (the share's slot) — held with them
   $('empty').style.display = 'none';
   // Map sibling files (so a .gltf + its .bin/textures dropped together resolve).
   const byName = new Map(files.map(f => [f.name, f]));
@@ -896,6 +917,7 @@ async function loadFiles(fileList) {
   }
   // A world that did not list its interiors (an export from before A5391, or a hand-picked set): load the held files as
   // ordinary parts, exactly as a drop always did.
+  if (doors.fileName) held = held.filter(f => f.name !== doors.fileName);   // A5403 · the doors file is never ingested as a static part
   if (held.length && !interiors.count) {
     console.info('[thalyn-interiors] ' + held.length + ' Interiors_*_web.glb dropped but the world lists none — loading them as ordinary parts');
     for (const f of held) {
@@ -921,11 +943,25 @@ const walk = TA.makeWalk(camera, document.body, groundAt, (on, why) => {
   controls.enabled = !on;
   $('b-walk').textContent = on ? (coarsePointer ? 'Stop walking' : 'Orbit (V)') : (coarsePointer ? 'Walk' : 'Walk (V)');
   $('b-walk-m').textContent = on ? 'Stop' : 'Walk';
-  if (on) toast(coarsePointer ? 'Left thumb walks · right thumb looks · push far to run' : 'WASD to walk · Shift to run · E/Q up/down · F back to ground · Esc or V to leave');
+  if (on) toast(coarsePointer ? 'Left thumb walks · right thumb looks · push far to run · tap a door to open it' : 'WASD to walk · Shift to run · E opens a door you face · E/Space up, Q down · F back to ground · Esc or V to leave');
   else if (why === 'refused') toast('Pointer lock refused — try V again in a second');
   else { const fwd = new THREE.Vector3(); camera.getWorldDirection(fwd); controls.target.copy(camera.position).addScaledVector(fwd, 30); controls.update(); }
-}, { touch: coarsePointer, waterAt: (x, z) => waterProbe(x, z), blockAt: (x, z) => trunkField.resolve(x, z), indoor });   // A5401 · I1
+}, { touch: coarsePointer, waterAt: (x, z) => waterProbe(x, z), blockAt: (x, z) => trunkField.resolve(x, z), indoor, doors });   // A5401 · I1 · A5403 · I2 doors
 if (coarsePointer) $('b-walk').textContent = 'Walk';
+// ★ A5403 · I2: a click or a tap on a door leaf toggles it (phones have no E). A drag (orbit, look) is never a click: < 6 px and < 400 ms.
+{
+  let pd = null;
+  canvas.addEventListener('pointerdown', e => { pd = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId }; });
+  canvas.addEventListener('pointerup', e => {
+    if (!pd || pd.id !== e.pointerId) return;
+    const moved = Math.hypot(e.clientX - pd.x, e.clientY - pd.y), dtMs = performance.now() - pd.t; pd = null;
+    if (moved > 6 || dtMs > 400 || !doors.count) return;
+    const locked = walk.active && !walk.touch;   // pointer lock: the click aims where you look
+    const r = canvas.getBoundingClientRect();
+    const nx = locked ? 0 : ((e.clientX - r.left) / r.width) * 2 - 1, ny = locked ? 0 : -(((e.clientY - r.top) / r.height) * 2 - 1);
+    doors.clickAt(nx, ny, e.pointerType === 'touch' ? 'tap' : 'click');
+  });
+}
 function toggleWalk() {
   if (walk.active) { walk.exit(); return; }
   if (!walkMeshes.length) { toast('Load a world first'); return; }
@@ -1015,6 +1051,7 @@ function setToneMapping(mode) {
   renderer.toneMapping = TONEMAPS[mode] ?? THREE.ACESFilmicToneMapping;
   worldRoot.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m) m.needsUpdate = true; }); });
   interiors.forEachMaterial(m => { m.needsUpdate = true; });   // A5392 · resident interiors live outside worldRoot
+  doors.forEachMaterial(m => { m.needsUpdate = true; });       // A5403 · the door leaves too
 }
 $('r-tone').onchange = e => setToneMapping(e.target.value);
 $('r-exp').oninput = e => { state.exposure = parseFloat(e.target.value); renderer.toneMappingExposure = state.exposure; };
@@ -1080,6 +1117,7 @@ tier.on((t, name) => {
   grass.setBudget(t, name);
   ivy.setBudget(t, name);
   interiors.setBudget(t, name);
+  doors.setBudget(t);   // A5403 · TIERS columns door* (absent ⇒ the game's numbers)
   applyCastersLaw(worldRoot, t);   // A5396 · B1: the casters law reads this row's shadowMinHeight
   audio.setVoiceCap(t.voices);
   post.setQuality(t);
@@ -1306,6 +1344,7 @@ renderer.setAnimationLoop(() => {
   }
   ivy.tick(camera);
   interiors.tick(camera);
+  doors.tick(dt);   // A5403 · I2: swings + the 'E opens it' hint
   grass.tick(dt, camera, { animate: !reduceMotion.matches, sunDir: state.sunDir, sunColor: L.sun.color, sunIntensity: skyOn ? L.sun.intensity : 0, night: state.night });
   audio.tick(dt, camera);
   if (together) together.tick(dt);
