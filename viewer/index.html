@@ -284,12 +284,13 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import * as TA from './thalyn-atmos.js?v=20261009p1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
+import * as TA from './thalyn-atmos.js?v=20261009m1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
 import * as TG from './thalyn-together.js';
 import * as TF from './thalyn-fauna.js';
 import * as TGR from './thalyn-grass.js?v=20261008a';   // A5386 · the grass field grown from extras.thalyn.grass
-import * as TIV from './thalyn-ivy.js?v=20261009p1';     // A5389 · the ivy's cells + the game's distance LOD (bump on change)
-import * as TIN from './thalyn-interiors.js?v=20261009p1';   // A5392 · building interiors lazy-loaded by distance (extras.thalyn.interiors)
+import * as TIV from './thalyn-ivy.js?v=20261009m1';     // A5389 · the ivy's cells + the game's distance LOD (bump on change)
+import * as TIN from './thalyn-interiors.js?v=20261009m1';   // A5392 · building interiors lazy-loaded by distance (extras.thalyn.interiors)
+import * as TIND from './thalyn-indoors.js?v=20261009m1';    // A5401 · I1 walking indoors: floor not roof · stairs · walls · doors walked through (⚠ its own import of thalyn-interiors.js carries the SAME ?v= — bump both together)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const $ = id => document.getElementById(id);
@@ -554,6 +555,7 @@ let worldRoot = new THREE.Group();
 scene.add(worldRoot);
 const walkMeshes = [];
 const groundAt = TA.makeGroundProbe(walkMeshes);
+const indoor = TIND.makeIndoorProbe(() => interiors, walkMeshes);   // A5401 · I1: consulted by the walk only inside a shown resident building (groundAt otherwise)
 // A5392 · INTERIORS AS LAZY UNITS: World_web leaves building interiors out (A5391) and lists them in extras.thalyn.interiors;
 // they load per building by camera distance under their OWN root — not under worldRoot, so framing, the walk/ground probe
 // (walkMeshes) and the grass never see a piece that may be evicted later. Interiors cast no sun shadow (the shell does).
@@ -590,7 +592,7 @@ function clearWorld() {
   lanterns.clear();
   grass.clear(); grassFor = null;
   ivy.clear();
-  interiors.clear();
+  interiors.clear(); indoor.reset();
   audio.setWorld(null); trunkField.set(null);
 }
 
@@ -665,6 +667,7 @@ function ingest(gltf) {
   if (ivy.adopt(gltf.scene, { lite: loadingLite, fakeKeys: paramsEarly.get('ivytest') === '1' })) ivy.setBudget(tier.table, tier.name);
   const tx = TA.readBlock(gltf);
   if (tx && tx.interiors && interiors.adopt(tx.interiors)) interiors.setBudget(tier.table, tier.name);   // A5392 · the source was set by the caller
+  indoor.setDoors(tx ? tx.doors : null);   // A5401 · I1: shell door-leaf boxes (A5400 exports; absent ⇒ none)
   if (tx && tx.atmosphere && !pendingAtmos && !TA.hasBlock(tx)) applyAtmosphere(tx.atmosphere);
   worldRoot.add(gltf.scene);
   if (sky.tex) { skyEnv.useDome(sky.tex, sky.domes); L.sky.visible = false; }
@@ -704,6 +707,7 @@ function rebuildWalkMeshes() {
   walkMeshes.length = 0;
   worldRoot.updateMatrixWorld(true);
   worldRoot.traverse(o => { if (o.isMesh && !o.userData.__liquid && !o.userData.__skyDome && !o.userData.__ivy && TA.isGroundMesh(o)) walkMeshes.push({ mesh: o, box: new THREE.Box3().setFromObject(o) }); });
+  TA.prebuildWalkBVH(walkMeshes);   // A5401 · I1 / B3a: the walk BVHs in idle time now, not on the first step (the landing dip)
 }
 
 function frameWorld(honourShot = true) {
@@ -912,7 +916,7 @@ const walk = TA.makeWalk(camera, document.body, groundAt, (on, why) => {
   if (on) toast(coarsePointer ? 'Left thumb walks · right thumb looks · push far to run' : 'WASD to walk · Shift to run · E/Q up/down · F back to ground · Esc or V to leave');
   else if (why === 'refused') toast('Pointer lock refused — try V again in a second');
   else { const fwd = new THREE.Vector3(); camera.getWorldDirection(fwd); controls.target.copy(camera.position).addScaledVector(fwd, 30); controls.update(); }
-}, { touch: coarsePointer, waterAt: (x, z) => waterProbe(x, z), blockAt: (x, z) => trunkField.resolve(x, z) });
+}, { touch: coarsePointer, waterAt: (x, z) => waterProbe(x, z), blockAt: (x, z) => trunkField.resolve(x, z), indoor });   // A5401 · I1
 if (coarsePointer) $('b-walk').textContent = 'Walk';
 function toggleWalk() {
   if (walk.active) { walk.exit(); return; }
