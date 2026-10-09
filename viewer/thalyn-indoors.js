@@ -23,7 +23,7 @@
 //   [thalyn-walk] outside '<building>'                                              (on leaving)
 // (the per-building `[thalyn-walk] bvh '<b>' <tris> tris in <ms> ms` line is printed by thalyn-interiors.js when it builds.)
 import * as THREE from 'three';
-import { readDoorBoxes, inDoorBox } from './thalyn-interiors.js?v=20261009p2';
+import { readDoorBoxes, inDoorBox } from './thalyn-interiors.js?v=20261009s1';
 
 export function makeIndoorProbe(getInteriors, shellEntries) {
   const ray = new THREE.Raycaster();

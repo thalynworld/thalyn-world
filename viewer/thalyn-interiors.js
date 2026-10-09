@@ -20,6 +20,7 @@
 // Console proof lines:
 //   [thalyn-interiors] loaded '<building>' <tris> tris in <ms> ms · resident a/b
 //   [thalyn-interiors] evicted '<building>' (<why>) · resident a/b
+//   [thalyn-interiors] split '<building>' <n> mesh(es) → <m> storey slice(s) in <ms> ms   (A5398)
 //   [thalyn-interiors] band '<building>' y <lo>…<hi> (cam <y>, storey <n>) shows <tris> of <tris> tris · a/b mesh(es)   (A5397 · B2)
 // and `text` (the ?perf=1 row): resident a/b · tris · shown · shown tris (after the band) · loading.
 
@@ -48,6 +49,133 @@ export const INDOOR_DEFAULTS = {
 // min(tris, bandCap)) — the band never hides more to meet it; the band log says when a band is over it.
 export const BAND_DEFAULTS = { bandBelowM: 7, bandAboveM: 12, bandCapTris: 350000 };
 export const BAND_MOVE_M = 0.5;   // a band pass runs only when the camera moved more than this in Y since the last one (per building)
+
+// ★ A5398 · THE STOREY SPLIT — gltfpack merges every storey of a building into a handful of meshes that each span the whole
+// height (Interiors_006: 4 prims, 2.25 M tris, all 133 m tall), so the band above could never hide anything and the per-building
+// BVH was one huge geometry. At load (after prepare, before the mesh index + BVH) every tall NON-instanced mesh is replaced by
+// one child mesh per storey bin: triangles bucketed by world centroid Y on the planBand grid (base = unit centre − extent,
+// storey height = 2·extent / storeys; storeys 0 ⇒ the TIERS column splitBinM, default 4 m). Vertex attributes are SHARED (no
+// vertex copy — only a new index per bin); each slice carries its OWN boundingBox/boundingSphere from its triangles (a shared
+// position's computeBoundingBox would cover the whole building ⇒ frustum culling and the band both break). three-mesh-bvh
+// 0.7.6 reorders only the INDEX (sortUtils partition) and reads positions — the shared attribute is never written.
+export const SPLIT_DEFAULTS = { splitBinM: 4, splitMinSpan: 1.5 };
+
+// The bin grid for a unit: { base, sh } (pure). Same grid as planBand when storeys ≥ 1.
+export function storeyGrid(unit, knobs) {
+  const binM = knobs && knobs.splitBinM > 0 ? knobs.splitBinM : SPLIT_DEFAULTS.splitBinM;
+  if (unit && unit.center && unit.extents && unit.extents[1] > 0) {
+    const base = unit.center[1] - unit.extents[1], h = 2 * unit.extents[1];
+    return { base, sh: unit.storeys >= 1 ? h / unit.storeys : binM };
+  }
+  return { base: 0, sh: binM };
+}
+
+// The raw position reader (plain or interleaved, normalized/quantized folded into one factor — gltfpack quantizes).
+function posReader(a) {
+  const inter = !!a.isInterleavedBufferAttribute, arr = inter ? a.data.array : a.array;
+  let f = 1;
+  if (a.normalized) f = arr instanceof Int16Array ? 1 / 32767 : arr instanceof Uint16Array ? 1 / 65535 : arr instanceof Int8Array ? 1 / 127 : arr instanceof Uint8Array ? 1 / 255 : 1;
+  return { arr, stride: inter ? a.data.stride : a.itemSize, off: inter ? a.offset : 0, f };
+}
+// The root BufferAttribute class (no three import here): climb from whatever index class the geometry uses.
+function bufferAttributeClass(gg) {
+  let C = gg.index ? gg.index.constructor : new gg.constructor().setIndex([0]).index.constructor;
+  while (Object.getPrototypeOf(C) !== Function.prototype) C = Object.getPrototypeOf(C);
+  return C;
+}
+
+// Split one mesh. Returns the slice meshes (not yet parented) or null when it should stay as it is.
+export function splitMesh(o, grid, minSpan) {
+  const gg = o.geometry, pa = gg && gg.attributes && gg.attributes.position;
+  if (!pa || o.isInstancedMesh || o.isSkinnedMesh || Array.isArray(o.material) || (gg.groups && gg.groups.length > 1) ||
+      (gg.morphAttributes && Object.keys(gg.morphAttributes).length) || o.children.length ||
+      gg.drawRange.start !== 0 || gg.drawRange.count !== Infinity || gg.boundsTree) return null;
+  const V = pa.count, idx = gg.index ? gg.index.array : null, T = ((idx ? idx.length : V) / 3) | 0;
+  if (T < 2) return null;
+  const { arr, stride, off, f } = posReader(pa), e = o.matrixWorld.elements;
+  const a1 = e[1] * f, a5 = e[5] * f, a9 = e[9] * f, a13 = e[13];
+  const wy = new Float32Array(V);
+  let yMin = Infinity, yMax = -Infinity;
+  for (let v = 0, p = off; v < V; v++, p += stride) {
+    const y = a1 * arr[p] + a5 * arr[p + 1] + a9 * arr[p + 2] + a13; wy[v] = y;
+    if (y < yMin) yMin = y; if (y > yMax) yMax = y;
+  }
+  const sh = grid.sh, base = grid.base;
+  if (!(sh > 0) || yMax - yMin <= minSpan * sh) return null;
+  const k0 = Math.floor((yMin - base) / sh), nb = Math.floor((yMax - base) / sh) - k0 + 1;
+  if (nb < 2 || nb > 65535) return null;
+  const binOf = new Uint16Array(T), cnt = new Uint32Array(nb), inv3sh = 1 / (3 * sh), b0 = base / sh + k0;
+  for (let t = 0; t < T; t++) {
+    const i = 3 * t, va = idx ? idx[i] : i, vb = idx ? idx[i + 1] : i + 1, vc = idx ? idx[i + 2] : i + 2;
+    let b = Math.floor((wy[va] + wy[vb] + wy[vc]) * inv3sh - b0);
+    if (b < 0) b = 0; else if (b >= nb) b = nb - 1;
+    binOf[t] = b; cnt[b]++;
+  }
+  let used = 0; for (let b = 0; b < nb; b++) if (cnt[b]) used++;
+  if (used < 2) return null;
+  // Per-bin index + local box (positions read raw, scaled by f — the geometry's own local frame).
+  const Big = V > 65535 ? Uint32Array : Uint16Array;
+  const out = new Array(nb), fill = new Uint32Array(nb), bx = new Float64Array(nb * 6);
+  for (let b = 0; b < nb; b++) { if (cnt[b]) out[b] = new Big(cnt[b] * 3); bx[b * 6] = bx[b * 6 + 1] = bx[b * 6 + 2] = Infinity; bx[b * 6 + 3] = bx[b * 6 + 4] = bx[b * 6 + 5] = -Infinity; }
+  for (let t = 0; t < T; t++) {
+    const b = binOf[t], dst = out[b], j = fill[b], o6 = b * 6, i = 3 * t;
+    for (let c = 0; c < 3; c++) {
+      const v = idx ? idx[i + c] : i + c; dst[j + c] = v;
+      const p = off + v * stride, x = arr[p], y = arr[p + 1], z = arr[p + 2];
+      if (x < bx[o6]) bx[o6] = x; if (x > bx[o6 + 3]) bx[o6 + 3] = x;
+      if (y < bx[o6 + 1]) bx[o6 + 1] = y; if (y > bx[o6 + 4]) bx[o6 + 4] = y;
+      if (z < bx[o6 + 2]) bx[o6 + 2] = z; if (z > bx[o6 + 5]) bx[o6 + 5] = z;
+    }
+    fill[b] = j + 3;
+  }
+  // Box3 / Sphere classes borrowed from the geometry (no three import in this file).
+  if (!gg.boundingBox) gg.computeBoundingBox();
+  if (!gg.boundingSphere) gg.computeBoundingSphere();
+  const Box3 = gg.boundingBox.constructor, Sphere = gg.boundingSphere.constructor, BA = bufferAttributeClass(gg);
+  const slices = [];
+  for (let b = 0; b < nb; b++) {
+    if (!cnt[b]) continue;
+    const g2 = new gg.constructor();
+    for (const n in gg.attributes) g2.setAttribute(n, gg.attributes[n]);   // SHARED, never copied
+    g2.setIndex(new BA(out[b], 1));
+    const o6 = b * 6, lo = (q) => bx[o6 + q] * f, hi = (q) => bx[o6 + 3 + q] * f;
+    const box = new Box3(); box.min.set(Math.min(lo(0), hi(0)), Math.min(lo(1), hi(1)), Math.min(lo(2), hi(2))); box.max.set(Math.max(lo(0), hi(0)), Math.max(lo(1), hi(1)), Math.max(lo(2), hi(2)));
+    g2.boundingBox = box; g2.boundingSphere = box.getBoundingSphere(new Sphere());
+    g2.name = gg.name; g2.userData = { ...gg.userData };
+    const k = k0 + b, s = new o.constructor(g2, o.material);
+    s.name = (o.name || 'mesh') + '#s' + k;
+    s.position.copy(o.position); s.quaternion.copy(o.quaternion); s.scale.copy(o.scale);
+    s.matrixAutoUpdate = o.matrixAutoUpdate; s.matrix.copy(o.matrix); s.matrixWorld.copy(o.matrixWorld);
+    s.castShadow = o.castShadow; s.receiveShadow = o.receiveShadow; s.frustumCulled = o.frustumCulled; s.renderOrder = o.renderOrder;
+    s.visible = o.visible; s.layers.mask = o.layers.mask;
+    if (o.customDepthMaterial) s.customDepthMaterial = o.customDepthMaterial;
+    if (o.customDistanceMaterial) s.customDistanceMaterial = o.customDistanceMaterial;
+    s.userData = { ...o.userData, __storeyBin: k };
+    slices.push(s);
+  }
+  return slices;
+}
+
+// Split every tall mesh of a loaded interior in place. Returns { meshes, slices, tris, ms }.
+export function splitByStorey(g, unit, knobs) {
+  const t0 = performance.now(), grid = storeyGrid(unit, knobs);
+  const minSpan = knobs && knobs.splitMinSpan > 0 ? knobs.splitMinSpan : SPLIT_DEFAULTS.splitMinSpan;
+  g.updateMatrixWorld(true);
+  const cand = [];
+  g.traverse(o => { if (o.isMesh && o.parent) cand.push(o); });
+  let meshes = 0, slices = 0, tris = 0;
+  for (const o of cand) {
+    const s = splitMesh(o, grid, minSpan);
+    if (!s) continue;
+    const parent = o.parent, at = parent.children.indexOf(o);
+    parent.remove(o);
+    for (const m of s) { parent.add(m); tris += m.geometry.index.count / 3; }
+    // keep the original's place in the child order (cosmetic; the slices follow where it was)
+    if (at >= 0) { const moved = parent.children.splice(parent.children.length - s.length, s.length); parent.children.splice(at, 0, ...moved); }
+    meshes++; slices += s.length;
+  }
+  return { meshes, slices, tris, ms: performance.now() - t0, sh: grid.sh };
+}
 
 // Triangles a mesh entry draws (the same count `load()` sums into L.tris — instancing not multiplied, so shown ≤ resident).
 export function meshTris(m) {
@@ -374,6 +502,12 @@ export function makeInteriors(opts) {
       g.name = 'Interior_' + u.building;
       g.userData.__interior = u.key;
       try { if (opts.prepare) opts.prepare(g); } catch (e) { console.warn('[thalyn-interiors] prepare failed (ignored)', e); }
+      // ★ A5398 · the storey split — BEFORE the tris count, compileAsync, the mesh index and the BVH (each slice its own geometry)
+      try {
+        const sp = splitByStorey(g, u, { splitBinM: tierRow && typeof tierRow.splitBinM === 'number' ? tierRow.splitBinM : SPLIT_DEFAULTS.splitBinM });
+        console.info(`[thalyn-interiors] split '${u.building}' ${sp.meshes} mesh(es) → ${sp.slices} storey slice(s) in ${sp.ms.toFixed(0)} ms` +
+          (sp.meshes ? ` (bin ${sp.sh.toFixed(2)} m, ${Math.round(sp.tris).toLocaleString()} tris split)` : ''));
+      } catch (e) { console.warn('[thalyn-interiors] split failed (ignored — the band and BVH see whole meshes)', e); }
       let tris = 0;
       g.traverse(o => { if (o.isMesh && o.geometry) { const gg = o.geometry; tris += gg.index ? gg.index.count / 3 : (gg.attributes.position ? gg.attributes.position.count / 3 : 0); } });
       g.visible = false;
