@@ -169,7 +169,8 @@ export function makeInteriors(opts) {
   function urlFor(u) {
     if (!source) return null;
     if (source.files) { const f = source.files.get(u.file); return f ? { url: URL.createObjectURL(f), blob: true } : null; }
-    try { return { url: new URL(u.file, source.url).href, blob: false }; } catch (e) { return null; }
+    // A5395: a re-share keeps the same file names, so carry the model's ?v= onto each interior (a phone never serves an old copy)
+    try { const m = new URL(source.url, location.href), r = new URL(u.file, m); r.search = m.search; return { url: r.href, blob: false }; } catch (e) { return null; }
   }
 
   async function load(u) {
