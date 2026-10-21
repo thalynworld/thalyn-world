@@ -284,14 +284,15 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import * as TA from './thalyn-atmos.js?v=20261010d1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
+import * as TA from './thalyn-atmos.js?v=20261021w1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
 import * as TG from './thalyn-together.js';
 import * as TF from './thalyn-fauna.js';
 import * as TGR from './thalyn-grass.js?v=20261008a';   // A5386 · the grass field grown from extras.thalyn.grass
 import * as TIV from './thalyn-ivy.js?v=20261009m1';     // A5389 · the ivy's cells + the game's distance LOD (bump on change)
 import * as TIN from './thalyn-interiors.js?v=20261010d1';   // A5392 · building interiors lazy-loaded by distance (extras.thalyn.interiors)
 import * as TIND from './thalyn-indoors.js?v=20261010d1';    // A5401 · I1 walking indoors: floor not roof · stairs · walls · doors walked through (⚠ its own import of thalyn-interiors.js carries the SAME ?v= — bump both together)
-import * as TDR from './thalyn-doors.js?v=20261010d1';       // A5403 · I2 doors that open: E / click / tap, a closed leaf blocks (extras.thalyn.doorsWeb + the door rows)
+import * as TDR from './thalyn-doors.js?v=20261010d1';
+import * as TW from './thalyn-water.js?v=20261021w1';       // A1232 · the game's water: flat, ONE shared mirror, ripples, opaque tone (bump on change)       // A5403 · I2 doors that open: E / click / tap, a closed leaf blocks (extras.thalyn.doorsWeb + the door rows)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const $ = id => document.getElementById(id);
@@ -381,6 +382,7 @@ function apply() {
 let pendingThalyn = null, pendingAtmos = null;
 let anchorRoot = null, shotPose = null;
 const kit = TA.makeMaterialKit();
+const water = TW.makeWater();   // A1232
 const weather = TA.makeWeather(scene, camera);
 const audio = TA.makeSoundscape('audio/');   // beds + positional voices (waterfalls / shores / canopies)
 const waterfalls = TA.makeWaterfalls(scene);
@@ -514,6 +516,7 @@ function applyThalynBlock(tx) {
     if (together) together.setCinemaSeed(cinemaSeed);
     syncSoloScreen();
     waterProbe = TA.makeWaterProbe(tx.liquids || []);   // A171 · swimming
+    water.setLiquids(tx.liquids || []);   // A1232 · the mirror's water rectangles (the sea ring never mirrors)
     buildGrass(tx);                                       // A5386 · needs the walk meshes, so it builds on the frameWorld pass
     // HUD: world name · tone · clock · weather, the postcard code, the shot.
     const name = String(tx.worldName || tx.sceneName || 'Thalyn world').slice(0, 40);
@@ -614,6 +617,7 @@ function clearWorld() {
   kit.reset();
   skyEnv.useDome(null);
   waterfalls.clear();
+  water.clear();   // A1232
   fauna.clear();
   lanterns.clear();
   grass.clear(); grassFor = null;
@@ -681,7 +685,7 @@ function ingest(gltf) {
       if (g && g.attributes.position && !g.attributes.normal) { try { g.computeVertexNormals(); } catch (e) {} }
       if (g && g.index) triCount += g.index.count / 3;
       else if (g && g.attributes.position) triCount += g.attributes.position.count / 3;
-      if (kit.upgradeLiquid(o)) return; // animated water/lava — no wind sway
+      if (kit.upgradeLiquid(o)) { if (!kit.lavaMats.includes(o.material)) water.adopt(o); return; } // animated water/lava — no wind sway (A1232: water → thalyn-water)
       (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => kit.patchFoliage(m, o.name));
     }
   });
@@ -1112,6 +1116,7 @@ tier.on((t, name) => {
   if (L.sun.shadow.mapSize.x !== t.shadowMap) { L.sun.shadow.mapSize.set(t.shadowMap, t.shadowMap); if (L.sun.shadow.map) { L.sun.shadow.map.dispose(); L.sun.shadow.map = null; } }
   weather.setBudget(t.weather);
   waterfalls.setBudget(t);
+  water.setBudget(t, name);   // A1232
   fauna.setBudget(t);
   lanterns.setBudget(t);
   grass.setBudget(t, name);
@@ -1362,6 +1367,7 @@ renderer.setAnimationLoop(() => {
     renderer.render(scene, camera); // the cinematic pass doesn't run in a headset — raw stereo render
   } else {
     if (walk.active) { walk.step(dt); stepSpin(true); } else { stepSpin(false); controls.update(); }
+    water.update(renderer, scene, camera, clock.elapsedTime);   // A1232 · the one mirror, before the frame (never in a headset)
     post.render();
   }
 });

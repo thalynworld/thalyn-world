@@ -787,8 +787,9 @@ export function makeMaterialKit() {
       mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(0.02, 0.13, 0.28), roughness: 0.04, metalness: 0.0,
         transparent: true, opacity: 0.82, depthWrite: true, envMapIntensity: 1.4 });
     }
-    const amp = isLava ? 0.22 : 0.12, freq = isLava ? 0.55 : 1.1;
-    mat.onBeforeCompile = (shader) => {
+    const amp = 0.22, freq = 0.55;
+    // A1232: WATER IS FLAT (the game's law A996) — only lava heaves; thalyn-water.js gives water its ripples + mirror.
+    if (isLava) mat.onBeforeCompile = (shader) => {
       shader.uniforms.uWindTime = uWindTime;
       shader.vertexShader = 'uniform float uWindTime;\n' + shader.vertexShader;
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>',
