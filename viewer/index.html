@@ -186,6 +186,7 @@
   <button id="b-postcard" style="display:none" title="Copy the postcard code — paste it into Thalyn to regrow this world">Copy postcard code</button>
   <button id="b-shot" style="display:none" title="Walk to where the picture was taken (V leaves)">Stand where the picture was taken</button>
   <button id="b-share-w" style="display:none" title="Copy a link + QR for this world">Share this world…</button>
+  <button id="b-card" style="display:none" title="The picture, re-shot in four looks - one PNG to share">Share card · 4 looks</button>
   <button id="b-together" style="display:none" title="Invite someone into this world with you — a link they open in any browser">Invite a friend here…</button>
   <div class="row"><label><input type="checkbox" id="t-sound" /> Sound</label>
     <input type="range" id="r-vol" class="vol" min="0" max="1" step="0.05" value="0.9" title="Volume" /><span class="stat" id="s-sound"></span></div>
@@ -295,7 +296,8 @@ import * as TDR from './thalyn-doors.js?v=20261010d1';
 import * as TW from './thalyn-water.js?v=20261021w1';       // A1232 · the game's water: flat, ONE shared mirror, ripples, opaque tone (bump on change)       // A5403 · I2 doors that open: E / click / tap, a closed leaf blocks (extras.thalyn.doorsWeb + the door rows)
 import * as TL from './thalyn-look.js?v=20261102a1';
 import * as TD from './thalyn-diorama.js?v=20261102a1';
-import * as TLR from './thalyn-lookrender.js?v=20261102a1';   // ★ R1e · the look's RENDER layer (grade · flatten · toon · outline), the game's laws (bump on change)   // ★ LOOK ENGINE boost · THE DIORAMA OPENING: the shared world first appears as a model on a table (bump on change)      // ★ LOOK ENGINE slice 2 · extras.thalyn.look → the look's water grade by row id (bump on change)
+import * as TLR from './thalyn-lookrender.js?v=20261102a1';
+import * as TSC from './thalyn-sharecard.js?v=20261102a1';   // ★ the share card × 4 looks (bump on change)   // ★ R1e · the look's RENDER layer (grade · flatten · toon · outline), the game's laws (bump on change)   // ★ LOOK ENGINE boost · THE DIORAMA OPENING: the shared world first appears as a model on a table (bump on change)      // ★ LOOK ENGINE slice 2 · extras.thalyn.look → the look's water grade by row id (bump on change)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const $ = id => document.getElementById(id);
@@ -386,6 +388,7 @@ let pendingThalyn = null, pendingAtmos = null;
 let anchorRoot = null, shotPose = null;
 let diorama = null, lastFrame = null;   // ★ the diorama opening (thalyn-diorama.js) + the last frameWorld box it stands on
 let lookRender = null;   // ★ R1e the look's render layer (thalyn-lookrender.js)
+let wornLook = { row: null, id: 'natural' };   // ★ the look the world wears (the share card puts it back after its four shots)
 const kit = TA.makeMaterialKit();
 const water = TW.makeWater();   // A1232
 const weather = TA.makeWeather(scene, camera);
@@ -510,7 +513,8 @@ function applyThalynBlock(tx) {
         const w = TL.lookWater(tx.water, row);
         if (w !== tx.water) applied.push(`water ${TA.tintWater(w, worldRoot, kit.lavaMats)} material(s)`);
       }
-      if (lookRender) { const d = lookRender.set(row ? row.render : null, tier.name, look.renderRow); if (d.enqueue) applied.push('render layer'); }
+      wornLook = { row: row ? row.render : null, id: look.renderRow || 'natural' };
+      if (lookRender) { const d = lookRender.set(wornLook.row, tier.name, wornLook.id); if (d.enqueue) applied.push('render layer'); }
       console.log(TL.describe(look, row, applied));
     });
     if (anchorRoot && anchorRoot.parent) anchorRoot.parent.remove(anchorRoot);
@@ -660,6 +664,7 @@ function resetWorld() {
 function resetAtmosphere() {
   pendingAtmos = null; pendingThalyn = null; anchorRoot = null; shotPose = null;
   if (lookRender) lookRender.set(null, tier.name, 'natural');   // ★ R1e: a new world starts natural until its own tag says otherwise
+  wornLook = { row: null, id: 'natural' };
   $('w-row').style.display = 'none'; $('w-sky').style.display = 'none';
   $('b-postcard').style.display = 'none'; $('b-shot').style.display = 'none';
   state = TA.defaultState(worldRadius); TA.sunFromElevation(state, 0.55);
@@ -877,7 +882,7 @@ function loadFromURLNow(url, name, shareUrl) {
   loader.load(url, gltf => {
       if (bar) { bar.style.width = '100%'; setTimeout(() => { bar.style.width = '0'; }, 600); }
       currentModelURL = shareUrl || url;
-      $('b-share-w').style.display = ''; $('b-together').style.display = '';
+      $('b-share-w').style.display = ''; $('b-together').style.display = ''; $('b-card').style.display = '';
       findPostcard(currentModelURL);
       armSoundOnFirstGesture(); if (!$('t-sound').checked) toast(currentSongURL ? "Tap anywhere to hear this world — and its maker's song" : "Tap anywhere to hear this world");
       interiors.setSource({ url });   // A5392 · Interiors_NNN_web.glb sit beside the file just loaded (full or lite)
@@ -1078,6 +1083,23 @@ function shareURL() {
   if (currentThumbURL) u.searchParams.set('img', currentThumbURL);  // W10.1 · and the postcard: the unfurl shows THIS world
   return u.toString();
 }
+// ★ THE SHARE CARD × 4 LOOKS: the picture's pose (else the current view) under Natural / Saturday / Toytown / Storybook → one PNG
+async function shareCardBlob() {
+  if (diorama && diorama.active) diorama.close();
+  if (walk.active) walk.exit();
+  const table = await TL.palettes();
+  return TSC.shootLookStrip({ renderer, post, camera, controls, lookRender, table, tierName: tier.name, pose: shotPose, sunDir: state.sunDir,
+                              restoreLook: () => lookRender.set(wornLook.row, tier.name, wornLook.id) });
+}
+$('b-card').onclick = async () => {
+  toast('Shooting the picture in four looks…');
+  const blob = await shareCardBlob();
+  if (!blob) { toast('The share card could not be made'); return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'thalyn_four_looks.png'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast('Saved thalyn_four_looks.png');
+};
 $('b-share-w').onclick = () => {
   if (!currentModelURL) { toast('Load a world from a link first — a local file has no address to share'); return; }
   const link = shareURL();
@@ -1147,7 +1169,7 @@ function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add
 post = TA.makePost(renderer, scene, camera);
 lookRender = TLR.makeLookRender(post, camera);   // ★ R1e · inert (disabled) until a look with a render block is worn
 diorama = TD.makeDiorama({ scene, camera, renderer, controls, post, worldRoot, lights: L });   // ★ the diorama opening
-if (new URLSearchParams(location.search).get('debug') === '1') window.__thalyn = { THREE, scene, camera, controls, worldRoot, diorama, get groundAt() { return groundAt; }, get lastFrame() { return lastFrame; }, get tx() { return pendingThalyn; } };   // dev only: headless checks
+if (new URLSearchParams(location.search).get('debug') === '1') window.__thalyn = { THREE, scene, camera, controls, worldRoot, diorama, shareCard: async () => { const b = await shareCardBlob(); return b ? await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); }) : null; }, get groundAt() { return groundAt; }, get lastFrame() { return lastFrame; }, get tx() { return pendingThalyn; } };   // dev only: headless checks
 function resizeToViewport() {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   const pr = cappedPixelRatio(prRow);   // A5397 · B4: the cap moves with the window width
