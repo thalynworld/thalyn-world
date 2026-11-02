@@ -294,7 +294,8 @@ import * as TIND from './thalyn-indoors.js?v=20261010d1';    // A5401 · I1 walk
 import * as TDR from './thalyn-doors.js?v=20261010d1';
 import * as TW from './thalyn-water.js?v=20261021w1';       // A1232 · the game's water: flat, ONE shared mirror, ripples, opaque tone (bump on change)       // A5403 · I2 doors that open: E / click / tap, a closed leaf blocks (extras.thalyn.doorsWeb + the door rows)
 import * as TL from './thalyn-look.js?v=20261102a1';
-import * as TD from './thalyn-diorama.js?v=20261102a1';   // ★ LOOK ENGINE boost · THE DIORAMA OPENING: the shared world first appears as a model on a table (bump on change)      // ★ LOOK ENGINE slice 2 · extras.thalyn.look → the look's water grade by row id (bump on change)
+import * as TD from './thalyn-diorama.js?v=20261102a1';
+import * as TLR from './thalyn-lookrender.js?v=20261102a1';   // ★ R1e · the look's RENDER layer (grade · flatten · toon · outline), the game's laws (bump on change)   // ★ LOOK ENGINE boost · THE DIORAMA OPENING: the shared world first appears as a model on a table (bump on change)      // ★ LOOK ENGINE slice 2 · extras.thalyn.look → the look's water grade by row id (bump on change)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const $ = id => document.getElementById(id);
@@ -384,6 +385,7 @@ function apply() {
 let pendingThalyn = null, pendingAtmos = null;
 let anchorRoot = null, shotPose = null;
 let diorama = null, lastFrame = null;   // ★ the diorama opening (thalyn-diorama.js) + the last frameWorld box it stands on
+let lookRender = null;   // ★ R1e the look's render layer (thalyn-lookrender.js)
 const kit = TA.makeMaterialKit();
 const water = TW.makeWater();   // A1232
 const weather = TA.makeWeather(scene, camera);
@@ -497,7 +499,10 @@ function applyThalynBlock(tx) {
     if (tx.water && tx.water.present) TA.tintWater(tx.water, worldRoot, kit.lavaMats);
     // ★ LOOK ENGINE slice 2 (2026-11-02): a world that wears a look carries extras.thalyn.look (absent = natural = nothing below runs).
     // Sun/ambient/fog arrive already graded by the game; the water block does not, so grade it by the look's row (thalyn-look.js).
-    const look = TL.readLook(tx);
+    // ★ R1e: ?look=<id> previews a look's render layer on a world that carries no tag (a test / preview aid; the tag wins when present)
+    const lookQ = new URLSearchParams(location.search).get('look');
+    const look = TL.readLook(tx) || (lookQ ? { version: 1, sceneRecipeId: lookQ, renderRow: lookQ, byZone: [] } : null);
+    if (lookRender) lookRender.set(null, tier.name, 'natural');
     if (look) TL.palettes().then(table => {
       if (pendingThalyn !== tx) return;   // another world loaded meanwhile
       const row = TL.rowFor(look, table), applied = [];
@@ -505,6 +510,7 @@ function applyThalynBlock(tx) {
         const w = TL.lookWater(tx.water, row);
         if (w !== tx.water) applied.push(`water ${TA.tintWater(w, worldRoot, kit.lavaMats)} material(s)`);
       }
+      if (lookRender) { const d = lookRender.set(row ? row.render : null, tier.name, look.renderRow); if (d.enqueue) applied.push('render layer'); }
       console.log(TL.describe(look, row, applied));
     });
     if (anchorRoot && anchorRoot.parent) anchorRoot.parent.remove(anchorRoot);
@@ -653,6 +659,7 @@ function resetWorld() {
 // (or fewer fields) does not inherit the previous world's atmosphere when switching.
 function resetAtmosphere() {
   pendingAtmos = null; pendingThalyn = null; anchorRoot = null; shotPose = null;
+  if (lookRender) lookRender.set(null, tier.name, 'natural');   // ★ R1e: a new world starts natural until its own tag says otherwise
   $('w-row').style.display = 'none'; $('w-sky').style.display = 'none';
   $('b-postcard').style.display = 'none'; $('b-shot').style.display = 'none';
   state = TA.defaultState(worldRadius); TA.sunFromElevation(state, 0.55);
@@ -1138,6 +1145,7 @@ function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add
 
 // ── Cinematic pass (bloom + per-tone grade) ──────────────────────────────────
 post = TA.makePost(renderer, scene, camera);
+lookRender = TLR.makeLookRender(post, camera);   // ★ R1e · inert (disabled) until a look with a render block is worn
 diorama = TD.makeDiorama({ scene, camera, renderer, controls, post, worldRoot, lights: L });   // ★ the diorama opening
 if (new URLSearchParams(location.search).get('debug') === '1') window.__thalyn = { THREE, scene, camera, controls, worldRoot, diorama, get groundAt() { return groundAt; }, get lastFrame() { return lastFrame; }, get tx() { return pendingThalyn; } };   // dev only: headless checks
 function resizeToViewport() {
@@ -1415,6 +1423,7 @@ renderer.setAnimationLoop(() => {
     if (diorama) diorama.tick(dt);   // ★ the diorama opening: the dive + its fade (no-op once the table is put away)
     if (walk.active) { walk.step(dt); stepSpin(true); } else { stepSpin(false); controls.update(); }
     water.update(renderer, scene, camera, clock.elapsedTime);   // A1232 · the one mirror, before the frame (never in a headset)
+    if (lookRender && lookRender.enabled) lookRender.update(state.sunDir, post.composer.renderTarget1.width, post.composer.renderTarget1.height);   // ★ R1e
     post.render();
   }
 });
