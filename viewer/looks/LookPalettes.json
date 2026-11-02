@@ -21,7 +21,7 @@
       "light":   { "intensityMul": 1.05, "shadowStrengthMul": 1.00 },
       "canopy":   { "variants": 6, "fill": 0.25, "colors": [ { "c": [1.00, 1.00, 1.00], "w": 1, "hue": 8, "val": 0.10 }, { "c": [0.84, 1.00, 0.96], "w": 2, "hue": 8, "val": 0.10 }, { "c": [1.08, 1.05, 0.74], "w": 2, "hue": 8, "val": 0.10 }, { "c": [0.78, 0.90, 0.78], "w": 1, "hue": 8, "val": 0.10 } ] },
       "shrubs":   { "variants": 6, "fill": 0.22, "colors": [ { "c": [1.10, 1.06, 0.76], "w": 2, "hue": 6, "val": 0.08 }, { "c": [0.92, 1.05, 0.84], "w": 1, "hue": 6, "val": 0.08 }, { "c": [1.04, 0.96, 0.80], "w": 1, "hue": 6, "val": 0.08 } ] },
-      "render":   { "on": true, "grade": { "blur": 2.0, "sat": 1.35, "val": 1.04, "levels": 4, "pmix": 0.45, "contrast": 1.06 }, "outline": { "px": 2.5, "color": [0.01, 0.01, 0.015], "soft": 1.0, "creases": true }, "toon": { "ratioMax": 1.4, "on": true, "ramp": "bands", "L0": 0.40, "L1": 0.74, "L2": 1.0, "e0": -0.05, "e1": 0.45, "soft": 0.02, "rim": 0.35, "amb": 0.35 } }
+      "render":   { "on": true, "grade": { "blur": 2.0, "sat": 1.35, "val": 1.04, "levels": 4, "pmix": 0.45, "contrast": 1.06 }, "outline": { "busy": 0.9, "fadeM": 160, "px": 2.5, "color": [0.01, 0.01, 0.015], "soft": 1.0, "creases": true }, "toon": { "ratioMax": 1.4, "on": true, "ramp": "bands", "L0": 0.40, "L1": 0.74, "L2": 1.0, "e0": -0.05, "e1": 0.45, "soft": 0.02, "rim": 0.35, "amb": 0.35 } }
     },
     {
       "styleId": "pastelclay",
@@ -38,7 +38,7 @@
       "light":   { "intensityMul": 1.10, "ambientMul": 1.25, "shadowStrengthMul": 0.60 },
       "canopy":   { "variants": 8, "fill": 0.35, "colors": [ { "c": [0.74, 1.00, 0.88], "w": 3, "hue": 8, "val": 0.08 }, { "c": [1.00, 0.76, 0.88], "w": 2, "hue": 8, "val": 0.08 }, { "c": [1.00, 0.84, 0.70], "w": 2, "hue": 8, "val": 0.08 }, { "c": [1.00, 0.97, 0.70], "w": 1, "hue": 8, "val": 0.08 }, { "c": [0.86, 0.86, 1.00], "w": 1, "hue": 8, "val": 0.08 } ] },
       "shrubs":   { "variants": 6, "fill": 0.30, "colors": [ { "c": [1.00, 1.00, 1.00], "w": 2, "hue": 4, "val": 0.06 }, { "c": [1.00, 0.94, 0.90], "w": 1, "hue": 4, "val": 0.06 }, { "c": [1.00, 0.98, 0.90], "w": 2, "hue": 4, "val": 0.06 }, { "c": [0.94, 1.00, 0.96], "w": 1, "hue": 4, "val": 0.06 } ] },
-      "render":   { "on": true, "grade": { "blur": 4.0, "brush": 0.04, "sat": 0.88, "val": 1.04, "contrast": 0.92, "lift": 0.025 }, "outline": { "px": 1.0, "color": [0.33, 0.24, 0.20], "soft": 0.40, "creases": false }, "toon": { "ratioMax": 1.35, "on": true, "ramp": "wrap", "wrap": 0.45, "amb": 0.40, "strength": 0.8 } }
+      "render":   { "on": true, "grade": { "blur": 4.0, "brush": 0.04, "sat": 0.88, "val": 1.04, "contrast": 0.92, "lift": 0.025 }, "outline": { "busy": 0.9, "fadeM": 120, "px": 1.0, "color": [0.33, 0.24, 0.20], "soft": 0.40, "creases": false }, "toon": { "ratioMax": 1.35, "on": true, "ramp": "wrap", "wrap": 0.45, "amb": 0.40, "strength": 0.8 } }
     },
     {
       "styleId": "goldenstorybook",
@@ -55,7 +55,7 @@
       "light":   { "colorMul": [1.12, 1.00, 0.80], "intensityMul": 1.10, "ambientMul": 0.95 },
       "canopy":   { "variants": 6, "fill": 0.15, "colors": [ { "c": [0.98, 1.00, 0.80], "w": 2, "val": 0.08, "sat": 0.08 }, { "c": [1.12, 0.94, 0.68], "w": 2, "val": 0.08, "sat": 0.08 }, { "c": [0.86, 1.00, 0.92], "w": 1, "val": 0.08, "sat": 0.08 }, { "c": [1.10, 0.84, 0.70], "w": 1, "val": 0.08, "sat": 0.08 } ] },
       "shrubs":   { "variants": 6, "fill": 0.12, "colors": [ { "c": [1.12, 0.98, 0.70], "w": 2, "val": 0.08, "sat": 0.08 }, { "c": [0.92, 0.98, 0.80], "w": 1, "val": 0.08, "sat": 0.08 }, { "c": [1.08, 0.88, 0.72], "w": 1, "val": 0.08, "sat": 0.08 } ] },
-      "render":   { "on": true, "grade": { "blur": 3.0, "brush": 0.10, "brushScale": 5, "sat": 1.20, "val": 1.03, "levels": 5, "pmix": 0.30, "warm": 0.05, "vignette": 0.30, "grain": 0.05 }, "outline": { "px": 1.0, "color": [0.30, 0.20, 0.13], "soft": 0.55, "creases": false }, "toon": { "ratioMax": 1.45, "on": true, "ramp": "bands", "L0": 0.28, "L1": 0.70, "L2": 1.0, "e0": 0.0, "e1": 0.45, "soft": 0.14, "rim": 0.30, "amb": 0.35, "strength": 0.85 } }
+      "render":   { "on": true, "grade": { "blur": 3.0, "brush": 0.10, "brushScale": 5, "sat": 1.20, "val": 1.03, "levels": 5, "pmix": 0.30, "warm": 0.05, "vignette": 0.30, "grain": 0.05 }, "outline": { "busy": 0.9, "fadeM": 140, "px": 1.0, "color": [0.30, 0.20, 0.13], "soft": 0.55, "creases": false }, "toon": { "ratioMax": 1.45, "on": true, "ramp": "bands", "L0": 0.28, "L1": 0.70, "L2": 1.0, "e0": 0.0, "e1": 0.45, "soft": 0.14, "rim": 0.30, "amb": 0.35, "strength": 0.85 } }
     },
     {
       "styleId": "sepiaink",

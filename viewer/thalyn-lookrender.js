@@ -19,7 +19,7 @@ const FRAG = `
 #include <packing>
 uniform sampler2D tDiffuse; uniform sampler2D tDepth;
 uniform float cameraNear, cameraFar; uniform mat4 uProjInv; uniform vec2 uRes; uniform vec3 uSunView;
-uniform vec4 uGradeA, uGradeB, uGradeC, uLineA, uLineB, uLineColor, uFlags, uFlatten, uToonA, uToonB, uToonC, uToonD;
+uniform vec4 uGradeA, uGradeB, uGradeC, uLineA, uLineB, uLineC, uLineColor, uFlags, uFlatten, uToonA, uToonB, uToonC, uToonD;
 varying vec2 vUv;
 
 float hash21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
@@ -100,7 +100,21 @@ float outline(vec2 uv, float depth){
   float dl = eyeDepth(uv - vec2(o.x, 0.0)), dr = eyeDepth(uv + vec2(o.x, 0.0));
   float du = eyeDepth(uv + vec2(0.0, o.y)), dd = eyeDepth(uv - vec2(0.0, o.y));
   float e2 = max(abs(dl + dr - 2.0 * depth), abs(du + dd - 2.0 * depth)) / depth;
-  return smoothstep(uLineB.x, uLineB.x * 2.0, e2) * uLineB.w;
+  float edge = smoothstep(uLineB.x, uLineB.x * 2.0, e2);
+  // BUSYNESS STAND-DOWN: on a ring of 8 taps at 2.5 line widths, count the depth steps. A real silhouette has them on ONE side (about
+  // half); leaf-card clutter has them scattered all round. Where the count is high, the line stands down (uLineC.x = how much, 0 = off).
+  if (uLineC.x > 0.0 && edge > 0.0) {
+    float steps = 0.0;
+    for (int k = 0; k < 8; k++) {
+      float a = float(k) * 0.785398;
+      float dk = eyeDepth(uv + vec2(cos(a), sin(a)) * o * 2.5);
+      steps += step(uLineB.x * 4.0, abs(dk - depth) / depth);
+    }
+    edge *= 1.0 - uLineC.x * smoothstep(3.5, 6.5, steps);
+  }
+  // DISTANCE FADE (uLineC.y = metres where the line is gone, 0 = off): from half that distance
+  if (uLineC.y > 0.0) edge *= 1.0 - smoothstep(uLineC.y * 0.5, uLineC.y, depth);
+  return edge * uLineB.w;
 }
 
 void main(){
@@ -140,7 +154,7 @@ export function makeLookRender(post, camera) {
       tDiffuse: { value: null }, tDepth: { value: null }, cameraNear: { value: 0.1 }, cameraFar: { value: 1000 },
       uProjInv: { value: new THREE.Matrix4() }, uRes: { value: new THREE.Vector2(1, 1) }, uSunView: { value: new THREE.Vector3(0, 1, 0) },
       uGradeA: { value: new THREE.Vector4(1, 0.12, 0.35, 1) }, uGradeB: { value: new THREE.Vector4(0, 0, 1, 0) }, uGradeC: { value: new THREE.Vector4() },
-      uLineA: { value: new THREE.Vector4(0, 0.35, 0.8, 4) }, uLineB: { value: new THREE.Vector4(0.015, 0.55, 60, 0) }, uLineColor: { value: new THREE.Vector4(0.02, 0.02, 0.025, 1) },
+      uLineA: { value: new THREE.Vector4(0, 0.35, 0.8, 4) }, uLineB: { value: new THREE.Vector4(0.015, 0.55, 60, 0) }, uLineC: { value: new THREE.Vector4(0, 0, 0, 0) }, uLineColor: { value: new THREE.Vector4(0.02, 0.02, 0.025, 1) },
       uFlags: { value: new THREE.Vector4() }, uFlatten: { value: new THREE.Vector4(0, 2, 0, 6) },
       uToonA: { value: new THREE.Vector4(1, 1, 1, 0.02) }, uToonB: { value: new THREE.Vector4(0, 0.5, 0.35, 0) }, uToonC: { value: new THREE.Vector4() }, uToonD: { value: new THREE.Vector4(1, 1, 0, 0) },
     },
@@ -190,6 +204,7 @@ export function makeLookRender(post, camera) {
     u.uFlatten.value.set(t >= 1 ? Math.min(8, Math.max(0, n(g.blur, 0))) : 0, t === 2 ? 4 : 2, c01(n(g.brush, 0)), Math.max(1, n(g.brushScale, 6)));
     u.uLineA.value.set(Math.max(0, n(o.px, 0)), n(o.falloff, 0.35), n(o.minPx, 0.8), Math.max(n(o.minPx, 0.8), n(o.maxPx, 4)));
     u.uLineB.value.set(n(o.depthThreshold, 0.015), n(o.normalThreshold, 0.55), Math.max(1, n(o.normalFadeM, 60)), c01(n(o.soft, 1)));
+    u.uLineC.value.set(c01(n(o.busy, 0)), Math.max(0, n(o.fadeM, 0)), 0, 0);
     const oc = Array.isArray(o.color) && o.color.length >= 3 ? o.color : [0.02, 0.02, 0.025];
     u.uLineColor.value.set(oc[0], oc[1], oc[2], 1);
     const soft = Math.max(1e-3, n(tn.soft, 0.02)), e0 = n(tn.e0, -0.05);
