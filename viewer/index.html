@@ -293,7 +293,8 @@ import * as TIN from './thalyn-interiors.js?v=20261010d1';   // A5392 · buildin
 import * as TIND from './thalyn-indoors.js?v=20261010d1';    // A5401 · I1 walking indoors: floor not roof · stairs · walls · doors walked through (⚠ its own import of thalyn-interiors.js carries the SAME ?v= — bump both together)
 import * as TDR from './thalyn-doors.js?v=20261010d1';
 import * as TW from './thalyn-water.js?v=20261021w1';       // A1232 · the game's water: flat, ONE shared mirror, ripples, opaque tone (bump on change)       // A5403 · I2 doors that open: E / click / tap, a closed leaf blocks (extras.thalyn.doorsWeb + the door rows)
-import * as TL from './thalyn-look.js?v=20261102a1';      // ★ LOOK ENGINE slice 2 · extras.thalyn.look → the look's water grade by row id (bump on change)
+import * as TL from './thalyn-look.js?v=20261102a1';
+import * as TD from './thalyn-diorama.js?v=20261102a1';   // ★ LOOK ENGINE boost · THE DIORAMA OPENING: the shared world first appears as a model on a table (bump on change)      // ★ LOOK ENGINE slice 2 · extras.thalyn.look → the look's water grade by row id (bump on change)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const $ = id => document.getElementById(id);
@@ -382,6 +383,7 @@ function apply() {
 // ── The Thalyn block ─────────────────────────────────────────────────────────
 let pendingThalyn = null, pendingAtmos = null;
 let anchorRoot = null, shotPose = null;
+let diorama = null, lastFrame = null;   // ★ the diorama opening (thalyn-diorama.js) + the last frameWorld box it stands on
 const kit = TA.makeMaterialKit();
 const water = TW.makeWater();   // A1232
 const weather = TA.makeWeather(scene, camera);
@@ -767,6 +769,7 @@ function frameWorld(honourShot = true) {
   const center = box.getCenter(new THREE.Vector3());
   const radius = Math.max(size.x, size.y, size.z) * 0.5 || 10;
   const dist = radius / Math.sin(THREE.MathUtils.degToRad(camera.fov * 0.5));
+  lastFrame = { box: box.clone(), center: center.clone(), dist };
   camera.near = Math.max(0.05, radius / 1000);
   camera.far = Math.max(dist * 8, 20000);
   camera.updateProjectionMatrix();
@@ -876,6 +879,7 @@ function loadFromURLNow(url, name, shareUrl) {
       compileWorld().then(fresh => {     // A5396 · B3: shader programs built BEFORE the first framed frame
         if (!fresh) return;              // another world started loading meanwhile
         frameWorld(); if (perf) perf.markLanding();
+        openDiorama();   // ★ the opening shot: the world on a table, then "Dive in" (?diorama=0 skips it)
         toast('Loaded ' + (name || '') ); $('empty').style.display = 'none';
         beaconShareView(currentModelURL);   // ML harvest §4 — a view, counted only on a world that LOADED
         postUp({ type: 'thalyn:loaded', label: name || '', meshes: meshCount });
@@ -979,14 +983,41 @@ if (coarsePointer) $('b-walk').textContent = 'Walk';
     doors.clickAt(nx, ny, e.pointerType === 'touch' ? 'tap' : 'click');
   });
 }
+// ★ LOOK ENGINE boost · THE DIORAMA OPENING (2026-11-02): a shared world first appears as a model on a table (the cut base with strata,
+// plinth, tabletop, painted card, table lamp, macro DoF); "Dive in" flies down to the picture and steps into the walk. Skipped for
+// ?diorama=0, a Together join (?session=), a headset, and any world with no straight cut edge (thalyn-diorama.js decides).
+function openDiorama() {
+  if (!diorama || !lastFrame || renderer.xr.isPresenting) return false;
+  const q = new URLSearchParams(location.search);
+  if (q.get('diorama') === '0' || q.get('session')) return false;
+  // the cut follows the SCENE SQUARE the game exported (extras.thalyn.bounds: centre ± radius in x/z) — the frame box also holds birds in
+  // flight, walls and props past the edge, which would put the cut out in the air
+  const wb = pendingThalyn ? TA.worldBounds(pendingThalyn) : null;
+  let box = lastFrame.box;
+  if (wb && wb.radius > 0) {
+    const r = wb.radius, lo = Number.isFinite(wb.minY) ? wb.minY : box.min.y, hi = Number.isFinite(wb.maxY) ? wb.maxY : box.max.y;
+    box = new THREE.Box3(new THREE.Vector3(wb.center.x - r, lo, wb.center.z - r), new THREE.Vector3(wb.center.x + r, hi, wb.center.z + r));
+  }
+  return diorama.open(box, groundAt, {
+    reduceMotion: reduceMotion.matches,
+    onDive: {
+      pose: () => shotPose ? { position: shotPose.position.clone(), target: shotPose.position.clone().addScaledVector(shotPose.forward, 30) } : null,
+      done: () => {
+        if (shotPose && walkMeshes.length) walk.enterPose(shotPose);   // into the picture, on foot (as the 'From the picture' button)
+        else if (walkMeshes.length) toggleWalk();                        // no picture: step in where the dive landed
+      },
+    },
+  });
+}
 function toggleWalk() {
+  if (diorama && diorama.active) diorama.close();   // the table is put away the moment you walk
   if (walk.active) { walk.exit(); return; }
   if (!walkMeshes.length) { toast('Load a world first'); return; }
   const t = controls.target.clone();
   walk.enterAt(new THREE.Vector3(t.x, t.y, t.z + 6), new THREE.Vector3(t.x, t.y, t.z - 20));
 }
 $('b-walk').onclick = toggleWalk;
-$('b-shot').onclick = () => { if (shotPose && walkMeshes.length) walk.enterPose(shotPose); };
+$('b-shot').onclick = () => { if (diorama && diorama.active) diorama.close(); if (shotPose && walkMeshes.length) walk.enterPose(shotPose); };
 
 // ── UI wiring ────────────────────────────────────────────────────────────────
 const dropEl = $('drop');
@@ -995,7 +1026,7 @@ addEventListener('dragleave', e => { if (e.target === document || e.relatedTarge
 addEventListener('drop', e => { e.preventDefault(); dropEl.classList.remove('show'); if (e.dataTransfer?.files?.length) loadFiles(e.dataTransfer.files); });
 $('b-open').onclick = () => $('file').click();
 $('file').onchange = e => loadFiles(e.target.files);
-$('b-reset').onclick = () => { walk.exit(); frameWorld(false); };
+$('b-reset').onclick = () => { if (diorama && diorama.active) diorama.close(); walk.exit(); frameWorld(false); };
 $('t-wind').onchange = e => { kit.uWindStrength.value = e.target.checked ? parseFloat($('r-wind').value) : 0; };
 $('r-wind').oninput = e => { if ($('t-wind').checked) kit.uWindStrength.value = parseFloat(e.target.value); };
 $('t-sky').onchange = e => setSky(e.target.checked);
@@ -1107,6 +1138,8 @@ function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add
 
 // ── Cinematic pass (bloom + per-tone grade) ──────────────────────────────────
 post = TA.makePost(renderer, scene, camera);
+diorama = TD.makeDiorama({ scene, camera, renderer, controls, post, worldRoot, lights: L });   // ★ the diorama opening
+if (new URLSearchParams(location.search).get('debug') === '1') window.__thalyn = { THREE, scene, camera, controls, worldRoot, diorama, get groundAt() { return groundAt; }, get lastFrame() { return lastFrame; }, get tx() { return pendingThalyn; } };   // dev only: headless checks
 function resizeToViewport() {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   const pr = cappedPixelRatio(prRow);   // A5397 · B4: the cap moves with the window width
@@ -1379,6 +1412,7 @@ renderer.setAnimationLoop(() => {
     stepXR(dt);
     renderer.render(scene, camera); // the cinematic pass doesn't run in a headset — raw stereo render
   } else {
+    if (diorama) diorama.tick(dt);   // ★ the diorama opening: the dive + its fade (no-op once the table is put away)
     if (walk.active) { walk.step(dt); stepSpin(true); } else { stepSpin(false); controls.update(); }
     water.update(renderer, scene, camera, clock.elapsedTime);   // A1232 · the one mirror, before the frame (never in a headset)
     post.render();
