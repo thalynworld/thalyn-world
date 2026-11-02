@@ -153,10 +153,13 @@ export function makeDiorama({ scene, camera, renderer, controls, post, worldRoot
   let root = null, saved = null, bokeh = null, active = false, diving = null, ui = null, lamp = null, fill = null;
   const fadeMats = [];
 
-  const ROOM = new THREE.Color(0x2b231c);
+  // the room = the backdrop card's own top colour, dimmed (the painted sky × the card's print tint): wherever a glimpse of the room shows past
+  // the card, it continues the card instead of hanging as a dark shape across the frame (lead 11-02: the dark ellipse at low angles)
+  const ROOM = new THREE.Color(0x34434f);
   function putAway(box) {
     saved = {
       background: scene.background, fog: scene.fog, autoRotate: controls.autoRotate, autoRotateSpeed: controls.autoRotateSpeed,
+      orbit: { maxPolar: controls.maxPolarAngle, minDist: controls.minDistance, maxDist: controls.maxDistance },
       sky: lights && lights.sky ? lights.sky.visible : null, stars: lights && lights.stars ? lights.stars.visible : null,
       sun: lights && lights.sun ? lights.sun.intensity : null, hemi: lights && lights.hemi ? lights.hemi.intensity : null,
       hidden: [], clipped: [], localClipping: renderer.localClippingEnabled, exposure: renderer.toneMappingExposure,
@@ -192,6 +195,7 @@ export function makeDiorama({ scene, camera, renderer, controls, post, worldRoot
     if (!saved) return;
     scene.background = saved.background; scene.fog = saved.fog;
     controls.autoRotate = saved.autoRotate; controls.autoRotateSpeed = saved.autoRotateSpeed;
+    freeOrbit();
     if (lights) {
       if (lights.sky && saved.sky !== null) lights.sky.visible = saved.sky;
       if (lights.stars && saved.stars !== null) lights.stars.visible = saved.stars;
@@ -203,6 +207,12 @@ export function makeDiorama({ scene, camera, renderer, controls, post, worldRoot
     renderer.localClippingEnabled = saved.localClipping;
     renderer.toneMappingExposure = saved.exposure;
     saved = null;
+  }
+
+  /** Give the page its own orbit limits back (the dive needs them free: it flies down to the picture, low and close). */
+  function freeOrbit() {
+    if (!saved || !saved.orbit) return;
+    controls.maxPolarAngle = saved.orbit.maxPolar; controls.minDistance = saved.orbit.minDist; controls.maxDistance = saved.orbit.maxDist;
   }
 
   function addUi(onDive) {
@@ -245,7 +255,7 @@ export function makeDiorama({ scene, camera, renderer, controls, post, worldRoot
     root.add(table); fadeMats.push(table.material);
     // the painted backdrop card, curved, behind the model from the opening view
     const view = new THREE.Vector3(Math.SQRT1_2, 0, -Math.SQRT1_2);   // the camera stands on this side; the card faces it from the far side
-    const R = span * 1.9, Hc = span * 1.0;
+    const R = span * 1.9, Hc = span * 1.8;   // tall enough that the orbit (pitch-limited below) never looks over its rim
     const card = new THREE.Mesh(new THREE.CylinderGeometry(R, R, Hc, 64, 1, true, 0, Math.PI * 0.9),
       new THREE.MeshBasicMaterial({ map: backdropTexture(), side: THREE.BackSide, transparent: true, color: new THREE.Color(0.5, 0.48, 0.45) }));   // a print in a dim room, not a sky
     const yaw = Math.atan2(-view.x, -view.z);
@@ -270,6 +280,9 @@ export function makeDiorama({ scene, camera, renderer, controls, post, worldRoot
     camera.position.copy(look).addScaledVector(dir, dist);
     controls.target.copy(look); controls.update();
     controls.autoRotate = !opts.reduceMotion; controls.autoRotateSpeed = 0.35;
+    // while the table shows, the visitor orbits the MODEL: never under the tabletop horizon, never inside the model, never out past the card
+    controls.maxPolarAngle = THREE.MathUtils.degToRad(74);
+    controls.minDistance = span * 0.55; controls.maxDistance = Math.min(R * 0.95, dist * 1.6);
     // macro DoF on the model: sharp at the model, the table and the card soft
     if (post && post.composer && !opts.noDof) {
       // the blur reaches its cap about one model-width from the focus: the model stays nearly sharp, the table and the card go soft
@@ -288,6 +301,7 @@ export function makeDiorama({ scene, camera, renderer, controls, post, worldRoot
     if (ui) { ui._unkey && ui._unkey(); ui.remove(); ui = null; }
     const pose = arrive && arrive.pose ? arrive.pose() : null;   // { position, target } or null = the page's own framing after close
     controls.autoRotate = false;
+    freeOrbit();   // the dive goes low and close — the table's orbit limits would clamp it
     diving = { t: 0, dur: 2.4, from: camera.position.clone(), fromT: controls.target.clone(), pose, arrive };
     console.info('[diorama] dive in');
   }
