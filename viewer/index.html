@@ -293,6 +293,7 @@ import * as TIN from './thalyn-interiors.js?v=20261010d1';   // A5392 · buildin
 import * as TIND from './thalyn-indoors.js?v=20261010d1';    // A5401 · I1 walking indoors: floor not roof · stairs · walls · doors walked through (⚠ its own import of thalyn-interiors.js carries the SAME ?v= — bump both together)
 import * as TDR from './thalyn-doors.js?v=20261010d1';
 import * as TW from './thalyn-water.js?v=20261021w1';       // A1232 · the game's water: flat, ONE shared mirror, ripples, opaque tone (bump on change)       // A5403 · I2 doors that open: E / click / tap, a closed leaf blocks (extras.thalyn.doorsWeb + the door rows)
+import * as TL from './thalyn-look.js?v=20261102a1';      // ★ LOOK ENGINE slice 2 · extras.thalyn.look → the look's water grade by row id (bump on change)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const $ = id => document.getElementById(id);
@@ -492,6 +493,18 @@ function applyThalynBlock(tx) {
     const aw = tx.atmosphere && Number(tx.atmosphere.windStrength);
     if (aw > 0 && !reduceMotion.matches) { $('t-wind').checked = true; const w = Math.min(2, aw * 0.4); $('r-wind').value = w; kit.uWindStrength.value = Math.max(kit.uWindStrength.value, w); }
     if (tx.water && tx.water.present) TA.tintWater(tx.water, worldRoot, kit.lavaMats);
+    // ★ LOOK ENGINE slice 2 (2026-11-02): a world that wears a look carries extras.thalyn.look (absent = natural = nothing below runs).
+    // Sun/ambient/fog arrive already graded by the game; the water block does not, so grade it by the look's row (thalyn-look.js).
+    const look = TL.readLook(tx);
+    if (look) TL.palettes().then(table => {
+      if (pendingThalyn !== tx) return;   // another world loaded meanwhile
+      const row = TL.rowFor(look, table), applied = [];
+      if (tx.water && tx.water.present) {
+        const w = TL.lookWater(tx.water, row);
+        if (w !== tx.water) applied.push(`water ${TA.tintWater(w, worldRoot, kit.lavaMats)} material(s)`);
+      }
+      console.log(TL.describe(look, row, applied));
+    });
     if (anchorRoot && anchorRoot.parent) anchorRoot.parent.remove(anchorRoot);
     anchorRoot = TA.buildAnchors(tx.anchors, worldRoot, (typeof tier !== 'undefined' ? tier.table.fireLights : 48));
     // Living worlds: the falls the world measured run; water edges, falls and tree cover sound from where they are.
