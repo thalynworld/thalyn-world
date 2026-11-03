@@ -5,8 +5,11 @@
 // The camera's zone (with the app's 3 m border hysteresis) cross-fades the ratios over the app's fade (2.5 s). A file without the block = null =
 // the viewer exactly as before. GAP vs the app: the sky-tint ratio is carried but unused (the viewer's sky is its own dome / procedural sky; the
 // fog colour carries the horizon).
+// ★ (11-03, founder: the sky's FORM changes at the border too) a biome whose sky differs from the dome's carries its own baked sky
+// (zones.skies[], a JPEG equirect in the dome texture's layout); `skyKey` names the sky to wear - the fade's FROM sky until the midpoint,
+// then the TO sky (the app's rule: one switch mid-fade, the colours keep blending). '' = the baked dome itself.
 
-const ONE = { fog: [1, 1, 1], fogDensity: 1, sun: [1, 1, 1], sunI: 1, amb: 1 };
+const ONE = { fog: [1, 1, 1], fogDensity: 1, sun: [1, 1, 1], sunI: 1, amb: 1, sky: '' };
 
 function decodeRle(b64, n) {
   const bin = atob(b64), out = new Uint8Array(n);
@@ -30,8 +33,12 @@ export function makeZoneAtmo(tx) {
   const byZone = new Map();
   for (const e of z.zoneAtmos || []) {
     if (!e || typeof e.zone !== 'number') continue;
-    byZone.set(e.zone, { row: e.row || 'natural', fog: arr3(e.fogColorMul), fogDensity: num(e.fogDensityMul), sun: arr3(e.sunColorMul), sunI: num(e.sunIntensityMul), amb: num(e.ambientMul) });
+    byZone.set(e.zone, { row: e.row || 'natural', fog: arr3(e.fogColorMul), fogDensity: num(e.fogDensityMul), sun: arr3(e.sunColorMul), sunI: num(e.sunIntensityMul), amb: num(e.ambientMul),
+      sky: typeof e.sky === 'string' ? e.sky : '', skyMode: e.skyMode || '' });
   }
+  const skies = new Map();   // key → { mode, jpg } (base64)
+  for (const k of z.skies || []) if (k && typeof k.key === 'string' && typeof k.jpg === 'string' && k.jpg.length) skies.set(k.key, { mode: k.mode || '', jpg: k.jpg });
+  for (const v of byZone.values()) if (v.sky && !skies.has(v.sky)) v.sky = '';   // a sky the file does not carry = the dome
   const minX = +z.worldMin[0], minZ = +z.worldMin[1], size = +z.worldSize, cell = size / res;
   const hyst = num(z.hysteresisM) || 3, fade = num(z.fadeSeconds) || 2.5;
 
@@ -71,6 +78,13 @@ export function makeZoneAtmo(tx) {
     return moved;
   }
 
-  console.log(`[zoneatmo] per-biome sky + fog: ${byZone.size} zone(s), map ${res}² over ${size.toFixed(0)} m, base biome ${z.baseZone} '${z.baseRow}' (hysteresis ${hyst} m, fade ${fade} s)`);
-  return { update, get mul() { return last; }, zoneAt };
+  console.log(`[zoneatmo] per-biome sky + fog: ${byZone.size} zone(s), map ${res}² over ${size.toFixed(0)} m, base biome ${z.baseZone} '${z.baseRow}' (hysteresis ${hyst} m, fade ${fade} s) · ${skies.size} zone sky(s)${skies.size ? ' [' + [...skies].map(([k, v]) => `${k}=${v.mode}`).join(', ') + ']' : ''}`);
+  return {
+    update, get mul() { return last; }, zoneAt,
+    /** The sky to wear now: the FROM sky until the fade's midpoint, then the TO sky ('' = the baked dome). */
+    get skyKey() { return (t < 0.5 ? from : to).sky || ''; },
+    /** A zone sky's base64 JPEG, or null. */
+    skyJpg(key) { const k = skies.get(key); return k ? k.jpg : null; },
+    skyMode(key) { const k = skies.get(key); return k ? k.mode : ''; },
+  };
 }
