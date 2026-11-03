@@ -297,6 +297,7 @@ import * as TW from './thalyn-water.js?v=20261021w1';       // A1232 · the game
 import * as TL from './thalyn-look.js?v=20261102a1';
 import * as TD from './thalyn-diorama.js?v=20261102a1';
 import * as TLR from './thalyn-lookrender.js?v=20261102a1';
+import * as TINK from './thalyn-ink.js?v=20261103a1';   // ★ Looking-Glass drawn live (the app's ink look path; bump on change)
 import * as TSC from './thalyn-sharecard.js?v=20261102a1';   // ★ the share card × 4 looks (bump on change)   // ★ R1e · the look's RENDER layer (grade · flatten · toon · outline), the game's laws (bump on change)   // ★ LOOK ENGINE boost · THE DIORAMA OPENING: the shared world first appears as a model on a table (bump on change)      // ★ LOOK ENGINE slice 2 · extras.thalyn.look → the look's water grade by row id (bump on change)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
@@ -387,7 +388,9 @@ function apply() {
 let pendingThalyn = null, pendingAtmos = null;
 let anchorRoot = null, shotPose = null;
 let diorama = null, lastFrame = null;   // ★ the diorama opening (thalyn-diorama.js) + the last frameWorld box it stands on
-let lookRender = null;   // ★ R1e the look's render layer (thalyn-lookrender.js)
+let lookRender = null;
+let inkRender = null;          // ★ Looking-Glass live (thalyn-ink.js) - inert until an ink look that is not baked is worn
+let worldFieldMeshes = 0;      // meshes of this world carrying the hatch field (TEXCOORD_4), tagged on FIELD_LAYER at load   // ★ R1e the look's render layer (thalyn-lookrender.js)
 let wornLook = { row: null, id: 'natural' };   // ★ the look the world wears (the share card puts it back after its four shots)
 const kit = TA.makeMaterialKit();
 const water = TW.makeWater();   // A1232
@@ -506,6 +509,7 @@ function applyThalynBlock(tx) {
     const lookQ = new URLSearchParams(location.search).get('look');
     const look = TL.readLook(tx) || (lookQ ? { version: 1, sceneRecipeId: lookQ, renderRow: lookQ, byZone: [] } : null);
     if (lookRender) lookRender.set(null, tier.name, 'natural');
+    if (inkRender) inkRender.set(null, tier.name, 'natural');
     if (look) TL.palettes().then(table => {
       if (pendingThalyn !== tx) return;   // another world loaded meanwhile
       const row = TL.rowFor(look, table), applied = [];
@@ -518,10 +522,12 @@ function applyThalynBlock(tx) {
       if (look.baked) {
         wornLook = { row: null, id: look.renderRow || 'natural' };
         if (lookRender) lookRender.set(null, tier.name, 'natural');
+        if (inkRender) inkRender.set(row ? row.render : null, tier.name, look.bakedLook || look.renderRow, { baked: true, fieldMeshes: worldFieldMeshes });
         applied.push(`baked '${look.bakedLook || look.renderRow}' - no live layer`);
       } else {
         wornLook = { row: row ? row.render : null, id: look.renderRow || 'natural' };
         if (lookRender) { const d = lookRender.set(wornLook.row, tier.name, wornLook.id); if (d.enqueue) applied.push('render layer'); }
+        if (inkRender) { const k = inkRender.set(wornLook.row, tier.name, wornLook.id, { fieldMeshes: worldFieldMeshes }); if (k.ink) applied.push('Looking-Glass ink (live)'); }
       }
       console.log(TL.describe(look, row, applied));
     });
@@ -646,6 +652,7 @@ function clearWorld() {
   });
   worldRoot = new THREE.Group();
   scene.add(worldRoot);
+  worldFieldMeshes = 0;
   walkMeshes.length = 0;
   kit.reset();
   skyEnv.useDome(null);
@@ -672,6 +679,7 @@ function resetWorld() {
 function resetAtmosphere() {
   pendingAtmos = null; pendingThalyn = null; anchorRoot = null; shotPose = null;
   if (lookRender) lookRender.set(null, tier.name, 'natural');   // ★ R1e: a new world starts natural until its own tag says otherwise
+  if (inkRender) inkRender.set(null, tier.name, 'natural');
   wornLook = { row: null, id: 'natural' };
   $('w-row').style.display = 'none'; $('w-sky').style.display = 'none';
   $('b-postcard').style.display = 'none'; $('b-shot').style.display = 'none';
@@ -736,6 +744,8 @@ function ingest(gltf) {
   if (tx && (tx.doorsWeb || tx.doors || tx.interiors)) doors.adopt(tx);   // A5403 · I2 (a second dropped part without a block never clears the world's doors)
   if (tx && tx.atmosphere && !pendingAtmos && !TA.hasBlock(tx)) applyAtmosphere(tx.atmosphere);
   worldRoot.add(gltf.scene);
+  worldFieldMeshes += TINK.tagFieldMeshes(gltf.scene);   // ★ the hatch field (an older file: 0 → the world fallback, no errors)
+  if (inkRender) inkRender.setFieldMeshes(worldFieldMeshes);
   if (sky.tex) { skyEnv.useDome(sky.tex, sky.domes); L.sky.visible = false; }
   if (tx) applyThalynBlock(tx); // after the meshes are under worldRoot (water tint / anchors need them)
   $('s-meshes').textContent = meshCount.toLocaleString();
@@ -1176,6 +1186,7 @@ function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add
 // ── Cinematic pass (bloom + per-tone grade) ──────────────────────────────────
 post = TA.makePost(renderer, scene, camera);
 lookRender = TLR.makeLookRender(post, camera);   // ★ R1e · inert (disabled) until a look with a render block is worn
+inkRender = TINK.makeInk(post, camera, scene, renderer);   // ★ Looking-Glass live · inert until an ink look (not baked) is worn
 diorama = TD.makeDiorama({ scene, camera, renderer, controls, post, worldRoot, lights: L });   // ★ the diorama opening
 if (new URLSearchParams(location.search).get('debug') === '1') window.__thalyn = { THREE, scene, camera, controls, worldRoot, diorama, shareCard: async () => { const b = await shareCardBlob(); return b ? await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); }) : null; }, get groundAt() { return groundAt; }, get lastFrame() { return lastFrame; }, get tx() { return pendingThalyn; } };   // dev only: headless checks
 function resizeToViewport() {
@@ -1454,6 +1465,7 @@ renderer.setAnimationLoop(() => {
     if (walk.active) { walk.step(dt); stepSpin(true); } else { stepSpin(false); controls.update(); }
     water.update(renderer, scene, camera, clock.elapsedTime);   // A1232 · the one mirror, before the frame (never in a headset)
     if (lookRender && lookRender.enabled) lookRender.update(state.sunDir, post.composer.renderTarget1.width, post.composer.renderTarget1.height);   // ★ R1e
+    if (inkRender) inkRender.update(post.composer.renderTarget1.width, post.composer.renderTarget1.height);   // every frame: cheap when off (the cost-line baseline)
     post.render();
   }
 });
