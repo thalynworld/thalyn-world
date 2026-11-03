@@ -72,14 +72,11 @@
     },
     {
       "styleId": "lookingglass",
-      "water":   { "deepMul": [1.10, 0.95, 0.75], "shallowMul": [1.10, 0.95, 0.75], "sat": 0.10 },
       "fog":     { "mul": [1.10, 0.95, 0.75], "sat": 0.10 },
       "sky":     { "mode": "panorama", "sat": 0.10, "tint": [1.10, 0.95, 0.75] },
       "snow":    { "color": [0.96, 0.90, 0.78] },
-      "grass":   { "baseMul": [1.10, 0.95, 0.75], "tipMul": [1.10, 0.95, 0.75], "sat": 0.10 },
-      "widgets": { "wood": [1.10, 0.95, 0.75], "metal": [1.10, 0.95, 0.75], "rope": [1.10, 0.95, 0.75], "stone": [1.10, 0.95, 0.75], "leaf": [1.10, 0.95, 0.75], "glow": [1.10, 0.95, 0.75], "fabric": [1.10, 0.95, 0.75], "sat": 0.10 },
       "weather": { "mul": [1.10, 0.95, 0.75], "sat": 0.10, "spriteSet": "sepiaink" },
-      "render":   { "on": true, "mode": "ink", "ink": { "keepLocal": 0.66, "paper": [0.96, 0.90, 0.78], "ink": [0.08, 0.065, 0.055], "accentHue": 0.965, "accentRange": 0.07, "accentMinSat": 0.35, "accentStrength": 1.0, "hatchDensity": 1.0, "hatchStrength": 0.9, "hatchPeriodPx": 6, "lineNearPx": 2.5, "grain": 0.06, "fibre": 0.05 } }
+      "render":   { "on": true, "mode": "ink", "ink": { "keepLocal": 0.66, "paper": [0.96, 0.90, 0.78], "ink": [0.08, 0.065, 0.055], "accentHue": 0.965, "accentRange": 0.07, "accentMinSat": 0.35, "accentStrength": 1.0, "hatchDensity": 1.0, "hatchStrength": 0.9, "hatchPeriodPx": 6, "lineNearPx": 2.5, "grain": 0.06, "fibre": 0.05, "handTint": true, "mutedSat": 0.58, "sage": 0.25, "stoneWarm": 0.35 } }
     }
   ]
 }
