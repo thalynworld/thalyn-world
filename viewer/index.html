@@ -297,7 +297,7 @@ import * as TW from './thalyn-water.js?v=20261021w1';       // A1232 · the game
 import * as TL from './thalyn-look.js?v=20261102a1';
 import * as TD from './thalyn-diorama.js?v=20261102a1';
 import * as TLR from './thalyn-lookrender.js?v=20261102a1';
-import * as TINK from './thalyn-ink.js?v=20261103b1';   // ★ Looking-Glass drawn live (the app's ink look path; bump on change)
+import * as TINK from './thalyn-ink.js?v=20261103c1';   // ★ Looking-Glass drawn live (the app's ink look path; bump on change)
 import * as TSC from './thalyn-sharecard.js?v=20261102a1';   // ★ the share card × 4 looks (bump on change)   // ★ R1e · the look's RENDER layer (grade · flatten · toon · outline), the game's laws (bump on change)   // ★ LOOK ENGINE boost · THE DIORAMA OPENING: the shared world first appears as a model on a table (bump on change)      // ★ LOOK ENGINE slice 2 · extras.thalyn.look → the look's water grade by row id (bump on change)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
@@ -1468,7 +1468,7 @@ renderer.setAnimationLoop(() => {
     if (walk.active) { walk.step(dt); stepSpin(true); } else { stepSpin(false); controls.update(); }
     water.update(renderer, scene, camera, clock.elapsedTime);   // A1232 · the one mirror, before the frame (never in a headset)
     if (lookRender && lookRender.enabled) lookRender.update(state.sunDir, post.composer.renderTarget1.width, post.composer.renderTarget1.height);   // ★ R1e
-    if (inkRender) inkRender.update(post.composer.renderTarget1.width, post.composer.renderTarget1.height);   // every frame: cheap when off (the cost-line baseline)
+    if (inkRender) inkRender.update(post.composer.renderTarget1.width, post.composer.renderTarget1.height, state.night);   // every frame: cheap when off (the cost-line baseline)
     post.render();
   }
 });

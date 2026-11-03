@@ -23,7 +23,7 @@ const VERT = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionM
 
 const FRAG = `
 #include <packing>
-uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform sampler2D tField; uniform sampler2D tTag; uniform float uTagOn;
+uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform sampler2D tField; uniform sampler2D tTag; uniform float uTagOn; uniform float uNight;
 uniform float cameraNear, cameraFar, uP11; uniform mat4 uProjInv, uViewInv; uniform vec2 uRes;
 uniform vec4 uLine, uEdge, uHatch, uPaper, uAccent, uTint, uGround, uGlow, uTier;
 uniform vec3 uInk, uPaperCol;
@@ -51,14 +51,16 @@ float engrave(float u1, float u2, float tone, float s, float aa){
   c = max(c, stripe(u2, s * 1.15, clamp(dk - 0.5, 0.0, 0.35), aa));
   return c; }
 vec3 handTint(vec3 hsv, float accent, float tone){
+  // NIGHT (the app's 11-03 walk fix, same numbers): the value lift, the paper and the light floor fall with the night amount
+  float night = clamp(uNight, 0.0, 1.0), lift = mix(0.42, 0.06, night);
   float green = smoothstep(0.14, 0.2, hsv.x) * (1.0 - smoothstep(0.42, 0.5, hsv.x));
   float hue = mix(hsv.x, 0.24, green * uTint.y);
-  vec3 muted = hsv2rgb(vec3(hue, hsv.y * max(uTint.x - 0.08 * green, 0.0), 0.42 + 0.58 * hsv.z));
+  vec3 muted = hsv2rgb(vec3(hue, hsv.y * max(uTint.x - 0.08 * green, 0.0), lift + (1.0 - lift) * hsv.z));
   float stone = 1.0 - smoothstep(0.08, 0.28, hsv.y);
   muted = muted * (1.0 - uTint.z * stone) + vec3(0.93, 0.85, 0.71) * uTint.z * stone * (0.5 + 0.5 * hsv.z);
   float k = clamp(uPaper.z, 0.0, 1.0);
-  vec3 b = toSrgb(uPaperCol) * (1.0 - k) + muted * k;
-  b *= 0.78 + 0.27 * clamp(tone * 1.3, 0.0, 1.0);
+  vec3 b = toSrgb(uPaperCol) * mix(1.0, 0.25, night) * (1.0 - k) + muted * k;
+  b *= mix(0.78, 0.35, night) + 0.27 * clamp(tone * 1.3, 0.0, 1.0);
   vec3 rose = hsv2rgb(vec3(uAccent.x, clamp(hsv.y * 0.6, 0.28, 0.5), 0.62 + 0.36 * hsv.z));
   return toLin(mix(b, rose, accent)); }
 
@@ -75,6 +77,7 @@ void main(){
   }
   float dh = abs(hsv.x - uAccent.x); dh = min(dh, 1.0 - dh);
   float accent = (1.0 - smoothstep(uAccent.y * 0.6, uAccent.y, dh)) * smoothstep(uAccent.z * 0.7, uAccent.z, hsv.y) * uAccent.w * tagAccent;
+  accent *= 1.0 - smoothstep(0.3, 0.8, clamp(uNight, 0.0, 1.0));   // the accent keys on the LIT colour: a warm light at night is not a rose
   float amber = smoothstep(0.03, 0.05, hsv.x) * (1.0 - smoothstep(0.14, 0.17, hsv.x)) * smoothstep(0.35, 0.5, hsv.y);
   float glow = sky ? 0.0 : max(tagGlow, uGlow.y * amber * smoothstep(uGlow.x, uGlow.x * 1.5, max(col.r, max(col.g, col.b))));
   vec3 base = handTint(hsv, accent, tone);
@@ -187,7 +190,7 @@ export function tagNodeTags(root) {
 export function makeInk(post, camera, scene, renderer) {
   const pass = new ShaderPass({
     uniforms: {
-      tDiffuse: { value: null }, tDepth: { value: null }, tField: { value: null }, tTag: { value: null }, uTagOn: { value: 0 },
+      tDiffuse: { value: null }, tDepth: { value: null }, tField: { value: null }, tTag: { value: null }, uTagOn: { value: 0 }, uNight: { value: 0 },
       cameraNear: { value: 0.1 }, cameraFar: { value: 1000 }, uP11: { value: 1 },
       uProjInv: { value: new THREE.Matrix4() }, uViewInv: { value: new THREE.Matrix4() }, uRes: { value: new THREE.Vector2(1, 1) },
       uLine: { value: new THREE.Vector4(3.5, 0.35, 1.2, 5) }, uEdge: { value: new THREE.Vector4(0.015, 0.9, 0, 1) },
@@ -335,7 +338,7 @@ export function makeInk(post, camera, scene, renderer) {
   }
 
   /** Every frame (cheap when off: the frame-time baseline for the no-timer cost line). */
-  function update(width, height) {
+  function update(width, height, night = 0) {
     const t = performance.now(), dt = lastT ? t - lastT : 0; lastT = t;
     if (ab) {
       if (dt > 0 && dt < MAX_DT) { ab.sum += dt; ab.n++; }
@@ -365,6 +368,7 @@ export function makeInk(post, camera, scene, renderer) {
     u.uProjInv.value.copy(camera.projectionMatrixInverse);
     u.uViewInv.value.copy(camera.matrixWorld);
     u.uRes.value.set(width, height);
+    u.uNight.value = night || 0;
   }
 
   return { set, update, get enabled() { return pass.enabled; }, pass, setFieldMeshes(c) { fieldMeshes = c; }, setTagMeshes(c) { tagMeshes = c; } };
