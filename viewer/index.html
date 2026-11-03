@@ -297,7 +297,7 @@ import * as TW from './thalyn-water.js?v=20261021w1';       // A1232 · the game
 import * as TL from './thalyn-look.js?v=20261102a1';
 import * as TD from './thalyn-diorama.js?v=20261102a1';
 import * as TLR from './thalyn-lookrender.js?v=20261102a1';
-import * as TINK from './thalyn-ink.js?v=20261103a1';   // ★ Looking-Glass drawn live (the app's ink look path; bump on change)
+import * as TINK from './thalyn-ink.js?v=20261103b1';   // ★ Looking-Glass drawn live (the app's ink look path; bump on change)
 import * as TSC from './thalyn-sharecard.js?v=20261102a1';   // ★ the share card × 4 looks (bump on change)   // ★ R1e · the look's RENDER layer (grade · flatten · toon · outline), the game's laws (bump on change)   // ★ LOOK ENGINE boost · THE DIORAMA OPENING: the shared world first appears as a model on a table (bump on change)      // ★ LOOK ENGINE slice 2 · extras.thalyn.look → the look's water grade by row id (bump on change)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
@@ -390,7 +390,8 @@ let anchorRoot = null, shotPose = null;
 let diorama = null, lastFrame = null;   // ★ the diorama opening (thalyn-diorama.js) + the last frameWorld box it stands on
 let lookRender = null;
 let inkRender = null;          // ★ Looking-Glass live (thalyn-ink.js) - inert until an ink look that is not baked is worn
-let worldFieldMeshes = 0;      // meshes of this world carrying the hatch field (TEXCOORD_4), tagged on FIELD_LAYER at load   // ★ R1e the look's render layer (thalyn-lookrender.js)
+let worldFieldMeshes = 0;      // meshes of this world carrying the hatch field (TEXCOORD_4), tagged on FIELD_LAYER at load
+let worldTagMeshes = 0;        // ★ V3 meshes carrying the Looking-Glass node tags (lg_*), tagged on TAG_LAYER at load   // ★ R1e the look's render layer (thalyn-lookrender.js)
 let wornLook = { row: null, id: 'natural' };   // ★ the look the world wears (the share card puts it back after its four shots)
 const kit = TA.makeMaterialKit();
 const water = TW.makeWater();   // A1232
@@ -522,12 +523,12 @@ function applyThalynBlock(tx) {
       if (look.baked) {
         wornLook = { row: null, id: look.renderRow || 'natural' };
         if (lookRender) lookRender.set(null, tier.name, 'natural');
-        if (inkRender) inkRender.set(row ? row.render : null, tier.name, look.bakedLook || look.renderRow, { baked: true, fieldMeshes: worldFieldMeshes });
+        if (inkRender) inkRender.set(row ? row.render : null, tier.name, look.bakedLook || look.renderRow, { baked: true, fieldMeshes: worldFieldMeshes, tagMeshes: worldTagMeshes });
         applied.push(`baked '${look.bakedLook || look.renderRow}' - no live layer`);
       } else {
         wornLook = { row: row ? row.render : null, id: look.renderRow || 'natural' };
         if (lookRender) { const d = lookRender.set(wornLook.row, tier.name, wornLook.id); if (d.enqueue) applied.push('render layer'); }
-        if (inkRender) { const k = inkRender.set(wornLook.row, tier.name, wornLook.id, { fieldMeshes: worldFieldMeshes }); if (k.ink) applied.push('Looking-Glass ink (live)'); }
+        if (inkRender) { const k = inkRender.set(wornLook.row, tier.name, wornLook.id, { fieldMeshes: worldFieldMeshes, tagMeshes: worldTagMeshes }); if (k.ink) applied.push('Looking-Glass ink (live)'); }
       }
       console.log(TL.describe(look, row, applied));
     });
@@ -653,6 +654,7 @@ function clearWorld() {
   worldRoot = new THREE.Group();
   scene.add(worldRoot);
   worldFieldMeshes = 0;
+  worldTagMeshes = 0;
   walkMeshes.length = 0;
   kit.reset();
   skyEnv.useDome(null);
@@ -745,7 +747,8 @@ function ingest(gltf) {
   if (tx && tx.atmosphere && !pendingAtmos && !TA.hasBlock(tx)) applyAtmosphere(tx.atmosphere);
   worldRoot.add(gltf.scene);
   worldFieldMeshes += TINK.tagFieldMeshes(gltf.scene);   // ★ the hatch field (an older file: 0 → the world fallback, no errors)
-  if (inkRender) inkRender.setFieldMeshes(worldFieldMeshes);
+  worldTagMeshes += TINK.tagNodeTags(gltf.scene);         // ★ V3 the stained glass: glow / no rose / no hatch, per node
+  if (inkRender) { inkRender.setFieldMeshes(worldFieldMeshes); inkRender.setTagMeshes(worldTagMeshes); }
   if (sky.tex) { skyEnv.useDome(sky.tex, sky.domes); L.sky.visible = false; }
   if (tx) applyThalynBlock(tx); // after the meshes are under worldRoot (water tint / anchors need them)
   $('s-meshes').textContent = meshCount.toLocaleString();

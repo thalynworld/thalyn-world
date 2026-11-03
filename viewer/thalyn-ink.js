@@ -17,12 +17,13 @@ import * as THREE from 'three';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 export const FIELD_LAYER = 30;
+export const TAG_LAYER = 29;    // ★ V3 meshes carrying the Looking-Glass node tags (lg_glow / lg_accent / lg_hatch_scale)
 
 const VERT = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
 
 const FRAG = `
 #include <packing>
-uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform sampler2D tField;
+uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform sampler2D tField; uniform sampler2D tTag; uniform float uTagOn;
 uniform float cameraNear, cameraFar, uP11; uniform mat4 uProjInv, uViewInv; uniform vec2 uRes;
 uniform vec4 uLine, uEdge, uHatch, uPaper, uAccent, uTint, uGround, uGlow, uTier;
 uniform vec3 uInk, uPaperCol;
@@ -66,10 +67,16 @@ void main(){
   float raw = rawDepth(vUv); bool sky = raw >= 1.0 - 1e-6;
   float lum = dot(col, vec3(0.299, 0.587, 0.114)); float tone = clamp(sqrt(max(lum, 0.0)), 0.0, 1.0);
   vec3 hsv = rgb2hsv(toSrgb(clamp(col, 0.0, 1.0)));
+  // ★ V3 THE NODE TAGS (the app's LookNodeTags): only where the tagged surface IS the visible one (its depth matches)
+  float tagGlow = 0.0, tagAccent = 1.0, tagHatch = 1.0;
+  if (uTagOn > 0.5 && !sky) {
+    vec4 tg = texture2D(tTag, vUv); float dE = eyeDepth(vUv);
+    if (tg.a > 0.0 && abs(tg.a - dE) < dE * 0.02 + 0.05) { tagGlow = tg.r; tagAccent = tg.g; tagHatch = tg.b; }
+  }
   float dh = abs(hsv.x - uAccent.x); dh = min(dh, 1.0 - dh);
-  float accent = (1.0 - smoothstep(uAccent.y * 0.6, uAccent.y, dh)) * smoothstep(uAccent.z * 0.7, uAccent.z, hsv.y) * uAccent.w;
+  float accent = (1.0 - smoothstep(uAccent.y * 0.6, uAccent.y, dh)) * smoothstep(uAccent.z * 0.7, uAccent.z, hsv.y) * uAccent.w * tagAccent;
   float amber = smoothstep(0.03, 0.05, hsv.x) * (1.0 - smoothstep(0.14, 0.17, hsv.x)) * smoothstep(0.35, 0.5, hsv.y);
-  float glow = sky ? 0.0 : uGlow.y * amber * smoothstep(uGlow.x, uGlow.x * 1.5, max(col.r, max(col.g, col.b)));
+  float glow = sky ? 0.0 : max(tagGlow, uGlow.y * amber * smoothstep(uGlow.x, uGlow.x * 1.5, max(col.r, max(col.g, col.b))));
   vec3 base = handTint(hsv, accent, tone);
   base = mix(base, col + toLin(vec3(1.0, 0.80, 0.48)) * 0.55 * amber, glow);
   float ink = 0.0;
@@ -111,7 +118,7 @@ void main(){
       float hatch = engrave(u1, u2, tone, s0, aa);
       if (uTier.x >= 2.0) hatch = mix(hatch, engrave(u1, u2, tone, s0 * 2.0, aa), smoothstep(0.0, 1.0, fr));
       float groundK = (uGround.w > 0.5 && nW.y > 0.85) ? uGround.z * (1.0 - smoothstep(uGround.x, uGround.y, depth)) : 1.0;   // GAP: no ground marker
-      ink = max(ink, hatch * uHatch.w * (1.0 - accent * 0.8) * groundK * (1.0 - noisy));
+      ink = max(ink, hatch * uHatch.w * (1.0 - accent * 0.8) * groundK * (1.0 - noisy) * tagHatch);
     }
     ink *= 1.0 - glow * 0.85;
   }
@@ -134,6 +141,18 @@ void main(){
 }`;
 const FIELD_FRAG = `varying vec3 vH; void main(){ gl_FragColor = vec4(vH.x, vH.y, 0.0, vH.z); }`;
 
+// ★ V3 the tag pass: tagged meshes → (lg_glow, lg_accent, lg_hatch_scale, eye depth); the values ride a per-vertex 'lgtag' baked at load
+const TAG_VERT = `
+#include <common>
+attribute vec3 lgtag;
+varying vec4 vT;
+void main(){
+  #include <begin_vertex>
+  #include <project_vertex>
+  vT = vec4(lgtag, -mvPosition.z);
+}`;
+const TAG_FRAG = `varying vec4 vT; void main(){ gl_FragColor = vT; }`;
+
 const n = (v, d) => (typeof v === 'number' && isFinite(v) ? v : d);
 const TIER = { lite: 0, laptop: 1, high: 2 };
 const srgb = (a, d) => { const c = Array.isArray(a) && a.length >= 3 ? a : d; return new THREE.Color().setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace); };
@@ -145,10 +164,30 @@ export function tagFieldMeshes(root) {
   return count;
 }
 
+/** ★ V3 · tag every mesh whose node (or a parent node, up to 2 levels) carries lg_glow / lg_accent / lg_hatch_scale in its glTF extras
+ *  (three's userData) onto TAG_LAYER, its values baked into a per-vertex 'lgtag' (glow, accent, hatch). Per NODE, never per material. */
+export function tagNodeTags(root) {
+  let count = 0;
+  const num = (v) => (typeof v === 'number' ? v : typeof v === 'boolean' ? (v ? 1 : 0) : (typeof v === 'string' && v.trim() !== '' && isFinite(+v)) ? +v : undefined);
+  root.traverse(o => {
+    if (!o.isMesh || !o.geometry || !o.geometry.attributes || !o.geometry.attributes.position) return;
+    const get = (k) => { for (let p = o, i = 0; p && i < 3; p = p.parent, i++) { const v = num(p.userData && p.userData[k]); if (v !== undefined) return v; } return undefined; };
+    const g = get('lg_glow'), a = get('lg_accent'), h = get('lg_hatch_scale');
+    if (g === undefined && a === undefined && h === undefined) return;
+    const glow = Math.min(1, Math.max(0, g ?? 0)), acc = Math.min(1, Math.max(0, a ?? 1)), hat = Math.min(2, Math.max(0, h ?? 1));
+    if (glow <= 0 && acc >= 1 && Math.abs(hat - 1) < 1e-6) return;   // identity: nothing to draw
+    const n = o.geometry.attributes.position.count, arr = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { arr[3 * i] = glow; arr[3 * i + 1] = acc; arr[3 * i + 2] = hat; }
+    o.geometry.setAttribute('lgtag', new THREE.BufferAttribute(arr, 3));
+    o.layers.enable(TAG_LAYER); count++;
+  });
+  return count;
+}
+
 export function makeInk(post, camera, scene, renderer) {
   const pass = new ShaderPass({
     uniforms: {
-      tDiffuse: { value: null }, tDepth: { value: null }, tField: { value: null },
+      tDiffuse: { value: null }, tDepth: { value: null }, tField: { value: null }, tTag: { value: null }, uTagOn: { value: 0 },
       cameraNear: { value: 0.1 }, cameraFar: { value: 1000 }, uP11: { value: 1 },
       uProjInv: { value: new THREE.Matrix4() }, uViewInv: { value: new THREE.Matrix4() }, uRes: { value: new THREE.Vector2(1, 1) },
       uLine: { value: new THREE.Vector4(3.5, 0.35, 1.2, 5) }, uEdge: { value: new THREE.Vector4(0.015, 0.9, 0, 1) },
@@ -160,7 +199,7 @@ export function makeInk(post, camera, scene, renderer) {
     vertexShader: VERT, fragmentShader: FRAG,
   });
   pass.enabled = false;
-  let inserted = false, said = '', tierN = 1, fieldMeshes = 0, edgeStrength = 1;
+  let inserted = false, said = '', tierN = 1, fieldMeshes = 0, edgeStrength = 1, tagMeshes = 0;
 
   // the depth: the composer's own targets (the look render attaches it the same way)
   function ensureDepth() {
@@ -179,18 +218,31 @@ export function makeInk(post, camera, scene, renderer) {
   const fieldMat = new THREE.ShaderMaterial({ vertexShader: FIELD_VERT, fragmentShader: FIELD_FRAG, side: THREE.DoubleSide });
   const _clear = new THREE.Color(), _layers = new THREE.Layers();
 
+  const tagMat = new THREE.ShaderMaterial({ vertexShader: TAG_VERT, fragmentShader: TAG_FRAG, side: THREE.DoubleSide });
+  let tagRT = null;
   function renderField(w, h) {
     if (!fieldRT || fieldRT.width !== w || fieldRT.height !== h) {
       if (fieldRT) fieldRT.dispose();
       fieldRT = new THREE.WebGLRenderTarget(w, h, { type: THREE.FloatType, format: THREE.RGBAFormat, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: true });
     }
+    return renderLayer(fieldRT, FIELD_LAYER, fieldMat);
+  }
+  function renderTags(w, h) {
+    // half float is plenty for the 0..2 tag values; the depth channel only has to MATCH within 2 % (+5 cm)
+    if (!tagRT || tagRT.width !== w || tagRT.height !== h) {
+      if (tagRT) tagRT.dispose();
+      tagRT = new THREE.WebGLRenderTarget(w, h, { type: floatOk ? THREE.FloatType : THREE.HalfFloatType, format: THREE.RGBAFormat, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthBuffer: true });
+    }
+    return renderLayer(tagRT, TAG_LAYER, tagMat);
+  }
+  function renderLayer(rt, layer, mat) {
     const prevTarget = renderer.getRenderTarget(), prevOverride = scene.overrideMaterial, prevAuto = renderer.autoClear, prevBg = scene.background;
     renderer.getClearColor(_clear); const prevAlpha = renderer.getClearAlpha();
     _layers.mask = camera.layers.mask;
     try {
-      camera.layers.set(FIELD_LAYER);
-      scene.overrideMaterial = fieldMat; scene.background = null;
-      renderer.setRenderTarget(fieldRT);
+      camera.layers.set(layer);
+      scene.overrideMaterial = mat; scene.background = null;
+      renderer.setRenderTarget(rt);
       renderer.setClearColor(0x000000, 0); renderer.autoClear = true;
       renderer.render(scene, camera);
     } finally {
@@ -198,7 +250,7 @@ export function makeInk(post, camera, scene, renderer) {
       scene.overrideMaterial = prevOverride; scene.background = prevBg;
       renderer.setRenderTarget(prevTarget); renderer.setClearColor(_clear, prevAlpha); renderer.autoClear = prevAuto;
     }
-    return fieldRT.texture;
+    return rt.texture;
   }
 
   // ── the COST line (lead 11-03): GPU timer where the browser has one, else the frame-time delta over 120 frames ──
@@ -231,6 +283,9 @@ export function makeInk(post, camera, scene, renderer) {
     u.tDepth.value = readBuffer.depthTexture || null;
     const fieldOn = tierN >= 2 && fieldMeshes > 0 && floatOk && !!readBuffer.depthTexture;
     u.tField.value = fieldOn ? renderField(readBuffer.width, readBuffer.height) : null;
+    const tagsOn = tierN >= 1 && tagMeshes > 0 && !!readBuffer.depthTexture;   // lite stays cheap: no tag pass
+    u.tTag.value = tagsOn ? renderTags(readBuffer.width, readBuffer.height) : null;
+    u.uTagOn.value = tagsOn ? 1 : 0;
     // re-derived EVERY frame from the stored numbers: no depth yet = tint only (never a garbage line), and it comes back by itself
     const hasDepth = !!readBuffer.depthTexture;
     u.uTier.value.set(hasDepth ? tierN : -1, fieldOn ? 1 : 0, 0, 0);
@@ -245,13 +300,15 @@ export function makeInk(post, camera, scene, renderer) {
     const k = (row && row.ink) || {};
     tierN = TIER[tierNameIn] ?? 1;
     fieldMeshes = opts.fieldMeshes ?? fieldMeshes;
-    const line = `${on}|${styleId}|${tierNameIn}|${fieldMeshes}`;
+    tagMeshes = opts.tagMeshes ?? tagMeshes;
+    const line = `${on}|${styleId}|${tierNameIn}|${fieldMeshes}|${tagMeshes}`;
     const changed = line !== said;   // the viewer re-applies the same look on a load: only a real change restarts the cost measure
     if (changed) {
       said = line;
       console.log(!on ? `[ink] off${opts.baked ? ` - the file is BAKED ('${styleId}'): its textures already wear the look` : ''}`
         : `[ink] '${styleId}' drawn live · tier ${tierNameIn}: hand-tint ✓ · outline ✓ · strokes ${tierN >= 1 ? '✓' : '- (lite: tint + outline only)'} · ` +
           `hatch field ${tierN >= 2 ? (fieldMeshes > 0 ? (floatOk ? `✓ (${fieldMeshes} mesh(es))` : '- (no float render targets: world fallback)') : '- (this file carries none: world fallback)') : '-'} · ` +
+          `node tags ${tagMeshes > 0 ? (tierN >= 1 ? `✓ (${tagMeshes} mesh(es): lg_glow / lg_accent / lg_hatch_scale)` : '- (lite)') : '-'} · ` +
           `GAPS vs the app: no grass marker (noisy normals stand down), no ground marker (up-facing surfaces fade ${n(k.groundNear, 5)}-${n(k.groundFar, 20)} m), no crease lines`);
     }
     if (!on) { pass.enabled = false; ab = null; return { ink: false }; }
@@ -310,5 +367,5 @@ export function makeInk(post, camera, scene, renderer) {
     u.uRes.value.set(width, height);
   }
 
-  return { set, update, get enabled() { return pass.enabled; }, pass, setFieldMeshes(c) { fieldMeshes = c; } };
+  return { set, update, get enabled() { return pass.enabled; }, pass, setFieldMeshes(c) { fieldMeshes = c; }, setTagMeshes(c) { tagMeshes = c; } };
 }
