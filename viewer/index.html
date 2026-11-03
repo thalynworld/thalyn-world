@@ -297,7 +297,8 @@ import * as TW from './thalyn-water.js?v=20261021w1';       // A1232 · the game
 import * as TL from './thalyn-look.js?v=20261102a1';
 import * as TD from './thalyn-diorama.js?v=20261102a1';
 import * as TLR from './thalyn-lookrender.js?v=20261102a1';
-import * as TINK from './thalyn-ink.js?v=20261103c1';   // ★ Looking-Glass drawn live (the app's ink look path; bump on change)
+import * as TINK from './thalyn-ink.js?v=20261103c1';
+import * as TZA from './thalyn-zoneatmo.js?v=20261103a1';   // ★ per-biome sky + fog (extras.thalyn.zones; bump on change)   // ★ Looking-Glass drawn live (the app's ink look path; bump on change)
 import * as TSC from './thalyn-sharecard.js?v=20261102a1';   // ★ the share card × 4 looks (bump on change)   // ★ R1e · the look's RENDER layer (grade · flatten · toon · outline), the game's laws (bump on change)   // ★ LOOK ENGINE boost · THE DIORAMA OPENING: the shared world first appears as a model on a table (bump on change)      // ★ LOOK ENGINE slice 2 · extras.thalyn.look → the look's water grade by row id (bump on change)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
@@ -362,7 +363,9 @@ let post = null; // cinematic pass, created once the renderer is sized (below)
 let worldRadius = 100;
 let state = TA.defaultState(worldRadius);   // the applied state
 let fogOn = false, fogScale = 1;
-function apply() {
+// The fog / sun / ambient this frame: the block's state × the viewer's weather override × (★ 11-03) the per-biome ratios of the zone the camera
+// stands in. Shared by apply() and the per-biome cross-fade (which re-applies ONLY this, never the audio / kit / environment).
+function atmoState() {
   const s = Object.assign({}, state);
   // The exported fog / sun are the app's ALREADY-weathered values (AtmosphereRenderer folds the weather into
   // RenderSettings before the export reads them), so the profile's fog/sun multipliers apply only when the viewer
@@ -371,8 +374,22 @@ function apply() {
   s.fogDensity = state.fogDensity * fogScale * wFog;   // heavy weather thickens the haze
   s.sunIntensity = state.sunIntensity * wDim;          // …and dims the sun
   if (wFog > 1.05 && !(state.fogDensity > 0)) s.fogDensity = (1.2 / Math.max(1, worldRadius)) * (wFog - 1);
+  if (zoneAtmo) {
+    // the app's ratios are on its sRGB-authored colours; the viewer's colours are linear → a colour ratio applies as ratio^2.2
+    const m = zoneAtmo.mul, lin = (a) => new THREE.Color(Math.pow(a[0], 2.2), Math.pow(a[1], 2.2), Math.pow(a[2], 2.2));
+    s.fogColor = state.fogColor.clone().multiply(lin(m.fog));
+    s.fogDensity *= m.fogDensity;
+    s.sunColor = state.sunColor.clone().multiply(lin(m.sun));
+    s.sunIntensity *= m.sunI;
+    s.hemiIntensity = state.hemiIntensity * m.amb;
+  }
+  return { s, fogArg: fogOn || wFog > 1.05 };
+}
+
+function apply() {
+  const { s, fogArg } = atmoState();
   kit.uWindStrength.value = Math.max(kit.uWindStrength.value, weather.windFloor * 1.4); // storms lean the trees
-  TA.applyState(s, L, renderer, scene, fogOn || wFog > 1.05);
+  TA.applyState(s, L, renderer, scene, fogArg);
   kit.setNight(state.night);
   L.sky.visible = skyOn && !skyEnv.active;
   // No baked dome → the studio room IBL lights everything; at night that reads as a lit-from-nowhere ground. Drop it after dusk.
@@ -391,7 +408,8 @@ let diorama = null, lastFrame = null;   // ★ the diorama opening (thalyn-diora
 let lookRender = null;
 let inkRender = null;          // ★ Looking-Glass live (thalyn-ink.js) - inert until an ink look that is not baked is worn
 let worldFieldMeshes = 0;      // meshes of this world carrying the hatch field (TEXCOORD_4), tagged on FIELD_LAYER at load
-let worldTagMeshes = 0;        // ★ V3 meshes carrying the Looking-Glass node tags (lg_*), tagged on TAG_LAYER at load   // ★ R1e the look's render layer (thalyn-lookrender.js)
+let worldTagMeshes = 0;
+let zoneAtmo = null;           // ★ per-biome sky + fog (thalyn-zoneatmo.js) - null = one sky, the viewer exactly as before        // ★ V3 meshes carrying the Looking-Glass node tags (lg_*), tagged on TAG_LAYER at load   // ★ R1e the look's render layer (thalyn-lookrender.js)
 let wornLook = { row: null, id: 'natural' };   // ★ the look the world wears (the share card puts it back after its four shots)
 const kit = TA.makeMaterialKit();
 const water = TW.makeWater();   // A1232
@@ -491,6 +509,7 @@ async function fetchAtmos(url) {
 function applyThalynBlock(tx) {
   if (!TA.hasBlock(tx)) return;
   pendingThalyn = tx;
+  zoneAtmo = TZA.makeZoneAtmo(tx);   // ★ per-biome sky + fog (null without extras.thalyn.zones)
   try {
     state = TA.stateFromBlock(tx, worldRadius);
     fogOn = state.fogDensity > 0;
@@ -655,6 +674,7 @@ function clearWorld() {
   scene.add(worldRoot);
   worldFieldMeshes = 0;
   worldTagMeshes = 0;
+  zoneAtmo = null;
   walkMeshes.length = 0;
   kit.reset();
   skyEnv.useDome(null);
@@ -1469,6 +1489,7 @@ renderer.setAnimationLoop(() => {
     water.update(renderer, scene, camera, clock.elapsedTime);   // A1232 · the one mirror, before the frame (never in a headset)
     if (lookRender && lookRender.enabled) lookRender.update(state.sunDir, post.composer.renderTarget1.width, post.composer.renderTarget1.height);   // ★ R1e
     if (inkRender) inkRender.update(post.composer.renderTarget1.width, post.composer.renderTarget1.height, state.night);   // every frame: cheap when off (the cost-line baseline)
+    if (zoneAtmo && zoneAtmo.update(dt, camera.position)) { const a = atmoState(); TA.applyState(a.s, L, renderer, scene, a.fogArg); }   // ★ per-biome sky + fog
     post.render();
   }
 });
