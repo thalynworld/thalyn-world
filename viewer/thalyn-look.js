@@ -1,7 +1,8 @@
 // thalyn-look.js — ★ THE LOOK ENGINE, slice 2 (2026-11-02): the world's LOOK in the browser.
 //
 // The game writes extras.thalyn.look (Thalyn Final, Styles/LookExport.cs) only when a world wears a look: ids only —
-//   { version, sceneRecipeId, sceneVersion, renderRow, byZone: [{ zone, recipeId, version, surface, form, formChoice, render, source, exportFallback }] }
+//   { version, sceneRecipeId, sceneVersion, renderRow, byZone: [{ zone, recipeId, version, surface, form, formChoice, render, source, exportFallback }],
+//     baked, bakedLook }   ← ★ B3c (11-03): baked = the textures already wear the look; the viewer draws no live layer for it
 // The viewer applies the RENDER row by id from its own copy of the game's table (looks/LookPalettes.json = Final's
 // Assets/Thalyn/Resources/LookPalettes.json, copied verbatim — re-copy it when the game's table changes).
 //

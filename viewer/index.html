@@ -513,8 +513,16 @@ function applyThalynBlock(tx) {
         const w = TL.lookWater(tx.water, row);
         if (w !== tx.water) applied.push(`water ${TA.tintWater(w, worldRoot, kit.lavaMats)} material(s)`);
       }
-      wornLook = { row: row ? row.render : null, id: look.renderRow || 'natural' };
-      if (lookRender) { const d = lookRender.set(wornLook.row, tier.name, wornLook.id); if (d.enqueue) applied.push('render layer'); }
+      // ★ B3c (11-03): look.baked = the file's textures already WEAR the look (the game's export bake: Looking-Glass hand-tint + engraving).
+      // Never draw that look's live render layer on top (no second tint / engrave); the water grade above stays (water is not baked).
+      if (look.baked) {
+        wornLook = { row: null, id: look.renderRow || 'natural' };
+        if (lookRender) lookRender.set(null, tier.name, 'natural');
+        applied.push(`baked '${look.bakedLook || look.renderRow}' - no live layer`);
+      } else {
+        wornLook = { row: row ? row.render : null, id: look.renderRow || 'natural' };
+        if (lookRender) { const d = lookRender.set(wornLook.row, tier.name, wornLook.id); if (d.enqueue) applied.push('render layer'); }
+      }
       console.log(TL.describe(look, row, applied));
     });
     if (anchorRoot && anchorRoot.parent) anchorRoot.parent.remove(anchorRoot);
