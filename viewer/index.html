@@ -196,6 +196,7 @@
       <option value="high">Desktop</option>
       <option value="laptop">Laptop</option>
       <option value="lite">Phone</option>
+      <option value="quest">Quest headset</option>
     </select></div>
   <div class="sub" id="s-quality"></div>
   <div class="row"><label><input type="checkbox" id="t-cinema" checked /> Cinematic</label>
@@ -297,10 +298,12 @@ import * as TCARD from './thalyn-card.js?v=20261108d1';     // A13680 · a card:
 import * as TPB from './thalyn-postbox.js?v=20261108p1';   // A13830 · I4 the maker's postbox (shows nothing unless the server says open)
 import * as TRP from './thalyn-report.js?v=20261108p1';    // A14134 · Report this world (read by a person)
 import * as TAR from './thalyn-ar.js?v=20261108a2';        // A13550 · View on your table (phone AR via model-viewer, loaded on tap)
+import * as TXR from './thalyn-xr.js?v=20261108x2';        // A13560 · the headset: teleport / smooth, wrist menu, controllers, giant scale
 import * as TW from './thalyn-water.js?v=20261021w1';       // A1232 · the game's water: flat, ONE shared mirror, ripples, opaque tone (bump on change)       // A5403 · I2 doors that open: E / click / tap, a closed leaf blocks (extras.thalyn.doorsWeb + the door rows)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const $ = id => document.getElementById(id);
+let xr = null;     // A13560 · the headset (made once the renderer + tier exist)
 let card = null;   // A13680 · the card (made below, once the walk + tier exist)
 
 // Honour the OS "reduce motion" preference: when set, the render loop freezes the
@@ -785,7 +788,7 @@ function frameWorld(honourShot = true) {
 // World_web_lite.glb (fewer triangles, smaller textures). On the Phone tier we ask for it first (one HEAD)
 // and fall back to the full file. Share/invite links always carry the FULL address — each device picks.
 async function preferLite(url) {
-  if (typeof tier === 'undefined' || tier.name !== 'lite' || !/World_web\.glb(\?.*)?$/i.test(url)) return url;
+  if (typeof tier === 'undefined' || (tier.table.as || tier.name) !== 'lite' || !/World_web\.glb(\?.*)?$/i.test(url)) return url;
   const lite = url.replace(/World_web\.glb/i, 'World_web_lite.glb');
   try { const r = await fetch(lite, { method: 'HEAD' }); if (r.ok) { console.info('[thalyn] phone tier: loading the lighter copy'); return lite; } } catch (e) {}
   return url;
@@ -1108,6 +1111,7 @@ if (coarsePointer) { document.body.classList.add('touch'); setClean(true); }
 $('b-walk-m').onclick = toggleWalk;
 let toastT;
 function toast(msg, force) { if (card && card.quiet && !force) return;   // A13680 · the cover + globe speak for themselves
+  if (xr && renderer.xr.isPresenting) { xr.say(msg); return; }   // A13560 · in a headset a toast shows on the wrist
   const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
 
 // ── Cinematic pass (bloom + per-tone grade) ──────────────────────────────────
@@ -1129,6 +1133,7 @@ resizeToViewport();
 const paramsEarly = new URLSearchParams(location.search);
 const tier = TA.makeTier(renderer, paramsEarly.get('q') || (() => { try { return localStorage.getItem('thalyn.viewer.q') || ''; } catch (e) { return ''; } })());
 tier.on((t, name) => {
+  name = t.as || name;   // A13560 · the Quest row budgets like the Phone row in every module that keys by tier name
   prRow = t; renderer.setPixelRatio(cappedPixelRatio(t));   // A5397 · B4 (resizeToViewport below re-applies it + the composer's)
   renderer.shadowMap.enabled = t.shadows; L.sun.castShadow = t.shadows;
   if (L.sun.shadow.mapSize.x !== t.shadowMap) { L.sun.shadow.mapSize.set(t.shadowMap, t.shadowMap); if (L.sun.shadow.map) { L.sun.shadow.map.dispose(); L.sun.shadow.map = null; } }
@@ -1146,18 +1151,17 @@ tier.on((t, name) => {
   if (card) card.setBudget(t);   // A13681 · globeFlakes
   post.setQuality(t);
   if (anchorRoot && pendingThalyn) { anchorRoot.parent && anchorRoot.parent.remove(anchorRoot); anchorRoot = TA.buildAnchors(pendingThalyn.anchors, worldRoot, t.fireLights); }
-  $('r-quality').value = tier.auto ? 'auto' : name;
+  $('r-quality').value = tier.auto ? 'auto' : tier.name;
   $('s-quality').textContent = (tier.auto ? 'Auto → ' : '') + t.label + (tier.auto && tier.guess.why ? ' (' + tier.guess.why + ')' : '');
   resizeToViewport();
-  console.info('[thalyn] quality tier ' + name + (tier.auto ? ' (auto: ' + tier.guess.why + ')' : ' (forced)'));
+  if (xr && !renderer.xr.isPresenting) xr.prepare();   // A13560 · the headset's framebuffer scale follows the row
+  console.info('[thalyn] quality tier ' + tier.name + (tier.auto ? ' (auto: ' + tier.guess.why + ')' : ' (forced)'));
 });
 $('r-quality').onchange = e => { tier.set(e.target.value); try { localStorage.setItem('thalyn.viewer.q', e.target.value === 'auto' ? '' : e.target.value); } catch (err) {} toast('Quality: ' + e.target.options[e.target.selectedIndex].text); };
 const perf = paramsEarly.get('perf') === '1' ? TA.makePerfHud(renderer) : null;
 if (paramsEarly.get('hidehud') === '1') setClean(true);
 
 // ── VR (WebXR): the button appears only where a headset is reachable ─────────
-let snapCooldown = 0;
-const _xrFwd = new THREE.Vector3(), _xrRight = new THREE.Vector3();
 if (navigator.xr && navigator.xr.isSessionSupported) {
   navigator.xr.isSessionSupported('immersive-vr').then(ok => { if (ok) document.body.appendChild(VRButton.createButton(renderer)); }).catch(() => {});
 }
@@ -1167,7 +1171,6 @@ renderer.xr.addEventListener('sessionstart', () => {
   const t = controls.target;
   const g = groundAt(t.x, t.z, t.y + 200);
   dolly.position.set(t.x, g !== null ? g : t.y, t.z);
-  toast('Left stick walks · right stick snap-turns');
 });
 renderer.xr.addEventListener('sessionend', () => {
   camera.position.set(dolly.position.x + 30, dolly.position.y + 20, dolly.position.z + 30);
@@ -1177,25 +1180,9 @@ renderer.xr.addEventListener('sessionend', () => {
   controls.update();
   requestAnimationFrame(resizeToViewport);
 });
-function stepXR(dt) {
-  const session = renderer.xr.getSession(); if (!session) return;
-  snapCooldown = Math.max(0, snapCooldown - dt);
-  let mx = 0, mz = 0, turn = 0;
-  for (const src of session.inputSources) {
-    const a = src.gamepad && src.gamepad.axes; if (!a || a.length < 2) continue;
-    const x = a.length >= 4 ? a[2] : a[0], y = a.length >= 4 ? a[3] : a[1];
-    if (src.handedness === 'right') { if (Math.abs(x) > 0.6 && snapCooldown === 0) { turn = Math.sign(x); snapCooldown = 0.35; } }
-    else { mx += x; mz += y; }
-  }
-  if (turn) dolly.rotateY(-turn * Math.PI / 6);
-  if (Math.abs(mx) > 0.12 || Math.abs(mz) > 0.12) {
-    camera.getWorldDirection(_xrFwd); _xrFwd.y = 0; if (_xrFwd.lengthSq() > 0.001) _xrFwd.normalize();
-    _xrRight.set(-_xrFwd.z, 0, _xrFwd.x);
-    dolly.position.addScaledVector(_xrFwd, -mz * dt * 3.5).addScaledVector(_xrRight, mx * dt * 3.5);
-  }
-  const g = groundAt(dolly.position.x, dolly.position.z, dolly.position.y + 5);
-  if (g !== null) dolly.position.y += (g - dolly.position.y) * Math.min(1, dt * 8);
-}
+// ★ A13560 · the headset's locomotion, wrist menu and controllers live in thalyn-xr.js (spec §3.4).
+xr = TXR.makeXR({ renderer, scene, camera, dolly, groundAt, tierTable: () => tier.table });
+xr.prepare();
 
 // ── Fullscreen toggle (bottom-right) ──────────────────────────────────────────
 // Works standalone and embedded (the parent iframe carries allow="fullscreen").
@@ -1367,10 +1354,11 @@ card = TCARD.makeCard({
 });
 { const w = TCARD.parseCardText(location.hash); if (w) card.setWords(w); }
 
-// ?api= points the postbox / report at another Thalyn API (local testing): a thalyn.world host over https, or this machine.
+// ?api= points the postbox / report at another Thalyn API (local testing): api.thalyn.world over https, or this machine.
 const API_BASE = (() => {
   const q = new URLSearchParams(location.search).get('api'); if (!q) return THALYN_API_BASE;
-  try { const u = new URL(q); return ((u.protocol === 'https:' && /(^|\.)thalyn\.world$/i.test(u.hostname)) || u.hostname === 'localhost' || u.hostname === '127.0.0.1') ? u.origin : THALYN_API_BASE; }
+  // Exactly the production API, or this machine (a localhost API only ever reaches the visitor's own computer).
+  try { const u = new URL(q); return ((u.protocol === 'https:' && u.hostname === 'api.thalyn.world') || (/^https?:$/.test(u.protocol) && (u.hostname === 'localhost' || u.hostname === '127.0.0.1'))) ? u.origin : THALYN_API_BASE; }
   catch (e) { return THALYN_API_BASE; }
 })();
 const worldReport = TRP.makeWorldReport({ api: API_BASE, modelURL: () => currentModelURL, cleanText: TCARD.cleanText });
@@ -1425,7 +1413,7 @@ renderer.setAnimationLoop(() => {
   TA.followShadow(L, camera, (tier.table && tier.table.shadowHalf) || 0, state.sunDir);
   skyEnv.follow(camera);                 // the baked sky dome stays centred on the viewer (a sky is at infinity)
   if (renderer.xr.isPresenting) {
-    stepXR(dt);
+    xr.step(dt);   // A13560
     renderer.render(scene, camera); // the cinematic pass doesn't run in a headset — raw stereo render
   } else {
     if (card) card.tick(dt);   // A13681 · the globe's snow + the flight through the glass
