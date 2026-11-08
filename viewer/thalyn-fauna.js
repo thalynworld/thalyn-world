@@ -23,10 +23,14 @@ const lerpAngle = (a, b, t) => { let d = b - a; while (d > Math.PI) d -= Math.PI
 
 // Per-species behaviour — the app's own numbers (AmbientFauna.cs constants), clip names from
 // animate_creature.py: quadrupeds walk / trot / idle / sit / graze, birds flap / glide / perch_hop / takeoff / idle_perch.
+// A14133 (client 4, fauna glTF lane): the rabbit is a be-near animal in the app (AmbientFauna.cs:94: no flee, no bolt),
+// hopping at 1.5 m/s. Clip rate: stride-matched from vWalkPerM/vRunPerM when the export carries them (cap 1.8), else the
+// app's legacy rule (speed / movePace clamped to 0.65–1.6). Never the 4–6.5× it used to be.
+const RATE_CAP = 1.8, LEGACY_RATE = [0.65, 1.6];
 const SPEC = {
   fox:    { move: 'trot', movePace: 2.3, idle: ['sit', 'idle'],   slow: 2.3, fast: 4.6, homeR: 0,  path: true,  notice: 18, flee: 8,  hide: [60, 120], pause: [4, 8],   every: [25, 60], watch: true,  lengthM: 1.05 },
   deer:   { move: 'walk', movePace: 1.3, idle: ['graze', 'idle'], slow: 1.3, fast: 8.5, homeR: 12, path: false, notice: 30, flee: 18, hide: [90, 180], pause: [20, 40], every: [10, 25], watch: true,  lengthM: 2.2 },
-  rabbit: { move: 'walk', movePace: 0.9, idle: ['graze', 'sit'],  slow: 0.9, fast: 3.6, homeR: 8,  path: false, notice: 12, flee: 6,  hide: [40, 90],  pause: [3, 8],   every: [4, 10],  watch: false, lengthM: 0.5 },
+  rabbit: { move: 'walk', movePace: 0.9, idle: ['graze', 'sit'],  slow: 1.5, fast: 4.2, homeR: 8,  path: false, notice: 0,  flee: 0,  hide: [40, 90],  pause: [3, 8],   every: [4, 10],  watch: false, lengthM: 0.5 },
   wolf:   { move: 'walk', movePace: 1.2, idle: ['sit', 'idle'],   slow: 1.2, fast: 1.2, homeR: 20, path: false, notice: 0,  flee: 0,  hide: [0, 0],    pause: [6, 15],  every: [15, 40], watch: false, lengthM: 1.6 },
   bear:   { move: 'walk', movePace: 1.0, idle: ['idle', 'graze'], slow: 1.0, fast: 1.0, homeR: 20, path: false, notice: 0,  flee: 0,  hide: [0, 0],    pause: [8, 20],  every: [15, 40], watch: false, lengthM: 2.0 },
 };
@@ -60,17 +64,27 @@ export function makeFauna(scene, getLoader, groundAt, base = 'creatures/') {
       for (const c of (g.animations || [])) { const n = String(c.name).split('|').pop().toLowerCase(); clips.set(n, c); }
       let length = Math.max(size.x, size.z), minY = box.isEmpty() ? 0 : box.min.y;
       if (!(length > 0.05)) { console.warn('[fauna] ' + species + '.glb measured ' + length.toFixed(3) + ' m — using the species\' own length'); length = (SPEC[species] || BIRD[species] || { lengthM: 1 }).lengthM; minY = 0; }
+      // A14133 · FACING: these rigs face −Z in their bind pose (neck/head ahead of the tail on −Z); heading puts +Z along the
+      // motion, so the body turns 180° under the heading group — the app's own head-tail check (bones by name, bind pose).
+      let faceYaw = 0;
+      {
+        const find = names => { let f = null; s.traverse(o => { if (!f && names.includes(o.name)) f = o; }); return f; };
+        const head = find(['Bn_Neck', 'Bn_Head']), tail = find(['Bn_Tail_01', 'Bn_Tail']);
+        if (head && tail) { const hz = head.getWorldPosition(new THREE.Vector3()).z, tz = tail.getWorldPosition(new THREE.Vector3()).z; if (hz < tz) faceYaw = Math.PI;
+          console.info('[fauna] A14133 ' + species + ': head z ' + hz.toFixed(3) + ' vs tail z ' + tz.toFixed(3) + (faceYaw ? ' → body turned 180°' : ' → faces +Z')); }
+      }
       console.info('[fauna] ' + species + '.glb — ' + [...clips.keys()].join(' ') + ' · ' + size.x.toFixed(2) + '×' + size.y.toFixed(2) + '×' + size.z.toFixed(2) + ' m');
-      return { scene: s, clips, length, minY, height: size.y };
+      return { scene: s, clips, length, minY, height: size.y, faceYaw };
     }).catch(e => { if (!missing.has(species)) { missing.add(species); console.warn('[fauna] no ' + base + species + '.glb — ' + species + ' skipped (' + (e && e.message) + ')'); } return null; });
     protos.set(species, p);
     return p;
   }
 
-  function instance(pr, lengthM) {
+  function instance(pr, lengthM, meshYaw) {
     const obj = skeletonClone(pr.scene);
     const scale = lengthM / pr.length;
     obj.scale.setScalar(scale);
+    obj.rotation.y = typeof meshYaw === 'number' ? meshYaw : (pr.faceYaw || 0);   // A14133 · the body under the heading
     obj.position.y = -pr.minY * scale;   // feet on the group's origin
     const g = new THREE.Group(); g.add(obj);
     const mixer = new THREE.AnimationMixer(obj);
@@ -119,12 +133,14 @@ export function makeFauna(scene, getLoader, groundAt, base = 'creatures/') {
     if (!Array.isArray(c.pos) || c.pos.length < 3) return;
     const home = new THREE.Vector3(c.pos[0], c.pos[1], c.pos[2]);
     const gy = ground(home.x, home.z, home.y); if (gy != null) home.y = gy;
-    const rec = { species, spec, home, index, lengthM: clamp(Number(c.lengthM) || spec.lengthM, spec.lengthM * 0.5, spec.lengthM * 2), yaw: (Number(c.yawDeg) || 0) * Math.PI / 180,
+    const num = v => (typeof v === 'number' && isFinite(v) ? v : null);
+    const rec = { vWalkPerM: num(c.vWalkPerM) || 0, vRunPerM: num(c.vRunPerM) || 0, meshYaw: (num(c.meshYawDeg) !== null && c.animated !== false) ? c.meshYawDeg * Math.PI / 180 : undefined,
+      species, spec, home, index, lengthM: clamp(Number(c.lengthM) || spec.lengthM, spec.lengthM * 0.5, spec.lengthM * 2), yaw: (Number(c.yawDeg) || 0) * Math.PI / 180,
       inst: null, state: 'pause', t: rnd(0.5, 3), target: null, pos: home.clone(), vel: 0, hidden: false, hideT: 0, path: null, dir: 1, seen: 0, awake: true, vis: 1 };
     creatures.push(rec);
     proto(species).then(pr => {
       if (!pr || !creatures.includes(rec)) return;
-      rec.inst = instance(pr, rec.lengthM);
+      rec.inst = instance(pr, rec.lengthM, rec.meshYaw);
       rec.inst.g.position.copy(rec.pos); rec.inst.g.rotation.y = rec.yaw;
       root.add(rec.inst.g);
       if (spec.path && polylines.length) { const n = nearestPolyline(rec.pos); if (n && n.d < 60) { rec.path = n.pl; rec.pathI = n.i; } }
@@ -147,6 +163,14 @@ export function makeFauna(scene, getLoader, groundAt, base = 'creatures/') {
     const y = ground(x, z, r.pos.y); r.target = new THREE.Vector3(x, y == null ? r.pos.y : y, z);
   }
 
+  // A14133 · which clip and how fast for a ground speed v (m/s).
+  function gait(r, v, fallbackClip) {
+    if (r.vWalkPerM > 0 && r.vRunPerM > 0) {
+      const vW = r.vWalkPerM * r.lengthM, vR = r.vRunPerM * r.lengthM, clip = v < (vW + vR) / 2 ? 'walk' : 'trot';
+      return { clip, ts: Math.min(RATE_CAP, v / Math.max(0.05, clip === 'walk' ? vW : vR)) };
+    }
+    return { clip: fallbackClip, ts: clamp(v / Math.max(0.1, r.spec.movePace), LEGACY_RATE[0], LEGACY_RATE[1]) };
+  }
   function tickCreature(r, dt, cam) {
     const s = r.spec, inst = r.inst; if (!inst) return;
     const dCam = r.pos.distanceTo(cam);
@@ -154,11 +178,11 @@ export function makeFauna(scene, getLoader, groundAt, base = 'creatures/') {
     if (!r.awake && r.state !== 'hidden') { r.awake = true; inst.g.visible = true; }
     r.t -= dt;
     // notice / flee (the app's own radii)
-    if (s.flee > 0 && r.state !== 'hidden' && r.state !== 'flee' && dCam < s.flee) { r.state = 'flee'; r.t = 6; r.fleeFrom = cam.clone(); play(inst, 'trot', 0.2, s.fast / Math.max(0.5, s.movePace)); }
+    if (s.flee > 0 && r.state !== 'hidden' && r.state !== 'flee' && dCam < s.flee) { r.state = 'flee'; r.t = 6; r.fleeFrom = cam.clone(); const gt = gait(r, s.fast, 'trot'); play(inst, gt.clip, 0.2, gt.ts); }
     else if (s.watch && s.notice > 0 && r.state === 'move' && dCam < s.notice && dCam > s.flee) { r.state = 'watch'; r.t = rnd(4, 9); play(inst, s.species === 'fox' ? 'sit' : 'idle', 0.4); }
 
     switch (r.state) {
-      case 'pause': if (r.t <= 0) { r.state = 'move'; pickTarget(r); r.moveT = rnd(s.every[0], s.every[1]); play(inst, s.move, 0.35, s.slow / s.movePace); } break;
+      case 'pause': if (r.t <= 0) { r.state = 'move'; pickTarget(r); r.moveT = rnd(s.every[0], s.every[1]); const gt = gait(r, s.slow, s.move); play(inst, gt.clip, 0.35, gt.ts); } break;
       case 'watch': { _d.subVectors(cam, r.pos); r.yaw = lerpAngle(r.yaw, Math.atan2(_d.x, _d.z), dt * 3); if (r.t <= 0) { r.state = 'pause'; r.t = rnd(1, 3); play(inst, s.idle[1] || s.idle[0], 0.4); } break; }
       case 'move': {
         if (!r.target) pickTarget(r);
