@@ -292,7 +292,7 @@ import * as TIV from './thalyn-ivy.js?v=20261009m1';     // A5389 · the ivy's c
 import * as TIN from './thalyn-interiors.js?v=20261010d1';   // A5392 · building interiors lazy-loaded by distance (extras.thalyn.interiors)
 import * as TIND from './thalyn-indoors.js?v=20261010d1';    // A5401 · I1 walking indoors: floor not roof · stairs · walls · doors walked through (⚠ its own import of thalyn-interiors.js carries the SAME ?v= — bump both together)
 import * as TDR from './thalyn-doors.js?v=20261010d1';
-import * as TCARD from './thalyn-card.js?v=20261108c6';     // A13680 · a card: cover → snow globe (thalyn-globe.js) → step inside → end line (bump on change, and its globe import with it)
+import * as TCARD from './thalyn-card.js?v=20261108c7';     // A13680 · a card: cover → snow globe (thalyn-globe.js) → step inside → end line (bump on change, and its globe import with it)
 import * as TW from './thalyn-water.js?v=20261021w1';       // A1232 · the game's water: flat, ONE shared mirror, ripples, opaque tone (bump on change)       // A5403 · I2 doors that open: E / click / tap, a closed leaf blocks (extras.thalyn.doorsWeb + the door rows)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
@@ -789,9 +789,9 @@ async function preferLite(url) {
 // The share MODERATION marker (server ask 2026-09-17): a muted tune or a removed world leaves
 // moderation.json beside World_web.glb. 404 = untouched (every share today). Never anything but status/songMuted/at.
 async function readModeration(url) {
-  if (!/World_web\.glb(\?.*)?$/i.test(url)) return null;
+  if (!/World_web(_lite)?\.glb(\?.*)?$/i.test(url)) return null;   // A13687 · a card hosts ONE glb, which may be the lite copy
   try {
-    const r = await fetch(url.replace(/World_web\.glb(\?.*)?$/i, 'moderation.json'), { cache: 'no-store' });
+    const r = await fetch(url.replace(/World_web(_lite)?\.glb(\?.*)?$/i, 'moderation.json'), { cache: 'no-store' });
     if (!r.ok) return null;
     const j = await r.json();
     return { removed: j.status === 'removed', songMuted: j.songMuted === true, at: j.at || '' };
@@ -814,9 +814,9 @@ function loadFromURL(url, name) {
 // W10.1 · the app puts postcard.png beside World_web.glb (the Discord unfurl picture). Unless ?img= already named
 // one, ask by NAME (one HEAD) so this viewer's own Share link carries the picture too.
 async function findPostcard(url) {
-  if (currentThumbURL || !/World_web\.glb(\?.*)?$/i.test(url)) return;
+  if (currentThumbURL || !/World_web(_lite)?\.glb(\?.*)?$/i.test(url)) return;
   for (const name of ['postcard.jpg', 'postcard.png']) {   // A308: JPEG since Sep-8; PNG for the shares before it
-    const img = url.replace(/World_web\.glb(\?.*)?$/i, name);
+    const img = url.replace(/World_web(_lite)?\.glb(\?.*)?$/i, name);
     try { const r = await fetch(img, { method: 'HEAD' }); if (r.ok) { currentThumbURL = img; console.info('[thalyn] postcard found beside the world (' + name + ')'); return; } } catch (e) {}
   }
 }

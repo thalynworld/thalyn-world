@@ -401,7 +401,7 @@ export function makeCard(deps) {
     });
   }
   function showThumb() {
-    const m = /^(https:\/\/[^#?]+\/)World_web\.glb(\?.*)?$/i.exec(deps.modelURL() || new URLSearchParams(location.search).get('model') || '');
+    const m = /^(https:\/\/[^#?]+\/)World_web(?:_lite)?\.glb(\?.*)?$/i.exec(deps.modelURL() || new URLSearchParams(location.search).get('model') || '');
     if (!m) return;
     const tryOne = names => { if (!names.length) return; thumbImg.onerror = () => tryOne(names.slice(1)); thumbImg.onload = () => { thumb.style.display = 'block'; }; thumbImg.src = m[1] + names[0]; };
     tryOne(['postcard.jpg', 'postcard.png']);
