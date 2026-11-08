@@ -284,7 +284,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import * as TA from './thalyn-atmos.js?v=20261021w1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
+import * as TA from './thalyn-atmos.js?v=20261108c1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
 import * as TG from './thalyn-together.js';
 import * as TF from './thalyn-fauna.js';
 import * as TGR from './thalyn-grass.js?v=20261008a';   // A5386 · the grass field grown from extras.thalyn.grass
@@ -292,10 +292,12 @@ import * as TIV from './thalyn-ivy.js?v=20261009m1';     // A5389 · the ivy's c
 import * as TIN from './thalyn-interiors.js?v=20261010d1';   // A5392 · building interiors lazy-loaded by distance (extras.thalyn.interiors)
 import * as TIND from './thalyn-indoors.js?v=20261010d1';    // A5401 · I1 walking indoors: floor not roof · stairs · walls · doors walked through (⚠ its own import of thalyn-interiors.js carries the SAME ?v= — bump both together)
 import * as TDR from './thalyn-doors.js?v=20261010d1';
+import * as TCARD from './thalyn-card.js?v=20261108c4';     // A13680 · a card: cover → snow globe (thalyn-globe.js) → step inside → end line (bump on change, and its globe import with it)
 import * as TW from './thalyn-water.js?v=20261021w1';       // A1232 · the game's water: flat, ONE shared mirror, ripples, opaque tone (bump on change)       // A5403 · I2 doors that open: E / click / tap, a closed leaf blocks (extras.thalyn.doorsWeb + the door rows)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const $ = id => document.getElementById(id);
+let card = null;   // A13680 · the card (made below, once the walk + tier exist)
 
 // Honour the OS "reduce motion" preference: when set, the render loop freezes the
 // ambient wind/water/lava animation (user-driven orbit/zoom still respond).
@@ -696,6 +698,7 @@ function ingest(gltf) {
   bakedLights.forEach(l => l.parent && l.parent.remove(l));
   if (ivy.adopt(gltf.scene, { lite: loadingLite, fakeKeys: paramsEarly.get('ivytest') === '1' })) ivy.setBudget(tier.table, tier.name);
   const tx = TA.readBlock(gltf);
+  if (tx && tx.card && card) card.setBlock(tx.card);   // A13680 · the card block (colour, carol, hero spot — never words)
   if (tx && tx.interiors && interiors.adopt(tx.interiors)) interiors.setBudget(tier.table, tier.name);   // A5392 · the source was set by the caller
   indoor.setDoors(tx ? tx.doors : null);   // A5401 · I1: shell door-leaf boxes (A5400 exports; absent ⇒ none)
   if (tx && (tx.doorsWeb || tx.doors || tx.interiors)) doors.adopt(tx);   // A5403 · I2 (a second dropped part without a block never clears the world's doors)
@@ -802,7 +805,7 @@ function showRemovedScreen() {
 }
 function loadFromURL(url, name) {
   readModeration(url).then(mod => {
-    if (mod && mod.removed) { showRemovedScreen(); postUp({ type: 'thalyn:removed' }); return; }
+    if (mod && mod.removed) { showRemovedScreen(); if (card) card.loadFailed(true); postUp({ type: 'thalyn:removed' }); return; }
     if ($('empty').innerHTML !== EMPTY_DEFAULT_HTML) $('empty').innerHTML = EMPTY_DEFAULT_HTML;
     if (mod && mod.songMuted) { currentSongURL = null; setTimeout(() => toast('The tune on this world was muted on request.'), 2500); }
     preferLite(url).then(u => loadFromURLNow(u, name, url));
@@ -860,16 +863,18 @@ function loadFromURLNow(url, name, shareUrl) {
       interiors.setSource({ url });   // A5392 · Interiors_NNN_web.glb sit beside the file just loaded (full or lite)
       doors.setSource({ url });       // A5403 · I2: the doors file sits there too (same ?v=)
       ingest(gltf);
+      if (card) card.prepareWorld(worldRoot);   // A13681 · the globe's crop planes compile with the world
       compileWorld().then(fresh => {     // A5396 · B3: shader programs built BEFORE the first framed frame
         if (!fresh) return;              // another world started loading meanwhile
         frameWorld(); if (perf) perf.markLanding();
+        if (card) card.worldReady();
         toast('Loaded ' + (name || '') ); $('empty').style.display = 'none';
         beaconShareView(currentModelURL);   // ML harvest §4 — a view, counted only on a world that LOADED
         postUp({ type: 'thalyn:loaded', label: name || '', meshes: meshCount });
       }).catch(e => console.error(e)); },
     ev => { if (bar && ev && ev.total) bar.style.width = Math.min(96, Math.round(ev.loaded / ev.total * 100)) + '%';
             else if (bar && ev && ev.loaded) bar.style.width = Math.min(96, Math.round(ev.loaded / 2097152)) + '%'; },
-    err => { console.error(err); if (bar) bar.style.width = '0'; toast('Failed: ' + (err?.message || err));
+    err => { console.error(err); if (bar) bar.style.width = '0'; toast('Failed: ' + (err?.message || err)); if (card) card.loadFailed(false);
       postUp({ type: 'thalyn:error', message: 'This world could not be loaded.' }); });
 }
 
@@ -885,6 +890,9 @@ async function loadFiles(fileList) {
   }
   resetAtmosphere(); // reset scene + HUD before the manifest parse below (a dropped manifest's atmosphere survives)
   const all = [...fileList];
+  // A13684 · a card saved as a file: World_web.glb + card.txt (the link's #fragment) dropped together.
+  const cardTxt = all.find(f => /\.txt$/i.test(f.name));
+  if (cardTxt && card) { try { const w = TCARD.parseCardText(await cardTxt.text()); if (w) card.setWords(w); else toast('That .txt is not a card'); } catch (e) {} }
   const jsonFile = all.find(f => /\.json$/i.test(f.name)); // a dropped .json sidecar → atmosphere
   if (jsonFile) {
     try { const j = JSON.parse(await jsonFile.text()); applyAtmosphere(j.atmosphere || j); }
@@ -931,8 +939,10 @@ async function loadFiles(fileList) {
     }
   }
   siblingURLs.forEach(u => URL.revokeObjectURL(u)); // free .bin/texture blob URLs created by the URL modifier
+  if (card) card.prepareWorld(worldRoot);   // A13681
   if (!(await compileWorld())) return;   // A5396 · B3 (a newer load superseded this one)
   frameWorld(); if (perf) perf.markLanding();
+  if (card) card.worldReady();
   toast(`Loaded ${done} file(s) — ${meshCount.toLocaleString()} meshes`);
   postUp(meshCount ? { type: 'thalyn:loaded', label: '', meshes: meshCount }
                    : { type: 'thalyn:error', message: 'That file could not be loaded.' });
@@ -943,6 +953,7 @@ let waterProbe = () => null;   // A171 · rebuilt from extras.thalyn.liquids on 
 const trunkField = TA.makeTrunkField();   // A308 · the trees you cannot walk through (living.trunks)
 const walk = TA.makeWalk(camera, document.body, groundAt, (on, why) => {
   if (on && (why === 'swim' || why === 'walk')) { if (why === 'swim') toast('Swimming — you float at the surface, half pace'); return; }   // A171 · a swim/walk change, not an enter/exit
+  if (card) card.onWalk(on, why);   // A13683 · leaving the walk brings the card's end line
   document.body.classList.toggle('walking', on);
   controls.enabled = !on;
   $('b-walk').textContent = on ? (coarsePointer ? 'Stop walking' : 'Orbit (V)') : (coarsePointer ? 'Walk' : 'Walk (V)');
@@ -1090,7 +1101,8 @@ $('b-hud').onclick = () => setClean(!document.body.classList.contains('clean'));
 if (coarsePointer) { document.body.classList.add('touch'); setClean(true); }
 $('b-walk-m').onclick = toggleWalk;
 let toastT;
-function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+function toast(msg, force) { if (card && card.quiet && !force) return;   // A13680 · the cover + globe speak for themselves
+  const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
 
 // ── Cinematic pass (bloom + per-tone grade) ──────────────────────────────────
 post = TA.makePost(renderer, scene, camera);
@@ -1125,6 +1137,7 @@ tier.on((t, name) => {
   doors.setBudget(t);   // A5403 · TIERS columns door* (absent ⇒ the game's numbers)
   applyCastersLaw(worldRoot, t);   // A5396 · B1: the casters law reads this row's shadowMinHeight
   audio.setVoiceCap(t.voices);
+  if (card) card.setBudget(t);   // A13681 · globeFlakes
   post.setQuality(t);
   if (anchorRoot && pendingThalyn) { anchorRoot.parent && anchorRoot.parent.remove(anchorRoot); anchorRoot = TA.buildAnchors(pendingThalyn.anchors, worldRoot, t.fireLights); }
   $('r-quality').value = tier.auto ? 'auto' : name;
@@ -1143,6 +1156,7 @@ if (navigator.xr && navigator.xr.isSessionSupported) {
   navigator.xr.isSessionSupported('immersive-vr').then(ok => { if (ok) document.body.appendChild(VRButton.createButton(renderer)); }).catch(() => {});
 }
 renderer.xr.addEventListener('sessionstart', () => {
+  if (card) card.leaveGlobeNow();   // A13685 · a headset steps straight inside
   walk.exit();
   const t = controls.target;
   const g = groundAt(t.x, t.z, t.y + 200);
@@ -1316,6 +1330,37 @@ function safeURL(raw) {
   } catch (e) {}
   return null;
 }
+// ── A card (A13680–A13685): #card=1&to&from&msg&head on the link; extras.thalyn.card in the world ──
+// The words never leave this page: they ride the fragment (never sent to a server) and are set as text only.
+function cardWorldBox() {
+  worldRoot.updateMatrixWorld(true);
+  const box = new THREE.Box3();
+  worldRoot.traverse(o => { if (o.isMesh && !o.userData.__liquid && !o.userData.__skyDome) box.expandByObject(o); });
+  return box;
+}
+const _cardLight = new THREE.Color(), _cardHemi = new THREE.Color();
+card = TCARD.makeCard({
+  scene, camera, renderer, controls, walk,
+  surfaceAt: (x, z) => { const g = groundAt(x, z, 20000), w = waterProbe(x, z); return (g === null && w === null) ? null : Math.max(g === null ? -Infinity : g, w === null ? -Infinity : w); },
+  worldBox: cardWorldBox, modelURL: () => currentModelURL, tierTable: () => tier.table, steamLink: TA.steamLink,
+  toast: m => toast(m, true),
+  setClean: on => setClean(on),
+  setGlobeLook: on => {
+    if (on) { scene.remove(L.sky, L.stars); skyEnv.setVisible(false); scene.background = new THREE.Color(0x14100d); weather.set(''); }
+    else { setSky(skyOn); setWeather(); }
+  },
+  setWorldSound: on => { const s = $('t-sound'); if (s.checked !== on) { s.checked = on; s.onchange({ target: s }); } },
+  sunLight: () => {
+    const day = 1 - state.night * 0.75;
+    _cardLight.copy(L.sun.color).multiplyScalar(0.42 * Math.min(2, L.sun.intensity) * day).add(_cardHemi.copy(L.hemi.color).multiplyScalar(0.4 * Math.min(1.5, L.hemi.intensity)));
+    _cardLight.r = Math.min(0.9, Math.max(0.3, _cardLight.r)); _cardLight.g = Math.min(0.9, Math.max(0.3, _cardLight.g)); _cardLight.b = Math.min(0.9, Math.max(0.32, _cardLight.b));
+    return _cardLight;
+  },
+  hasShot: () => !!(shotPose && walkMeshes.length),
+  enterDefault: () => { if (shotPose && walkMeshes.length) walk.enterPose(shotPose); else if (!walk.active) toggleWalk(); },
+});
+{ const w = TCARD.parseCardText(location.hash); if (w) card.setWords(w); }
+
 const params = new URLSearchParams(location.search);
 $('cta').href = TA.steamLink(parent && parent !== window ? 'demo_embed' : 'viewer');
 if (params.get('cta') === '0') $('cta').style.display = 'none';
@@ -1366,7 +1411,8 @@ renderer.setAnimationLoop(() => {
     stepXR(dt);
     renderer.render(scene, camera); // the cinematic pass doesn't run in a headset — raw stereo render
   } else {
-    if (walk.active) { walk.step(dt); stepSpin(true); } else { stepSpin(false); controls.update(); }
+    if (card) card.tick(dt);   // A13681 · the globe's snow + the flight through the glass
+    if (walk.active) { walk.step(dt); stepSpin(true); } else if (!(card && card.mode === 'flying')) { stepSpin(false); controls.update(); }
     water.update(renderer, scene, camera, clock.elapsedTime);   // A1232 · the one mirror, before the frame (never in a headset)
     post.render();
   }
