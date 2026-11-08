@@ -36,6 +36,9 @@ const SPEC = {
 };
 const BIRD = { songbird: { lengthM: 0.30, flyScale: 2.6 }, owl: { lengthM: 0.42, flyScale: 2.4 } };
 
+// The creature files' cache key: bump it whenever a creatures/*.glb is replaced (Pages and phones cache them).
+export const CREATURES_V = '20261108k1';
+
 export function makeFauna(scene, getLoader, groundAt, base = 'creatures/') {
   const root = new THREE.Group(); root.name = 'Thalyn_Fauna'; scene.add(root);
   const protos = new Map();         // species → Promise<{scene, clips, length, minY, height}|null>
@@ -49,7 +52,7 @@ export function makeFauna(scene, getLoader, groundAt, base = 'creatures/') {
   function proto(species) {
     if (protos.has(species)) return protos.get(species);
     const loader = getLoader();
-    const p = loader.loadAsync(base + species + '.glb').then(g => {
+    const p = loader.loadAsync(base + species + '.glb?v=' + CREATURES_V).then(g => {
       const s = g.scene;
       s.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; o.frustumCulled = true; if (o.material) { o.material.side = THREE.FrontSide; } } });
       // ⚠ MEASURE THE BIND POSE, NOT THE SKIN: Box3.setFromObject on a SkinnedMesh runs every vertex through the
