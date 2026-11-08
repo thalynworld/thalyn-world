@@ -17,7 +17,7 @@ import * as THREE from 'three';
 import { TTFLoader } from 'three/addons/loaders/TTFLoader.js';
 import { Font } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
-import * as TGL from './thalyn-globe.js?v=20261108c6';
+import * as TGL from './thalyn-globe.js?v=20261108d1';
 
 // ── The wire (agreed client ⟷ server 2026-11-08) ─────────────────────────────
 export const HEADLINES = {
@@ -84,6 +84,8 @@ export function readBlock(b) {
     colour: COLOURS[b.colour] ? b.colour : 'berry_red', vine: VINES[b.vine] ? b.vine : 'holly', plinth: ['wood', 'stone', 'brass'].includes(b.plinth) ? b.plinth : 'wood',
     carol: CAROLS[b.carol] ? b.carol : null, date: /^\d{4}-\d{2}-\d{2}$/.test(b.date || '') ? b.date : '',
     headline: HEADLINES[b.headline] ? b.headline : null, spot,
+    // A14130 · crop {x, z, r} (glTF frame, r metres): the card's world holds only what stands inside this disc (r 0 / absent = whole world)
+    crop: b.crop && [b.crop.x, b.crop.z, b.crop.r].every(v => Number.isFinite(+v)) && +b.crop.r > 0 ? { x: +b.crop.x, z: +b.crop.z, r: +b.crop.r } : null,
   };
 }
 
@@ -236,7 +238,7 @@ export function buildSpotLetters(font, { name, head, colour, spot, vine = 'holly
 const CSS = `
 @font-face { font-family: 'ThalynCinzel'; src: url('fonts/Cinzel.ttf') format('truetype'); font-weight: 400 900; font-display: swap; }
 #card-cover { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; padding: 16px;
-  background: radial-gradient(ellipse at 50% 30%, rgba(40,28,20,0.86), rgba(9,12,11,0.96)); }
+  background: radial-gradient(ellipse at 50% 30%, rgba(40,28,20,0.97), rgba(9,12,11,0.99)); }
 #card-cover.show { display: flex; }
 #card-cover .cc { width: min(380px, 100%); text-align: center; padding: 22px 20px 18px; border-radius: 16px; background: rgba(18,22,19,0.88);
   border: 1px solid rgba(232,198,106,0.45); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
@@ -249,6 +251,10 @@ const CSS = `
   letter-spacing: 0.04em; background: rgba(232,198,106,0.22); color: #E8C66A; border: 1px solid rgba(232,198,106,0.65); }
 #card-cover button.cc-open:hover { background: rgba(232,198,106,0.32); }
 #card-cover button:focus-visible, .card-ui button:focus-visible, .card-ui a:focus-visible { outline: 2px solid #E8C66A; outline-offset: 2px; }
+#card-cover .cc-qr { margin-top: 14px; display: none; flex-direction: column; align-items: center; gap: 6px; font-size: 13px; color: #cfe0d7; }
+#card-cover .cc-qr.show { display: flex; }
+#card-cover .cc-qr img { background: #fff; padding: 6px; border-radius: 8px; width: 132px; height: 132px; image-rendering: pixelated; }
+@media (pointer: coarse) { #card-cover .cc-qr { display: none !important; } }
 #card-cover .cc-melt { display: flex; justify-content: center; margin-bottom: 8px; opacity: 0.85; }
 #card-cover .cc-make { display: inline-block; margin-top: 12px; color: #E8C66A; font-size: 14px; }
 #card-cover .cc-status { margin-top: 10px; font-size: 13px; color: #9DBCAC; min-height: 18px; }
@@ -422,13 +428,25 @@ export function makeCard(deps) {
     cover.classList.add('show'); document.body.classList.add('card-cover-on');
     console.info('[thalyn-card] demo card melted (' + why + ')');
   }
+  // A14131 · PC → phone: on a desktop the cover carries a QR of this very link, #fragment included (the words stay in the
+  // link; the code is drawn here by the page's own qrcode-generator, MIT, no fetch). Never on a phone.
+  function showQR() {
+    if (matchMedia('(pointer: coarse)').matches || !words || typeof window.qrcode !== 'function' || cc.querySelector('.cc-qr')) return;
+    try {
+      const q = window.qrcode(0, 'M'); q.addData(location.href); q.make();
+      const box = el('div', { cls: 'cc-qr show' }, cc);
+      el('div', { text: 'Open on your phone' }, box);
+      const img = el('img', { alt: 'QR code: open this card on your phone' }, box); img.src = q.createDataURL(4, 2);
+      console.info('[thalyn-card] A14131 cover QR for the phone (' + location.href.length + ' chars)');
+    } catch (e) { console.warn('[thalyn-card] QR failed (the link is still the link)', e); }
+  }
   function activate() {
-    if (active) { paint(); return; }
+    if (active) { paint(); showQR(); return; }
     active = true; mode = 'cover';
     document.body.classList.add('card-on', 'card-cover-on');
     renderer.localClippingEnabled = true;
     deps.setClean && deps.setClean(true);   // a friend opening a card gets the card, not the viewer's panels (H / the corner button brings them back)
-    cover.classList.add('show'); paint(); showThumb();
+    cover.classList.add('show'); paint(); showThumb(); showQR();
     openBtn.focus({ preventScroll: true });
     if (isDemoCard() && new Date().toISOString().slice(0, 10) >= CARD.demoMeltsOn) { melted('past ' + CARD.demoMeltsOn); return; }
     loadFont('fonts/Cinzel.ttf').then(f => { font = f; buildLetters(); }).catch(e => console.warn('[thalyn-card] font failed (no raised letters)', e));
@@ -460,6 +478,7 @@ export function makeCard(deps) {
     const box = deps.worldBox(); if (!box || box.isEmpty()) return null;
     const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3());
     let R = Math.max(2, Math.min(s.x, s.z) * 0.5), cx = c.x, cz = c.z;
+    if (block && block.crop) return { cx: block.crop.x, cz: block.crop.z, R: block.crop.r, topY: box.max.y, baseY: box.min.y };   // the exported disc: the dome fits it
     const sp = block && block.spot;
     if (sp && Math.hypot(sp.x - cx, sp.z - cz) > R * 0.8) { cx = sp.x; cz = sp.z; }   // the hero spot is always inside the globe
     return { cx, cz, R, topY: box.max.y, baseY: box.min.y };
@@ -665,6 +684,12 @@ export function makeCard(deps) {
     leaveGlobeNow() { if (mode === 'globe' || mode === 'flying') { fly = null; leaveGlobe(); mode = 'walk'; } },
     setBudget(t) { globe.setBudget((t && t.globeFlakes) || 3000); },
     tick, onWalk, globe,
+    /** A14130 · the walk stays inside the card's disc (a soft wall at 0.95 r): returns a moved {x, z} or null. */
+    fence(x, z) {
+      const c = active && block && block.crop; if (!c) return null;
+      const dx = x - c.x, dz = z - c.z, d = Math.hypot(dx, dz), lim = c.r * 0.95;
+      return d > lim ? { x: c.x + dx / d * lim, z: c.z + dz / d * lim } : null;
+    },
     get active() { return active; }, get mode() { return mode; },
     get quiet() { return active && (mode === 'cover' || mode === 'globe' || mode === 'flying'); },
   };
