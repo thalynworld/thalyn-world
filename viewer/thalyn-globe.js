@@ -20,12 +20,18 @@ export const GLOBE = {
   swirlS: 0.9,           // after a shake, the flakes fly this long before the message starts to gather
   gatherS: 2.6,
   holdS: 4,
-  slotsMax: 1600,        // at most this many flakes make the letters (and never more than 55 % of the snow)
+  slotsMax: 1600,        // at most this many flakes make the letters (and never more than half the snow)
+  slotShare: 0.5,
+  airS: 18,              // after a shake the snow stays up in the glass this long, drifting and swirling, then settles
+  airFall: 0.16,         // the fall speed while it is fully up (a fraction of the resting fall)
+  airSwirl: 0.4,         // the slow swirl that keeps going while it is up (as a stir)
+  flakeRefN: 4000,       // a tier with fewer flakes draws each a little bigger (up to flakeGrowMax) so the glass still looks full
+  flakeGrowMax: 1.5,
   shakeAccel: 13,        // phone: m/s² of motion (gravity removed) that counts as a shake
   shakeCooldownS: 1.1,
   jiggleTurns: 3,        // desktop: this many quick reversals of a drag within jiggleWindowS
   jiggleWindowS: 0.7,
-  jiggleSpeed: 900,      // px/s a drag must be moving for a reversal to count
+  jiggleSpeed: 900,      // px/s a drag must be moving for a reversal to count (a finger: 60 % of it)
 };
 
 // The plinth presets: wood (warm, the demo's), stone (grey-green, rough), brass (metallic, reflections from the scene only). None glow.
@@ -75,7 +81,7 @@ export function makeGlobe(opts) {
   scene.add(group);
   let built = null;       // { cx, cz, baseY, R, Rw, H, Rg, cy, front }
   let flakes = null, budget = 3000;
-  let stir = 0, stirPeak = 0, msgPhase = 'idle', msgT = 0, msgCells = null, onMessage = null;
+  let stir = 0, stirPeak = 0, air = 0, sinceShake = -1, airLog = 0, msgPhase = 'idle', msgT = 0, msgCells = null, onMessage = null;
   const tiltV = new THREE.Vector2();
   let grid = null, gridIdx = 0, gridMin = 0;
   const disposables = [];
@@ -194,7 +200,7 @@ export function makeGlobe(opts) {
   function makeFlakes() {
     if (flakes) { group.remove(flakes.points); flakes.geo.dispose(); flakes.mat.dispose(); flakes = null; }
     if (!built) return;
-    const n = budget, b = built;
+    const n = budget, b = built, grow = Math.min(GLOBE.flakeGrowMax, Math.max(1, Math.sqrt(GLOBE.flakeRefN / n)));
     const pos = new Float32Array(n * 3), vel = new Float32Array(n * 3), size = new Float32Array(n), slot = new Float32Array(n);
     const seed = new Float32Array(n), settled = new Uint8Array(n), target = new Float32Array(n * 3), tslot = new Int32Array(n).fill(-1);
     for (let i = 0; i < n; i++) {
@@ -202,7 +208,7 @@ export function makeGlobe(opts) {
       const x = b.cx + Math.cos(a) * r, z = b.cz + Math.sin(a) * r;
       const top = yTopAt(r), fl = floorAt(x, z);
       pos[i * 3] = x; pos[i * 3 + 1] = fl + Math.random() * Math.max(1, top - fl); pos[i * 3 + 2] = z;
-      size[i] = 0.55 + Math.random() * 0.9;
+      size[i] = (0.55 + Math.random() * 0.9) * grow;
       seed[i] = Math.random();
     }
     // A shuffled order: the first k of it make the message (so the letter flakes are spread through the snow).
@@ -248,7 +254,7 @@ export function makeGlobe(opts) {
     cx.font = `600 ${px}px ${msgFont}`; cx.fillStyle = '#fff'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
     lines.forEach((l, i) => cx.fillText(l, w / 2, px * 0.15 + lh * (i + 0.5)));
     const data = cx.getImageData(0, 0, w, h).data;
-    const want = Math.min(GLOBE.slotsMax, Math.floor((flakes ? flakes.n : 0) * 0.55));
+    const want = Math.min(GLOBE.slotsMax, Math.floor((flakes ? flakes.n : 0) * GLOBE.slotShare));
     for (let cell = 2; cell <= 12; cell++) {      // the finest grid whose lit cells fit the flakes we have
       const out = [];
       for (let y = 0; y < h; y += cell) for (let x = 0; x < w; x += cell) {
@@ -286,6 +292,7 @@ export function makeGlobe(opts) {
   function shake(strength = 1, flurry = false) {
     if (!flakes) return;
     stir = flurry ? Math.max(stir, 0.5 * strength) : Math.min(1, Math.max(stir, 0.55) + 0.45 * strength); stirPeak = Math.max(stirPeak, stir);
+    air = Math.max(air, flurry ? 0.6 : Math.min(1, 0.6 + 0.4 * strength));   // every shake (button, drag, phone) puts the snow back up
     if (!flurry && msgText && msgPhase === 'idle' && stir >= GLOBE.slotStir) { msgPhase = 'swirl'; msgT = 0; }
   }
   function tilt(x, z) { tiltV.set(x, z); }
@@ -297,7 +304,8 @@ export function makeGlobe(opts) {
     const t = performance.now();
     if (lastMove) {
       const dt = Math.max(1, t - lastMove.t) / 1000, vx = (e.clientX - lastMove.x) / dt, vy = (e.clientY - lastMove.y) / dt;
-      const sx = Math.abs(vx) > GLOBE.jiggleSpeed ? Math.sign(vx) : 0, sy = Math.abs(vy) > GLOBE.jiggleSpeed ? Math.sign(vy) : 0;
+      const js = GLOBE.jiggleSpeed * (e.pointerType === 'mouse' ? 1 : 0.6);
+      const sx = Math.abs(vx) > js ? Math.sign(vx) : 0, sy = Math.abs(vy) > js ? Math.sign(vy) : 0;
       if ((sx && lastSx && sx !== lastSx) || (sy && lastSy && sy !== lastSy)) reversals.push(t);
       if (sx) lastSx = sx; if (sy) lastSy = sy;
       reversals = reversals.filter(r => t - r < GLOBE.jiggleWindowS * 1000);
@@ -309,8 +317,8 @@ export function makeGlobe(opts) {
   function fireShake(how, mag) {
     const t = performance.now();
     if (t - lastShakeT < GLOBE.shakeCooldownS * 1000) { shake(0.4); return; }
-    lastShakeT = t; shake(1);
-    console.info('[thalyn-globe] shake (' + how + (mag ? ' ' + mag.toFixed(1) + ' m/s²' : '') + ') → stir ' + stir.toFixed(2) + (msgText ? ' · the message gathers' : ''));
+    lastShakeT = t; shake(1); sinceShake = 0; airLog = 0;
+    console.info('[thalyn-globe] shake (' + how + (mag ? ' ' + mag.toFixed(1) + ' m/s²' : '') + ') → stir ' + stir.toFixed(2) + ' · snow up for ~' + Math.round(GLOBE.airS * air) + ' s' + (msgText ? ' · the message gathers' : ''));
     opts.onShake && opts.onShake(how);
   }
   const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -351,18 +359,30 @@ export function makeGlobe(opts) {
     f.mat.uniforms.uScale.value = renderer.getDrawingBufferSize(_db).y * 0.5 / Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
     stir = Math.max(0, stir - dt / GLOBE.stirDecayS);
     if (stir === 0) stirPeak = 0;
+    // The snow stays up while the message is in the air, then drifts down over airS.
+    if (msgPhase === 'idle') air = Math.max(0, air - dt / GLOBE.airS); else air = Math.max(air, 0.75);
+    if (sinceShake >= 0) {   // the check line: how much of the snow is still up after a shake
+      sinceShake += dt;
+      const at = [5, 12][airLog];
+      if (at !== undefined && sinceShake >= at) { airLog++; console.info('[thalyn-globe] snow in the air ' + at + ' s after the shake: ' + Math.round(api.airborne() * 100) + '% of ' + f.n + ' flakes up in the glass'); }
+      if (air === 0 && stir < 0.2) { console.info('[thalyn-globe] the snow has settled, ' + sinceShake.toFixed(0) + ' s after the shake'); sinceShake = -1; }
+    }
     // The message's clock.
     if (msgPhase !== 'idle') {
       msgT += dt;
       if (msgPhase === 'swirl' && msgT > GLOBE.swirlS) { msgPhase = placeTargets() ? 'gather' : 'idle'; msgT = 0; }
       else if (msgPhase === 'gather' && msgT > GLOBE.gatherS) { msgPhase = 'hold'; msgT = 0; onMessage && onMessage(true); console.info('[thalyn-globe] message formed in the snow (' + f.nSlots + ' flakes)'); }
       else if (msgPhase === 'hold' && msgT > GLOBE.holdS) { msgPhase = 'idle'; msgT = 0; onMessage && onMessage(false);
-        for (let s = 0; s < f.n; s++) if (f.tslot[s] >= 0) { f.tslot[s] = -1; f.slot[s] = 0; f.settled[s] = 0; f.vel[s * 3 + 1] = -b.Rg * 0.02; }
+        // The letters let go into the swirl (not straight down): the snow keeps drifting round the scene.
+        for (let s = 0; s < f.n; s++) if (f.tslot[s] >= 0) { f.tslot[s] = -1; f.slot[s] = 0; f.settled[s] = 0;
+          f.vel[s * 3] = (Math.random() - 0.5) * b.Rg * 0.2; f.vel[s * 3 + 1] = (Math.random() - 0.3) * b.Rg * 0.08; f.vel[s * 3 + 2] = (Math.random() - 0.5) * b.Rg * 0.2; }
+        air = Math.max(air, 0.85);
         f.geo.attributes.aSlot.needsUpdate = true; }
     }
     const gathering = msgPhase === 'gather' || msgPhase === 'hold';
     const Rg = b.Rg, t = performance.now() / 1000, k = Math.min(1, dt * 1.6), kg = Math.min(1, dt * (msgPhase === 'hold' ? 6 : 2.2));
-    const swirl = stir * Rg * 0.42, lift = stir * Rg * 0.30, tx = tiltV.x * Rg * 0.10, tz = tiltV.y * Rg * 0.10;
+    const sw = Math.max(stir, GLOBE.airSwirl * air), fallK = 1 - (1 - GLOBE.airFall) * air;
+    const swirl = sw * Rg * 0.42, lift = sw * Rg * 0.30, tx = tiltV.x * Rg * 0.10, tz = tiltV.y * Rg * 0.10;
     camera.getWorldDirection(_f); _f.y = 0; if (_f.lengthSq() < 1e-6) _f.set(0, 0, -1); _f.normalize();
     const rx = -_f.z, rz = _f.x;   // screen-right on the ground plane: the phone's tilt drifts the snow on screen axes
     const driftX = rx * tx - _f.x * tz, driftZ = rz * tx - _f.z * tz;
@@ -377,20 +397,24 @@ export function makeGlobe(opts) {
       }
       const sd = f.seed[i];
       if (f.settled[i]) {
-        if (stir > 0.2 && Math.random() < stir * dt * 4) {
+        if ((stir > 0.2 && Math.random() < stir * dt * 4) || (air > 0.5 && Math.random() < air * dt * 3)) {
           f.settled[i] = 0; V[i3 + 1] = lift * (0.4 + sd); V[i3] = (Math.random() - 0.5) * swirl; V[i3 + 2] = (Math.random() - 0.5) * swirl;
-        } else if (stir === 0 && Math.random() < dt * 0.006) {   // a light flurry that never quite stops
+        } else if (stir === 0 && air === 0 && Math.random() < dt * 0.006) {   // a light flurry that never quite stops
           const r = Math.sqrt(Math.random()) * b.Rw * 0.9, a = Math.random() * Math.PI * 2;
           P[i3] = b.cx + Math.cos(a) * r; P[i3 + 2] = b.cz + Math.sin(a) * r; P[i3 + 1] = yTopAt(r) * 0.98 + b.cy * 0.02;
           f.settled[i] = 0; V[i3] = V[i3 + 1] = V[i3 + 2] = 0;
         } else continue;
       }
       const dx = P[i3] - b.cx, dz = P[i3 + 2] - b.cz, r = Math.hypot(dx, dz) || 1e-3, rn = r / b.Rw;
-      const vt = Rg * (0.07 + 0.06 * sd);
-      const wob = Rg * 0.012;
-      const txv = (-dz / r) * swirl * (0.6 + sd * 0.8) + Math.sin(t * (0.7 + sd) + sd * 40) * wob + driftX;
-      const tzv = (dx / r) * swirl * (0.6 + sd * 0.8) + Math.cos(t * (0.6 + sd) + sd * 23) * wob + driftZ;
-      const tyv = -vt + lift * (1 - 2 * rn) * (0.5 + sd);
+      const vt = Rg * (0.07 + 0.06 * sd) * fallK;
+      const wob = Rg * (0.012 + 0.02 * air);
+      // A rolling current fills the whole glass: up the middle, out under the dome, down the sides, in across the floor
+      // (the up and down halves have equal area, so the snow spreads through the volume instead of piling at the rim).
+      const fl0 = floorAt(P[i3], P[i3 + 2]), hf = Math.max(0, Math.min(1, (P[i3 + 1] - fl0) / Math.max(1e-3, yTopAt(Math.min(r, b.Rw)) - fl0)));
+      const vr = lift * 0.8 * (2 * hf - 1) * (0.6 + 0.8 * sd);
+      const txv = (-dz / r) * swirl * (0.6 + sd * 0.8) + (dx / r) * vr + Math.sin(t * (0.7 + sd) + sd * 40) * wob + driftX;
+      const tzv = (dx / r) * swirl * (0.6 + sd * 0.8) + (dz / r) * vr + Math.cos(t * (0.6 + sd) + sd * 23) * wob + driftZ;
+      const tyv = -vt + lift * (1 - 2 * rn * rn) * (0.5 + sd);
       V[i3] += (txv - V[i3]) * k; V[i3 + 1] += (tyv - V[i3 + 1]) * k; V[i3 + 2] += (tzv - V[i3 + 2]) * k;
       P[i3] += V[i3] * dt; P[i3 + 1] += V[i3 + 1] * dt; P[i3 + 2] += V[i3 + 2] * dt;
       // Inside the glass: the crop's wall, the dome, the floor.
@@ -401,8 +425,8 @@ export function makeGlobe(opts) {
       const fl = floorAt(P[i3], P[i3 + 2]) + Rg * 0.002;
       if (P[i3 + 1] < fl) {
         P[i3 + 1] = fl;
-        if (stir < 0.2) { f.settled[i] = 1; V[i3] = V[i3 + 1] = V[i3 + 2] = 0; }
-        else V[i3 + 1] = Math.abs(V[i3 + 1]) * 0.5;
+        if (stir < 0.2 && air < 0.12) { f.settled[i] = 1; V[i3] = V[i3 + 1] = V[i3 + 2] = 0; }
+        else V[i3 + 1] = Math.abs(V[i3 + 1]) * 0.5 + Rg * 0.04 * air;   // still up: it skims the floor and lifts again
       }
       if (f.slot[i] > 0) { f.slot[i] = 0; slotDirty = true; }
     }
@@ -425,10 +449,22 @@ export function makeGlobe(opts) {
     if (built && built.glass) built.glass.material.opacity = 0.035 * a;
     if (flakes) flakes.points.visible = a > 0.02;
   }
-  function dispose() { setActive(false); clearMeshes(); built = null; group.visible = false; msgPhase = 'idle'; onMessage && onMessage(false); }
+  function dispose() { setActive(false); clearMeshes(); built = null; group.visible = false; msgPhase = 'idle'; air = 0; stir = 0; onMessage && onMessage(false); }
 
-  return {
+  const api = {
     group, build, setBudget, setMessage, shake, tilt, tick, setActive, setFade, dispose,
-    get built() { return built; }, get stir() { return stir; }, get phase() { return msgPhase; }, get flakeCount() { return flakes ? flakes.n : 0; },
+    get built() { return built; }, get stir() { return stir; }, get air() { return air; },
+    /** How much of the snow is up in the glass (0..1): off the floor by more than a tenth of the height there — for checking. */
+    airborne() {
+      if (!flakes || !built) return 0; let k = 0; const P = flakes.pos;
+      for (let i = 0; i < flakes.n; i++) {
+        if (flakes.settled[i]) continue;
+        const x = P[i * 3], y = P[i * 3 + 1], z = P[i * 3 + 2], fl = floorAt(x, z), top = yTopAt(Math.min(built.Rw, Math.hypot(x - built.cx, z - built.cz)));
+        if (y > fl + (top - fl) * 0.1) k++;
+      }
+      return k / flakes.n;
+    },
+    shakeNow(how) { fireShake(how || 'button'); }, get phase() { return msgPhase; }, get flakeCount() { return flakes ? flakes.n : 0; },
   };
+  return api;
 }

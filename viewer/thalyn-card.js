@@ -17,7 +17,7 @@ import * as THREE from 'three';
 import { TTFLoader } from 'three/addons/loaders/TTFLoader.js';
 import { Font } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
-import * as TGL from './thalyn-globe.js?v=20261108d1';
+import * as TGL from './thalyn-globe.js?v=20261108w1';
 
 // ── The wire (agreed client ⟷ server 2026-11-08) ─────────────────────────────
 export const HEADLINES = {
@@ -264,6 +264,7 @@ const CSS = `
 .card-ui { position: fixed; z-index: 50; display: none; }
 body.card-globe .card-ui.g, body.card-on .card-ui.a { display: flex; }
 #card-tag { left: 50%; top: 16px; transform: translateX(-50%); flex-direction: column; align-items: center; text-align: center; pointer-events: none; max-width: calc(100vw - 120px); }
+@media (max-width: 520px) { #card-tag { top: 66px; max-width: calc(100vw - 32px); } }   /* under the corner ⋯ and sound buttons */
 #card-tag .h { font: 600 24px/1.15 'ThalynCinzel', Georgia, serif; color: #E8C66A; text-shadow: 0 2px 14px rgba(0,0,0,0.75); overflow-wrap: anywhere; }
 #card-tag .f { font: 14px/1.4 Georgia, serif; color: #e8efe9; text-shadow: 0 1px 8px rgba(0,0,0,0.85); margin-top: 3px; overflow-wrap: anywhere; }
 #card-bar { left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); gap: 10px; flex-wrap: wrap; justify-content: center; width: min(560px, calc(100vw - 32px)); }
@@ -280,6 +281,16 @@ body.card-globe #card-msg { display: block; }
 #card-mute svg { width: 22px; height: 22px; }
 #card-mute .off { display: none; } #card-mute.muted .on { display: none; } #card-mute.muted .off { display: block; }
 body.card-walk #card-mute { top: 64px; }
+#card-more { right: 66px; top: 14px; width: 44px; height: 44px; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; padding: 0;
+  background: rgba(13,20,17,0.82); color: #E8C66A; border: 1px solid rgba(232,198,106,0.4); backdrop-filter: blur(8px); font: 700 20px/1 Georgia, serif; letter-spacing: 1px; }
+body.card-walk #card-more { top: 64px; }
+#card-more-menu { right: 14px; top: 64px; z-index: 55; flex-direction: column; min-width: 190px; padding: 6px; border-radius: 12px;
+  background: rgba(13,20,17,0.95); border: 1px solid rgba(232,198,106,0.4); backdrop-filter: blur(8px); }
+body.card-walk #card-more-menu { top: 114px; }
+#card-more-menu.show { display: flex; }
+#card-more-menu button { text-align: left; padding: 10px 12px; border-radius: 8px; cursor: pointer; background: none; border: none; color: #e8efe9; font-size: 14px; }
+#card-more-menu button:hover { background: rgba(232,198,106,0.14); }
+#card-cover button.cc-report { margin-top: 12px; background: none; border: none; color: #9DBCAC; cursor: pointer; font-size: 12px; text-decoration: underline; padding: 4px; }
 #card-end { left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;
   padding: 8px 14px; border-radius: 12px; background: rgba(13,20,17,0.82); border: 1px solid rgba(232,198,106,0.35); backdrop-filter: blur(8px);
   font-size: 13px; color: #cfe0d7; width: max-content; max-width: calc(100vw - 32px); text-align: center; }
@@ -339,6 +350,7 @@ export function makeCard(deps) {
   const openBtn = el('button', { cls: 'cc-open', type: 'button', text: 'Open your card' }, cc);
   const status = el('div', { cls: 'cc-status', role: 'status', 'aria-live': 'polite' }, cc);
   const paste = el('details', { cls: 'cc-paste' }, cc); paste.hidden = true;
+  const ccReport = el('button', { cls: 'cc-report', type: 'button', text: 'Report this card' }, cc);
   el('summary', { text: 'Have a card code? (card.txt)' }, paste);
   const pasteBox = el('textarea', { 'aria-label': 'Paste the card code', placeholder: '#card=1&to=…' }, paste);
   const pasteGo = el('button', { type: 'button', text: 'Use it' }, paste);
@@ -352,6 +364,10 @@ export function makeCard(deps) {
   const inBtn = el('button', { type: 'button', cls: 'in', text: 'Step inside' }, bar);
   const mute = el('button', { id: 'card-mute', cls: 'card-ui a', type: 'button', 'aria-label': 'Sound off', title: 'Sound on / off' }, document.body);
   mute.innerHTML = SPEAKER;   // static markup, no card text
+  // Report is always one tap from the corner (globe and walk), beside the sound: ⋯ → Report this card.
+  const more = el('button', { id: 'card-more', cls: 'card-ui a', type: 'button', 'aria-label': 'More', 'aria-haspopup': 'menu', 'aria-expanded': 'false', title: 'More', text: '⋯' }, document.body);
+  const moreMenu = el('div', { id: 'card-more-menu', cls: 'card-ui', role: 'menu' }, document.body);
+  const moreReport = el('button', { type: 'button', role: 'menuitem', text: 'Report this card…' }, moreMenu);
   const end = el('div', { id: 'card-end', cls: 'card-ui', role: 'contentinfo' }, document.body);
   el('span', { text: 'Made in Thalyn' }, end); el('span', { text: '·', 'aria-hidden': 'true' }, end);
   const endLink = el('a', { target: '_blank', rel: 'noopener', text: 'make one back: free demo on Steam ↗' }, end);
@@ -417,7 +433,7 @@ export function makeCard(deps) {
   function modelParam() { return deps.modelURL() || new URLSearchParams(location.search).get('model') || ''; }
   function isDemoCard() { return /\/cards-demo\//i.test(modelParam()); }
   function melted(why) {
-    openBtn.style.display = 'none'; paste.hidden = true;
+    openBtn.style.display = 'none'; paste.hidden = true; ccReport.style.display = 'none';
     if (!cc.querySelector('.cc-melt')) {
       const m = el('div', { cls: 'cc-melt' }); m.innerHTML = FLAKE;   // static drawing, no card text
       cc.insertBefore(m, kicker);
@@ -446,7 +462,7 @@ export function makeCard(deps) {
     document.body.classList.add('card-on', 'card-cover-on');
     renderer.localClippingEnabled = true;
     deps.setClean && deps.setClean(true);   // a friend opening a card gets the card, not the viewer's panels (H / the corner button brings them back)
-    cover.classList.add('show'); paint(); showThumb(); showQR();
+    cover.classList.add('show'); paint(); showThumb(); showQR(); syncReport();
     openBtn.focus({ preventScroll: true });
     if (isDemoCard() && new Date().toISOString().slice(0, 10) >= CARD.demoMeltsOn) { melted('past ' + CARD.demoMeltsOn); return; }
     loadFont('fonts/Cinzel.ttf').then(f => { font = f; buildLetters(); }).catch(e => console.warn('[thalyn-card] font failed (no raised letters)', e));
@@ -510,7 +526,7 @@ export function makeCard(deps) {
     shakeBtn.focus({ preventScroll: true });
     console.info('[thalyn-card] globe open: crop R ' + cr.R.toFixed(1) + ' m · ' + globe.flakeCount + ' flakes' + (block && block.carol ? ' · carol ' + block.carol : ''));
   }
-  shakeBtn.onclick = () => { globe.shake(1); console.info('[thalyn-globe] shake (button)'); hintEl.textContent = words && words.msg ? 'Watch the snow…' : ''; };
+  shakeBtn.onclick = () => { globe.shakeNow('button'); hintEl.textContent = words && words.msg ? 'Watch the snow…' : ''; };
   inBtn.onclick = () => stepInside(false);
 
   function leaveGlobe() {
@@ -573,16 +589,36 @@ export function makeCard(deps) {
   function showEnd(why) {
     if (endShown) return; endShown = true;
     end.classList.add('show');
-    repBtn.style.display = deps.modelURL() ? '' : 'none';   // a card opened from a file has no address to report
+    repBtn.style.display = reportUrl() ? '' : 'none';   // a card opened from a file has no address to report
     console.info('[thalyn-card] end line shown (' + why + ')');
   }
   endX.onclick = () => end.classList.remove('show');
+  // A card opened from a dropped file has no address to report; one opened from a link always does (even while it loads).
+  function reportUrl() {
+    const u = deps.modelURL(); if (u) return u;
+    const m = new URLSearchParams(location.search).get('model'); if (!m) return '';
+    try { return new URL(m, location.href).href; } catch (e) { return ''; }
+  }
+  function syncReport() { const ok = !!reportUrl(); ccReport.style.display = ok ? '' : 'none'; moreReport.style.display = ok ? '' : 'none'; more.style.display = ok ? '' : 'none'; }
+  function setMenu(on) { moreMenu.classList.toggle('show', on); more.setAttribute('aria-expanded', on ? 'true' : 'false'); }
+  more.onclick = e => { e.stopPropagation(); setMenu(!moreMenu.classList.contains('show')); if (moreMenu.classList.contains('show')) moreReport.focus({ preventScroll: true }); };
+  addEventListener('pointerdown', e => { if (moreMenu.classList.contains('show') && !moreMenu.contains(e.target) && e.target !== more) setMenu(false); }, true);
+  moreMenu.addEventListener('keydown', e => { if (e.key === 'Escape') { setMenu(false); more.focus(); } });
 
   // ── Report ──
-  repBtn.onclick = () => { repSt.textContent = ''; repSend.disabled = false; rep.classList.add('show'); repReason.focus(); };
+  function openReport(from) {
+    setMenu(false); repSt.textContent = ''; repSend.disabled = false; rep.classList.add('show'); repReason.focus();
+    if (document.pointerLockElement) document.exitPointerLock();   // walking: free the mouse for the form
+    console.info('[thalyn-card] report opened (' + from + ')');
+  }
+  repBtn.onclick = () => openReport('end line');
+  ccReport.onclick = () => openReport('cover');
+  moreReport.onclick = () => openReport('corner ⋯ · ' + mode);
+  rep.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') rep.classList.remove('show'); });
+  rep.addEventListener('keyup', e => e.stopPropagation());
   repClose.onclick = () => rep.classList.remove('show');
   repSend.onclick = async () => {
-    const url = deps.modelURL(); if (!url) { repSt.textContent = 'This card was opened from a file — there is nothing online to take down.'; return; }
+    const url = reportUrl(); if (!url) { repSt.textContent = 'This card was opened from a file — there is nothing online to take down.'; return; }
     const body = { url: url.split('#')[0], reason: repReason.value };
     const note = cleanText(repNote.value, 1000); if (note) body.details = note;
     if (repInclBox.checked && words) {
