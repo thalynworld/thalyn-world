@@ -186,6 +186,7 @@
   <button id="b-postcard" style="display:none" title="Copy the postcard code — paste it into Thalyn to regrow this world">Copy postcard code</button>
   <button id="b-shot" style="display:none" title="Walk to where the picture was taken (V leaves)">Stand where the picture was taken</button>
   <button id="b-share-w" style="display:none" title="Copy a link + QR for this world">Share this world…</button>
+  <button id="b-report-w" style="display:none" title="Tell Thalyn about a problem with this world">Report this world…</button>
   <button id="b-together" style="display:none" title="Invite someone into this world with you — a link they open in any browser">Invite a friend here…</button>
   <div class="row"><label><input type="checkbox" id="t-sound" /> Sound</label>
     <input type="range" id="r-vol" class="vol" min="0" max="1" step="0.05" value="0.9" title="Volume" /><span class="stat" id="s-sound"></span></div>
@@ -293,6 +294,8 @@ import * as TIN from './thalyn-interiors.js?v=20261010d1';   // A5392 · buildin
 import * as TIND from './thalyn-indoors.js?v=20261010d1';    // A5401 · I1 walking indoors: floor not roof · stairs · walls · doors walked through (⚠ its own import of thalyn-interiors.js carries the SAME ?v= — bump both together)
 import * as TDR from './thalyn-doors.js?v=20261010d1';
 import * as TCARD from './thalyn-card.js?v=20261108d1';     // A13680 · a card: cover → snow globe (thalyn-globe.js) → step inside → end line (bump on change, and its globe import with it)
+import * as TPB from './thalyn-postbox.js?v=20261108p1';   // A13830 · I4 the maker's postbox (shows nothing unless the server says open)
+import * as TRP from './thalyn-report.js?v=20261108p1';    // A14134 · Report this world (read by a person)
 import * as TW from './thalyn-water.js?v=20261021w1';       // A1232 · the game's water: flat, ONE shared mirror, ripples, opaque tone (bump on change)       // A5403 · I2 doors that open: E / click / tap, a closed leaf blocks (extras.thalyn.doorsWeb + the door rows)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
@@ -858,6 +861,7 @@ function loadFromURLNow(url, name, shareUrl) {
       if (bar) { bar.style.width = '100%'; setTimeout(() => { bar.style.width = '0'; }, 600); }
       currentModelURL = shareUrl || url;
       $('b-share-w').style.display = ''; $('b-together').style.display = '';
+      $('b-report-w').style.display = /\/worlds\/[^/]+\/[^/]+\//i.test(currentModelURL || '') ? '' : 'none';   // A14134 · a shared world (cards carry their own Report)
       findPostcard(currentModelURL);
       armSoundOnFirstGesture(); if (!$('t-sound').checked) toast(currentSongURL ? "Tap anywhere to hear this world — and its maker's song" : "Tap anywhere to hear this world");
       interiors.setSource({ url });   // A5392 · Interiors_NNN_web.glb sit beside the file just loaded (full or lite)
@@ -1360,6 +1364,16 @@ card = TCARD.makeCard({
   enterDefault: () => { if (shotPose && walkMeshes.length) walk.enterPose(shotPose); else if (!walk.active) toggleWalk(); },
 });
 { const w = TCARD.parseCardText(location.hash); if (w) card.setWords(w); }
+
+// ?api= points the postbox / report at another Thalyn API (local testing): a thalyn.world host over https, or this machine.
+const API_BASE = (() => {
+  const q = new URLSearchParams(location.search).get('api'); if (!q) return THALYN_API_BASE;
+  try { const u = new URL(q); return ((u.protocol === 'https:' && /(^|\.)thalyn\.world$/i.test(u.hostname)) || u.hostname === 'localhost' || u.hostname === '127.0.0.1') ? u.origin : THALYN_API_BASE; }
+  catch (e) { return THALYN_API_BASE; }
+})();
+const worldReport = TRP.makeWorldReport({ api: API_BASE, modelURL: () => currentModelURL, cleanText: TCARD.cleanText });
+$('b-report-w').onclick = () => worldReport.open();
+{ const m = new URLSearchParams(location.search).get('model'); if (m && safeURL(m)) TPB.makePostbox({ api: API_BASE, model: m, cleanText: TCARD.cleanText, toast: t => toast(t, true) }); }
 
 const params = new URLSearchParams(location.search);
 $('cta').href = TA.steamLink(parent && parent !== window ? 'demo_embed' : 'viewer');
