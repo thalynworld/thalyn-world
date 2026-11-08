@@ -665,6 +665,8 @@ export function makeCard(deps) {
     /** extras.thalyn.card from the world file. */
     setBlock(b) { const r = readBlock(b); if (!r) return; block = r; console.info('[thalyn-card] extras.thalyn.card ' + JSON.stringify({ template: r.template, colour: r.colour, carol: r.carol, spot: !!r.spot, date: r.date })); activate(); },
     /** Before the world's shaders compile: the crop planes go on every world material (one compile, not two). */
+    /** A13570 · a part that loads after the world (the boats) is cropped by the globe too. */
+    adoptClip(root) { if (active) clip.adopt(root); },
     prepareWorld(root) { if (!active) return; const n = clip.adopt(root); console.info('[thalyn-card] crop planes on ' + n + ' world material(s)'); },
     /** After the world is framed. */
     worldReady() {
