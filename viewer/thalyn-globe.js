@@ -28,6 +28,13 @@ export const GLOBE = {
   jiggleSpeed: 900,      // px/s a drag must be moving for a reversal to count
 };
 
+// The plinth presets: wood (warm, the demo's), stone (grey-green, rough), brass (metallic, reflections from the scene only). None glow.
+export const PLINTHS = {
+  wood:  { a: 0x2e1a0e, b: 0x4a2c17, rough: 0.62, metal: 0, env: 0.35 },
+  stone: { a: 0x4d524a, b: 0x6c7268, rough: 0.88, metal: 0, env: 0.3 },
+  brass: { a: 0x7a5a24, b: 0x9c7a38, rough: 0.35, metal: 1, env: 0.9 },
+};
+
 // ── The crop: N planes, shared by every world material (one recompile when adopted; moved by constant only) ──
 export function makeClip(n = GLOBE.clipPlanes) {
   const planes = [];
@@ -145,7 +152,8 @@ export function makeGlobe(opts) {
     {
       const g = new THREE.LatheGeometry(prof, segs);
       const p = g.attributes.position, colArr = new Float32Array(p.count * 3);
-      const wa = new THREE.Color(0x2e1a0e), wb = new THREE.Color(0x4a2c17), t = new THREE.Color();
+      const PL = PLINTHS[b.plinth] || PLINTHS.wood;
+      const wa = new THREE.Color(PL.a), wb = new THREE.Color(PL.b), t = new THREE.Color();
       for (let i = 0; i < p.count; i++) {
         const x = p.getX(i), y = p.getY(i), z = p.getZ(i), a = Math.atan2(z, x);
         const ring = 0.5 + 0.5 * Math.sin((y - baseY) / ph * 46 + Math.sin(a * 3) * 1.4 + Math.sin(a * 11) * 0.3);
@@ -153,7 +161,7 @@ export function makeGlobe(opts) {
         colArr[i * 3] = t.r; colArr[i * 3 + 1] = t.g; colArr[i * 3 + 2] = t.b;
       }
       g.setAttribute('color', new THREE.BufferAttribute(colArr, 3));
-      const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0, envMapIntensity: 0.35 });
+      const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: PL.rough, metalness: PL.metal, envMapIntensity: PL.env });
       const plinth = new THREE.Mesh(g, m); plinth.position.set(cx, 0, cz); plinth.castShadow = true; plinth.receiveShadow = true; plinth.name = 'Globe_Plinth';
       group.add(plinth); disposables.push(g, m);
     }

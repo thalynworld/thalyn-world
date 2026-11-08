@@ -17,12 +17,23 @@ import * as THREE from 'three';
 import { TTFLoader } from 'three/addons/loaders/TTFLoader.js';
 import { Font } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
-import * as TGL from './thalyn-globe.js?v=20261108c4';
+import * as TGL from './thalyn-globe.js?v=20261108c6';
 
 // ── The wire (agreed client ⟷ server 2026-11-08) ─────────────────────────────
 export const HEADLINES = {
   merry_christmas: 'Merry Christmas', happy_christmas: 'Happy Christmas', seasons_greetings: "Season's Greetings",
   with_love: 'With love', warm_wishes: 'Warm wishes',
+  // full-game occasions (the app's CardCatalogue.Headlines)
+  happy_birthday: 'Happy Birthday', welcome_home: 'Welcome Home', thank_you: 'Thank You', be_mine: 'Be Mine', happy_halloween: 'Happy Halloween',
+};
+export const OCCASIONS = { christmas: 'merry_christmas', birthday: 'happy_birthday', new_home: 'welcome_home', thank_you: 'thank_you', valentine: 'be_mine', halloween: 'happy_halloween' };
+// What grows over the NAME (the greeting line always wears frost only). frost / bare grow nothing; bare has no snow caps either.
+export const VINES = {
+  holly:     { leaf: 0x1b4423, rough: 0.30, berry: 0x9c1420, berryP: 0.55, caps: true },
+  ivy:       { leaf: 0x2c5527, rough: 0.50, berry: 0,        berryP: 0,    caps: true },
+  mistletoe: { leaf: 0x6e8a48, rough: 0.55, berry: 0xe9e7dc, berryP: 0.7,  caps: true },
+  frost:     { leaf: null, caps: true },
+  bare:      { leaf: null, caps: false },
 };
 export const COLOURS = {   // non-emissive PBR, the same three the app offers
   berry_red:  { hex: 0x8E1B24, roughness: 0.45, metalness: 0 },
@@ -36,6 +47,7 @@ export const CARD = {
   carolVolume: 0.7, carolWalkVolume: 0.45,
   flyS: 1.4,               // "Step inside": the flight through the glass
   reportUrl: 'https://api.thalyn.world/api/cards/report',
+  demoMeltsOn: '2027-01-12', demoMeltsLabel: '12 January 2027',
   reasons: [['harassment', 'Harassment or bullying'], ['hate', 'Hate'], ['sexual', 'Sexual content'], ['violence', 'Violence or threats'],
             ['privacy', 'Private information'], ['spam', 'Spam or a scam'], ['copyright', 'Copyright'], ['illegal', 'Something illegal'], ['other', 'Something else']],
 };
@@ -50,7 +62,8 @@ export function cleanText(s, n) {
 /** Read card words from a fragment, a whole link, or a card.txt — null when there is no card=1. */
 export function parseCardText(text) {
   if (!text) return null;
-  let s = String(text).trim();
+  // card.txt carries the fragment on its own line (the 2nd); a pasted link or a bare fragment works too.
+  let s = String(text).split(/\r?\n/).map(l => l.trim()).find(l => /(^|[#&?])card=1(&|$)/.test(l)) || '';
   const hash = s.indexOf('#'); if (hash >= 0) s = s.slice(hash + 1);
   const i = s.search(/(^|&)card=1(&|$)/); if (i < 0) return null;
   let q; try { q = new URLSearchParams(s); } catch (e) { return null; }
@@ -68,7 +81,7 @@ export function readBlock(b) {
     ? { x: +sp.x, y: +sp.y, z: +sp.z, yaw: num(sp.yaw) || 0, width: Math.max(1, Math.min(60, num(sp.width) || 8)), height: Math.max(0.4, Math.min(2.4 / 0.7, num(sp.height) || 2.4)) } : null;
   return {
     v: +b.v || 1, occasion: String(b.occasion || 'christmas'), template: String(b.template || ''),
-    colour: COLOURS[b.colour] ? b.colour : 'berry_red', vine: 'holly', plinth: 'wood',
+    colour: COLOURS[b.colour] ? b.colour : 'berry_red', vine: VINES[b.vine] ? b.vine : 'holly', plinth: ['wood', 'stone', 'brass'].includes(b.plinth) ? b.plinth : 'wood',
     carol: CAROLS[b.carol] ? b.carol : null, date: /^\d{4}-\d{2}-\d{2}$/.test(b.date || '') ? b.date : '',
     headline: HEADLINES[b.headline] ? b.headline : null, spot,
   };
@@ -139,9 +152,8 @@ function hollyLeaf() {
   g.computeVertexNormals();
   return (leafGeo = g);
 }
-const hollyMat = () => new THREE.MeshStandardMaterial({ color: 0x1b4423, roughness: 0.3, metalness: 0, side: THREE.DoubleSide });
-const berryMat = () => new THREE.MeshStandardMaterial({ color: 0x9c1420, roughness: 0.28, metalness: 0 });
-function grownHolly(meshes, leafSize, seedN = 1) {
+function grownHolly(meshes, leafSize, seedN = 1, vine = VINES.holly) {
+  if (!vine || vine.leaf === null) return null;
   // Area-weighted samples on the faces that look up (world space).
   const tris = [], a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), ab = new THREE.Vector3(), ac = new THREE.Vector3(), n = new THREE.Vector3();
   let total = 0;
@@ -159,9 +171,9 @@ function grownHolly(meshes, leafSize, seedN = 1) {
   if (!tris.length) return null;
   let rnd = seedN * 9301 + 49297; const rand = () => ((rnd = (rnd * 9301 + 49297) % 233280) / 233280);
   const spots = Math.max(12, Math.min(180, Math.round(total / (leafSize * leafSize) * 0.7)));
-  const leaves = new THREE.InstancedMesh(hollyLeaf(), hollyMat(), spots * 3);
+  const leaves = new THREE.InstancedMesh(hollyLeaf(), new THREE.MeshStandardMaterial({ color: vine.leaf, roughness: vine.rough, metalness: 0, side: THREE.DoubleSide }), spots * 3);
   if (!berryGeo) berryGeo = new THREE.SphereGeometry(1, 10, 8);
-  const berries = new THREE.InstancedMesh(berryGeo, berryMat(), spots * 3);
+  const berries = new THREE.InstancedMesh(berryGeo, new THREE.MeshStandardMaterial({ color: vine.berry || 0x9c1420, roughness: 0.28, metalness: 0 }), spots * 3);
   const M = new THREE.Matrix4(), q = new THREE.Quaternion(), qy = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), sc = new THREE.Vector3(), pos = new THREE.Vector3(), e = new THREE.Euler();
   let nl = 0, nb = 0;
   for (let s = 0; s < spots; s++) {
@@ -177,7 +189,7 @@ function grownHolly(meshes, leafSize, seedN = 1) {
       const s0 = leafSize * (0.8 + rand() * 0.45);
       M.compose(pos, qy, sc.set(s0, s0, s0)); leaves.setMatrixAt(nl++, M);
     }
-    if (rand() < 0.55) for (let k = 0; k < 3; k++) {
+    if (rand() < vine.berryP) for (let k = 0; k < 3; k++) {
       const br = leafSize * (0.085 + rand() * 0.03), ang = rand() * Math.PI * 2;
       const bp = pos.clone().add(new THREE.Vector3(Math.cos(ang) * leafSize * 0.12, leafSize * 0.08 + br, Math.sin(ang) * leafSize * 0.12).applyQuaternion(q));
       M.compose(bp, q, sc.set(br, br, br)); berries.setMatrixAt(nb++, M);
@@ -192,30 +204,31 @@ function grownHolly(meshes, leafSize, seedN = 1) {
 }
 
 /** The raised name (and the greeting above it) at the hero spot, frosted, holly over the top. */
-export function buildSpotLetters(font, { name, head, colour, spot }) {
+export function buildSpotLetters(font, { name, head, colour, spot, vine = 'holly' }) {
+  const V = VINES[vine] || VINES.holly;
   const group = new THREE.Group(); group.name = 'Thalyn_CardLetters';
   const nameStr = cuttable(font, name || ''), headStr = cuttable(font, head || '');
   const mat = letterMaterial(colour), base = (COLOURS[colour] || COLOURS.berry_red).hex;
   const boxW = spot.width, boxH = Math.min(spot.height, 2.4 / 0.7);
   const meshes = [];
   let y = 0;
-  const line = (str, hTarget) => {
+  const line = (str, hTarget, caps) => {
     if (!str) return null;
     const g0 = textGeo(font, str, 1), bb = g0.boundingBox, w = bb.max.x - bb.min.x, h = bb.max.y - bb.min.y;
     const k = Math.min(hTarget / Math.max(1e-3, h), boxW / Math.max(1e-3, w));
     g0.dispose();
-    const g = frost(textGeo(font, str, k), base);
+    const g = frost(textGeo(font, str, k), base, caps ? 0.8 : 0);
     const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true;
     return { m, h: g.boundingBox.max.y - g.boundingBox.min.y };
   };
-  const nm = line(nameStr, Math.min(2.4, boxH * 0.7));
-  const hd = line(headStr, boxH * 0.26);
+  const nm = line(nameStr, Math.min(2.4, boxH * 0.7), V.caps);
+  const hd = line(headStr, boxH * 0.26, true);   // the greeting always wears frost only
   if (nm) { nm.m.position.y = 0; group.add(nm.m); meshes.push(nm.m); y = nm.h; }
   if (hd) { hd.m.position.y = y + boxH * 0.06; group.add(hd.m); meshes.push(hd.m); }
   group.position.set(spot.x, spot.y, spot.z);
   group.rotation.y = spot.yaw * Math.PI / 180;   // front = (sin yaw, 0, cos yaw) — the same convention as the cinema screen
   group.updateMatrixWorld(true);                 // the holly samples the letters in world space
-  const holly = meshes.length ? grownHolly(meshes, Math.max(0.14, (nm ? nm.h : 1) * 0.21), nameStr.length + 7) : null;
+  const holly = nm ? grownHolly([nm.m], Math.max(0.14, nm.h * 0.21), nameStr.length + 7, V) : null;   // the vine grows on the name
   return { group, holly, name: nameStr, head: headStr };
 }
 
@@ -236,6 +249,8 @@ const CSS = `
   letter-spacing: 0.04em; background: rgba(232,198,106,0.22); color: #E8C66A; border: 1px solid rgba(232,198,106,0.65); }
 #card-cover button.cc-open:hover { background: rgba(232,198,106,0.32); }
 #card-cover button:focus-visible, .card-ui button:focus-visible, .card-ui a:focus-visible { outline: 2px solid #E8C66A; outline-offset: 2px; }
+#card-cover .cc-melt { display: flex; justify-content: center; margin-bottom: 8px; opacity: 0.85; }
+#card-cover .cc-make { display: inline-block; margin-top: 12px; color: #E8C66A; font-size: 14px; }
 #card-cover .cc-status { margin-top: 10px; font-size: 13px; color: #9DBCAC; min-height: 18px; }
 #card-cover .cc-paste { margin-top: 10px; font-size: 12px; color: #9DBCAC; text-align: left; }
 #card-cover .cc-paste textarea { width: 100%; margin-top: 6px; height: 54px; border-radius: 8px; border: 1px solid rgba(232,198,106,0.3); background: rgba(255,255,255,0.05); color: #e8efe9; font: 12px ui-monospace, Consolas, monospace; }
@@ -278,7 +293,10 @@ body.card-walk #card-mute { top: 64px; }
 body.card-cover-on #hud, body.card-cover-on #b-hud, body.card-cover-on #b-walk-m, body.card-cover-on #cta, body.card-cover-on #b-fs, body.card-cover-on #title, body.card-cover-on #VRButton,
 body.card-globe #hud, body.card-globe #b-hud, body.card-globe #b-walk-m, body.card-globe #cta, body.card-globe #title { display: none !important; }
 body.card-on #cta { display: none !important; }
+body.card-on #empty { display: none !important; }
 `;
+const FLAKE = '<svg viewBox="0 0 64 64" width="56" height="56" fill="none" stroke="#cfe0d7" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">'
+  + '<g id="arm"><path d="M32 6v52M32 14l-6-6M32 14l6-6M32 50l-6 6M32 50l6 6"/></g><use href="#arm" transform="rotate(60 32 32)"/><use href="#arm" transform="rotate(120 32 32)"/></svg>';
 const SPEAKER = '<svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 8.5a4.5 4.5 0 0 1 0 7M18.5 6a8 8 0 0 1 0 12"/></svg>'
   + '<svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>';
 
@@ -368,7 +386,7 @@ export function makeCard(deps) {
   mute.onclick = () => setMuted(!muted);
 
   // ── Words → the page ──
-  const headline = () => HEADLINES[(words && words.head) || (block && block.headline) || ''] || 'Merry Christmas';
+  const headline = () => HEADLINES[(words && words.head) || (block && block.headline) || (block && OCCASIONS[block.occasion]) || ''] || 'Merry Christmas';
   function paint() {
     const to = words && words.to, from = words && words.from;
     forEl.textContent = to ? 'For ' + to : 'For you';
@@ -389,6 +407,21 @@ export function makeCard(deps) {
     tryOne(['postcard.jpg', 'postcard.png']);
   }
 
+  // Demo cards live under cards-demo/ and melt on CARD.demoMeltsOn (the server deletes them that day).
+  function modelParam() { return deps.modelURL() || new URLSearchParams(location.search).get('model') || ''; }
+  function isDemoCard() { return /\/cards-demo\//i.test(modelParam()); }
+  function melted(why) {
+    openBtn.style.display = 'none'; paste.hidden = true;
+    if (!cc.querySelector('.cc-melt')) {
+      const m = el('div', { cls: 'cc-melt' }); m.innerHTML = FLAKE;   // static drawing, no card text
+      cc.insertBefore(m, kicker);
+    }
+    kicker.textContent = 'This card has melted';
+    status.textContent = 'Christmas cards made in the free demo stay until ' + CARD.demoMeltsLabel + '.';
+    if (!cc.querySelector('.cc-make')) { const a = el('a', { cls: 'cc-make', target: '_blank', rel: 'noopener', text: 'Make one of your own: free demo on Steam ↗' }, cc); a.href = deps.steamLink('card_melted'); }
+    cover.classList.add('show'); document.body.classList.add('card-cover-on');
+    console.info('[thalyn-card] demo card melted (' + why + ')');
+  }
   function activate() {
     if (active) { paint(); return; }
     active = true; mode = 'cover';
@@ -397,6 +430,7 @@ export function makeCard(deps) {
     deps.setClean && deps.setClean(true);   // a friend opening a card gets the card, not the viewer's panels (H / the corner button brings them back)
     cover.classList.add('show'); paint(); showThumb();
     openBtn.focus({ preventScroll: true });
+    if (isDemoCard() && new Date().toISOString().slice(0, 10) >= CARD.demoMeltsOn) { melted('past ' + CARD.demoMeltsOn); return; }
     loadFont('fonts/Cinzel.ttf').then(f => { font = f; buildLetters(); }).catch(e => console.warn('[thalyn-card] font failed (no raised letters)', e));
     console.info('[thalyn-card] card ' + JSON.stringify({ to: !!(words && words.to), from: !!(words && words.from), msg: words ? Array.from(words.msg).length : 0, head: (words && words.head) || (block && block.headline) || null, block: !!block }));
   }
@@ -438,7 +472,7 @@ export function makeCard(deps) {
     const sp = block && block.spot, front = sp ? new THREE.Vector3(Math.sin(sp.yaw * Math.PI / 180), 0, Math.cos(sp.yaw * Math.PI / 180)) : new THREE.Vector3(0, 0, 1);
     clip.set(cr.cx, cr.cz, cr.R);
     const g0 = deps.surfaceAt(cr.cx, cr.cz);
-    const b = globe.build({ center: new THREE.Vector3(cr.cx, Math.max(cr.baseY, Math.min(g0 === null ? cr.baseY : g0, cr.topY)), cr.cz), R: cr.R, topY: cr.topY, front });
+    const b = globe.build({ center: new THREE.Vector3(cr.cx, Math.max(cr.baseY, Math.min(g0 === null ? cr.baseY : g0, cr.topY)), cr.cz), R: cr.R, topY: cr.topY, front, plinth: block ? block.plinth : 'wood' });
     buildPlinthText();
     saved = { minD: controls.minDistance, maxD: controls.maxDistance, pan: controls.enablePan, maxPolar: controls.maxPolarAngle, auto: controls.autoRotate, autoS: controls.autoRotateSpeed, near: camera.near, far: camera.far };
     const tgt = new THREE.Vector3(b.cx, b.baseY + b.H * 0.25, b.cz);
@@ -550,10 +584,10 @@ export function makeCard(deps) {
     if (letters && !force) return;
     if (letters) { scene.remove(letters.group); if (letters.holly) scene.remove(letters.holly); }
     const name = (words && words.to) || '';
-    letters = buildSpotLetters(font, { name, head: headline(), colour: block.colour, spot: block.spot });
+    letters = buildSpotLetters(font, { name, head: headline(), colour: block.colour, spot: block.spot, vine: block.vine });
     scene.add(letters.group); if (letters.holly) scene.add(letters.holly);
     const hc = letters.holly ? letters.holly.userData.counts : { leaves: 0, berries: 0 };
-    console.info(`[thalyn-card] raised letters at the hero spot: "${letters.head}" / ${letters.name ? Array.from(letters.name).length + ' letter name' : '(no name)'} · ${block.colour} · holly ${hc.leaves} leaves + ${hc.berries} berries · emissive none`);
+    console.info(`[thalyn-card] raised letters at the hero spot: "${letters.head}" / ${letters.name ? Array.from(letters.name).length + ' letter name' : '(no name)'} · ${block.colour} · ${block.vine} ${hc.leaves} leaves + ${hc.berries} berries · emissive none`);
     if (mode === 'globe') buildPlinthText();
   }
   function disposePlinthText() { if (plinthText) { plinthText.parent && plinthText.parent.remove(plinthText); plinthText = null; } }
@@ -622,6 +656,8 @@ export function makeCard(deps) {
     loadFailed(removedNow) {
       if (!active) return;
       removed = !!removedNow;
+      // A removed marker = taken down. A demo card that is gone (or past its date) has MELTED (server ruling 11-08).
+      if (!removed && isDemoCard()) { melted('the link is gone'); return; }
       openBtn.style.display = 'none';
       status.textContent = removed ? 'This card was taken down.' : "This card can't be opened. The link may have expired.";
       cover.classList.add('show'); document.body.classList.add('card-cover-on');
