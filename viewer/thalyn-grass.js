@@ -36,6 +36,71 @@ function bytesOf(b64) {
 const f32Of = b64 => { const b = bytesOf(b64); return b ? new Float32Array(b.buffer, 0, b.length >> 2) : null; };
 const u16Of = b64 => { const b = bytesOf(b64); return b ? new Uint16Array(b.buffer, 0, b.length >> 1) : null; };
 
+// ── L5 · THE MOWN VERGE (extras.thalyn.grass.verge, 2026-11-09) ──────────────────────────────────────────────
+// The app shortens the grass in a band beside each drawn path / road that keeps its "Mown edge" (GrassField.VergePolyline
+// writes the A channel of an RGBA8 texture, bilinear, at texelM). The export ships the polylines that drew it, not the
+// texture: { present, version, heightMul, bandM, texelM, size, origin:[x,z], lines:[{ halfW, band, pts:[x,z,…] }] } in UNITY XZ
+// (agreed with the client 11-09; its proof line is `[GltfExtras] A14750 grass verge`). Each line carries its OWN band
+// (vergeWidthM is live tuning, so two stamps can differ); the top-level bandM is only the last stamp's and is the fallback. Here the same
+// falloff is evaluated at the four texel centres around a cell and bilerped — what the kernel's SampleLevel reads.
+// Absent block / no lines ⇒ no verge term (blades byte-identical to before).
+function parseVerge(vb) {
+  if (!vb || vb.present === false || !Array.isArray(vb.lines) || !vb.lines.length) return null;   // JsonUtility always writes the block: present says
+  const texel = vb.texelM > 0 ? vb.texelM : 0.5, bandTop = vb.bandM > 0 ? vb.bandM : 0.4;
+  const hMul = Math.min(1, Math.max(0, vb.heightMul != null ? vb.heightMul : 0.4));
+  const segs = [];   // flat rows: ax az bx bz halfW reach band plateau minX minZ maxX maxZ
+  let bMin = Infinity, bMax = 0;
+  for (const ln of vb.lines) {
+    const p = ln && ln.pts, hw = ln && ln.halfW > 0 ? ln.halfW : 0.5;
+    if (!Array.isArray(p) || p.length < 4) continue;
+    const band = Math.max(ln.band > 0 ? ln.band : bandTop, texel), plateau = Math.min(0.1, band * 0.4), reach = hw + band;   // VergePolyline, per stamp
+    bMin = Math.min(bMin, band); bMax = Math.max(bMax, band);
+    for (let i = 0; i + 3 < p.length; i += 2) {
+      const ax = p[i], az = p[i + 1], bx = p[i + 2], bz = p[i + 3];
+      if (![ax, az, bx, bz].every(isFinite)) continue;
+      segs.push(ax, az, bx, bz, hw, reach, band, plateau, Math.min(ax, bx) - reach, Math.min(az, bz) - reach, Math.max(ax, bx) + reach, Math.max(az, bz) + reach);
+    }
+  }
+  if (!segs.length) return null;
+  const o = Array.isArray(vb.origin) ? vb.origin : [0, 0];
+  return { segs, texel, bMin, bMax, hMul, ox: +o[0] || 0, oz: +o[1] || 0, lines: vb.lines.length, size: vb.size > 0 ? vb.size | 0 : 0 };
+}
+const SEG = 12;
+// The segment rows whose reach (+ one texel for the bilerp) touches a box — a tile's list, so a pathless tile costs nothing.
+function vergeSegsIn(V, x0, z0, x1, z1) {
+  const out = [], s = V.segs, m = V.texel;
+  for (let i = 0; i < s.length; i += SEG)
+    if (s[i + 10] >= x0 - m && s[i + 8] <= x1 + m && s[i + 11] >= z0 - m && s[i + 9] <= z1 + m) out.push(i);
+  return out;
+}
+const smooth01 = t => { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t); };
+// VergePolyline's texel value at one texel centre (max over the lines; quantised to a byte as the texture holds it).
+function vergeTexel(V, rows, x, z) {
+  const s = V.segs; let best = 0;
+  for (const i of rows) {
+    const ax = s[i], az = s[i + 1], abx = s[i + 2] - ax, abz = s[i + 3] - az, len2 = abx * abx + abz * abz;
+    const u = len2 < 1e-6 ? 0 : Math.min(1, Math.max(0, ((x - ax) * abx + (z - az) * abz) / len2));
+    const d = Math.hypot(x - (ax + abx * u), z - (az + abz * u));
+    if (d >= s[i + 5]) continue;
+    const edge = d - s[i + 4], band = s[i + 6], plateau = s[i + 7];
+    const v = edge <= plateau ? 1 : 1 - smooth01((edge - plateau) / Math.max(0.01, band - plateau));
+    if (v > best) { best = v; if (best >= 1) break; }
+  }
+  return Math.round(best * 255) / 255;
+}
+// The bilinear read at a unity (x, z) — texel centres at origin + (i + 0.5) · texel, indices clamped to [0, size−1]
+// (the trail texture's Clamp sampler; the PC never writes a texel outside it).
+function vergeAt(V, rows, x, z) {
+  const fx = (x - V.ox) / V.texel - 0.5, fz = (z - V.oz) / V.texel - 0.5;
+  const ix = Math.floor(fx), iz = Math.floor(fz), tx = fx - ix, tz = fz - iz, T = V.texel;
+  const cl = V.size > 0 ? (i => Math.min(V.size - 1, Math.max(0, i))) : (i => i);
+  const x0 = V.ox + (cl(ix) + 0.5) * T, x1 = V.ox + (cl(ix + 1) + 0.5) * T;
+  const z0 = V.oz + (cl(iz) + 0.5) * T, z1 = V.oz + (cl(iz + 1) + 0.5) * T;
+  const a = vergeTexel(V, rows, x0, z0), b = vergeTexel(V, rows, x1, z0);
+  const c = vergeTexel(V, rows, x0, z1), d = vergeTexel(V, rows, x1, z1);
+  return (a + (b - a) * tx) * (1 - tz) + (c + (d - c) * tx) * tz;
+}
+
 // ── The kernel's hashes, verbatim (uint maths via Math.imul / >>> 0; float(h) rounds to float32 as in HLSL) ──
 function wang(s) {
   s = ((s ^ 61) ^ (s >>> 16)) >>> 0;
@@ -285,7 +350,7 @@ export function makeGrass(scene) {
     uNight: { value: 1 },
   };
   const root = new THREE.Group(); root.name = 'ThalynGrassField';
-  let block = null, layers = [], cov = null, bio = null, res = 0, wMinX = 0, wMinZ = 0, wSize = 1;
+  let block = null, layers = [], cov = null, bio = null, res = 0, wMinX = 0, wMinZ = 0, wSize = 1, verge = null;
   let probe = null, probeKind = '';
   let budget = { radius: 40, density: 0.6, lod: 10, name: 'laptop' };
   const tiles = new Map();          // key → { tx, tz, h: Float32Array|null, minY, maxY, per: [ {data, n, ranks} ] }
@@ -298,7 +363,7 @@ export function makeGrass(scene) {
 
   function clear() {
     for (const e of layers) { for (const d of e.draws) { root.remove(d.mesh); d.geo.dispose(); } e.mat.dispose(); }
-    layers = []; tiles.clear(); queue = []; working = null; block = null; cov = bio = null; probe = null;
+    layers = []; tiles.clear(); queue = []; working = null; block = null; cov = bio = null; probe = null; verge = null;
     if (tuftGeo) { tuftGeo.dispose(); tuftGeo = null; }
     if (lodGeo) { lodGeo.dispose(); lodGeo = null; }
     if (root.parent) root.parent.remove(root);
@@ -315,6 +380,10 @@ export function makeGrass(scene) {
     if (!cov || !bio || res <= 0 || cov.length < res * res || !pos || !uvs || !idx) { console.warn('[thalyn-grass] the grass block is incomplete — no grass'); return 0; }
     block = gb; probe = terrainProbe; probeKind = kind || '';
     wMinX = gb.worldMin[0]; wMinZ = gb.worldMin[1]; wSize = gb.worldSize;
+    verge = parseVerge(gb.verge);
+    console.info(verge
+      ? '[thalyn-grass] verge: ' + verge.lines + ' line(s), ' + (verge.segs.length / SEG) + ' segment(s) · band ' + (verge.bMin === verge.bMax ? verge.bMin.toFixed(2) : verge.bMin.toFixed(2) + '–' + verge.bMax.toFixed(2)) + ' m · texel ' + verge.texel.toFixed(3) + ' m (' + (verge.size || '?') + '²) · height ×' + verge.hMul.toFixed(2)
+      : '[thalyn-grass] verge: none in this world (no grass.verge block, or no path keeps its mown edge)');
     tuftGeo = new THREE.BufferGeometry();
     tuftGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
     tuftGeo.setAttribute('gUv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
@@ -431,6 +500,8 @@ export function makeGrass(scene) {
     const mask = L.biomeMask | 0, dens = budget.density, band = L.wildHeight ? (block.moistureBandM || 8) : 0;
     const water = block.waterLevelY || 0, boost = block.moistureBoost || 0.4;
     const clump = !!L.useClumping, tight = Math.max(0.01, (L.clumpSize || 2) * 0.3);
+    if (verge && !t.vRows) t.vRows = vergeSegsIn(verge, t.tx * TILE - GRID_PAD, t.tz * TILE - GRID_PAD, (t.tx + 1) * TILE + GRID_PAD, (t.tz + 1) * TILE + GRID_PAD);
+    const vRows = verge && t.vRows.length ? t.vRows : null;
     for (let cz = cz0; cz <= cz1; cz++) {
      if (((cz - cz0) & 7) === 7) yield;
      for (let cx = cx0; cx <= cx1; cx++) {
@@ -443,6 +514,7 @@ export function makeGrass(scene) {
       if (rnd(seed, 3) >= coverageAt(u, v)) continue;
       if (dens < 1 && rnd(seed, 9) >= dens) continue;   // the viewer's tier thinning (a hash the kernel never uses)
       let hMul = 1, cMul = 1, shade = 0, facing = 0, tcx = 0, tcz = 0;
+      const vg = vRows ? vergeAt(verge, vRows, px, pz) : 0;   // the cell's own position, before the clump pull (the kernel's rule)
       if (clump) {
         voronoi(px / tight, pz / tight, 0.5, _vo);
         const dist = _vo[0], ccx = _vo[1] * tight, ccz = _vo[2] * tight;
@@ -462,6 +534,7 @@ export function makeGrass(scene) {
       let height = hr[0] + (hr[1] - hr[0]) * rnd(seed, 5);
       if (band > 0) { const above = py - water; const wet = Math.min(1, Math.max(0, 1 - above / band)) * (above >= 0 ? 1 : 0); height *= 1 + boost * wet; }
       height *= hMul;
+      if (vg > 0) { height *= 1 + (verge.hMul - 1) * vg; t.mown++; }   // ★ L5 · the mown verge beside a drawn path
       const width = wr[0] + (wr[1] - wr[0]) * rnd(seed, 6);
       let rot = rnd(seed, 7) * 6.28318530718;
       if (facing > 0 && (tcx * tcx + tcz * tcz) > 1e-6) {
@@ -492,6 +565,7 @@ export function makeGrass(scene) {
 
   function* genTile(t) {
     yield* probeTile(t);
+    t.mown = 0;
     const per = [];
     for (const e of layers) {
       const c = e.clip;
@@ -607,7 +681,8 @@ export function makeGrass(scene) {
     }
     drawn = total; drawnTris = tris;
     if (!queue.length && !working) {
-      const line = 'tier=' + budget.name + ' R=' + R + ' density×' + budget.density + ' lod=' + budget.lod + 'm blades=' + drawn.toLocaleString() + ' tris=' + (drawnTris / 1e6).toFixed(2) + 'M';
+      let line = 'tier=' + budget.name + ' R=' + R + ' density×' + budget.density + ' lod=' + budget.lod + 'm blades=' + drawn.toLocaleString() + ' tris=' + (drawnTris / 1e6).toFixed(2) + 'M';
+      if (verge) { let m = 0, g = 0; for (const t of tiles.values()) if (t.ready) { m += t.mown || 0; for (const p of t.per) g += p.n; } line += ' mown=' + m.toLocaleString() + ' of ' + g.toLocaleString() + ' grown'; }   // ★ L5 · verge blades grown near you
       if (!logged) { logged = line; console.info('[thalyn-grass] ' + line + ' (' + layers.length + ' layer(s), ' + tiles.size + ' tile(s) of ' + TILE + ' m, roots on ' + probeKind + ')'); }
     }
   }
