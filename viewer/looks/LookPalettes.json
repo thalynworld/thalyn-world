@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "looks": [
+    {
+      "styleId": "natural",
+      "canopy":  { "variants": 6, "colors": [ { "c": [0.90, 1.00, 0.88], "w": 3, "hue": 5, "val": 0.08 }, { "c": [0.80, 0.92, 0.78], "w": 2, "hue": 5, "val": 0.08 }, { "c": [0.98, 1.02, 0.84], "w": 1, "hue": 5, "val": 0.08 } ] },
+      "shrubs":  { "variants": 6, "colors": [ { "c": [1.04, 1.03, 0.84], "w": 3, "hue": 6, "val": 0.06, "sat": 0.05 }, { "c": [0.98, 0.95, 0.76], "w": 2, "hue": 6, "val": 0.06, "sat": 0.05 }, { "c": [1.08, 1.04, 0.92], "w": 1, "hue": 6, "val": 0.06, "sat": 0.05 } ] }
+    },
+    {
+      "styleId": "saturdaycartoon",
+      "water":   { "deepMul": [0.90, 1.00, 1.15], "shallowMul": [1.00, 1.12, 1.18], "sat": 1.35 },
+      "fog":     { "mul": [0.96, 1.00, 1.06], "sat": 1.25, "densityMul": 0.60 },
+      "sky":     { "mode": "poster", "steps": 3, "posterMip": 4, "posterSoft": 0.08, "sat": 1.25, "tint": [0.95, 1.00, 1.08], "cloudFloor": 0.30 },
+      "snow":    { "color": [0.92, 0.97, 1.00] },
+      "grass":   { "baseMul": [1.00, 1.12, 0.85], "tipMul": [1.08, 1.20, 0.80], "sat": 1.35 },
+      "grassForm": { "widthMul": 1.80, "heightMul": 0.95, "bendMul": 0.50, "varianceMul": 0.55 },
+      "wind":      { "amp": 1.25, "hz": 1.80, "gust": 1.30 },
+      "moss":      { "moss": [1.10, 1.25, 0.85], "lichen": [1.10, 1.10, 0.95] },
+      "widgets": { "sat": 1.30 },
+      "weather": { "sat": 1.40, "spriteSet": "saturdaycartoon" },
+      "light":   { "intensityMul": 1.05, "shadowStrengthMul": 1.00 },
+      "canopy":   { "variants": 6, "fill": 0.25, "colors": [ { "c": [1.00, 1.00, 1.00], "w": 1, "hue": 8, "val": 0.10 }, { "c": [0.84, 1.00, 0.96], "w": 2, "hue": 8, "val": 0.10 }, { "c": [1.08, 1.05, 0.74], "w": 2, "hue": 8, "val": 0.10 }, { "c": [0.78, 0.90, 0.78], "w": 1, "hue": 8, "val": 0.10 } ] },
+      "shrubs":   { "variants": 6, "fill": 0.22, "colors": [ { "c": [1.10, 1.06, 0.76], "w": 2, "hue": 6, "val": 0.08 }, { "c": [0.92, 1.05, 0.84], "w": 1, "hue": 6, "val": 0.08 }, { "c": [1.04, 0.96, 0.80], "w": 1, "hue": 6, "val": 0.08 } ] },
+      "render":   { "on": true, "grade": { "blur": 2.0, "sat": 1.35, "val": 1.04, "levels": 4, "pmix": 0.45, "contrast": 1.06 }, "outline": { "busy": 0.9, "fadeM": 160, "px": 2.5, "color": [0.01, 0.01, 0.015], "soft": 1.0, "creases": true }, "toon": { "ratioMax": 1.4, "on": true, "ramp": "bands", "L0": 0.40, "L1": 0.74, "L2": 1.0, "e0": -0.05, "e1": 0.45, "soft": 0.02, "rim": 0.35, "amb": 0.35 } },
+      "roleSurfaces": { "wood": "TM-BARKYKJ7", "stone": "TM-ROCKAPP6", "leaf": "TM-GRAS7NHK", "metal": "TM-META98HM", "rope": "TM-ROPE4VDH", "fabric": "TM-FABR8HC9" }
+    },
+    {
+      "styleId": "pastelclay",
+      "water":   { "deepMul": [1.25, 1.20, 1.22], "shallowMul": [1.18, 1.14, 1.16], "sat": 0.70 },
+      "fog":     { "mul": [1.00, 1.04, 1.10], "sat": 0.60, "densityMul": 0.50 },
+      "sky":     { "mode": "gradient", "sat": 0.85, "tint": [1.06, 1.00, 1.06], "zenith": [0.55, 0.76, 0.96], "horizon": [0.86, 0.93, 0.99], "ground": [0.82, 0.90, 0.82], "toneMix": 0.15, "cloudKeep": 0.80 },
+      "snow":    { "color": [1.00, 0.96, 0.98] },
+      "grass":   { "baseMul": [1.05, 1.25, 1.08], "tipMul": [1.10, 1.30, 1.12], "sat": 0.80 },
+      "grassForm": { "widthMul": 2.20, "heightMul": 0.75, "bendMul": 0.35, "varianceMul": 0.45 },
+      "wind":      { "amp": 0.70, "hz": 0.75, "gust": 0.50 },
+      "moss":      { "moss": [1.25, 1.15, 1.20], "lichen": [1.15, 1.10, 1.15] },
+      "widgets": { "wood": [1.15, 1.10, 1.05], "metal": [1.10, 1.08, 1.12], "stone": [1.12, 1.08, 1.08], "sat": 0.70 },
+      "weather": { "sat": 0.70, "spriteSet": "pastelclay" },
+      "light":   { "intensityMul": 1.10, "ambientMul": 1.25, "shadowStrengthMul": 0.60 },
+      "canopy":   { "variants": 8, "fill": 0.35, "colors": [ { "c": [0.74, 1.00, 0.88], "w": 3, "hue": 8, "val": 0.08 }, { "c": [1.00, 0.76, 0.88], "w": 2, "hue": 8, "val": 0.08 }, { "c": [1.00, 0.84, 0.70], "w": 2, "hue": 8, "val": 0.08 }, { "c": [1.00, 0.97, 0.70], "w": 1, "hue": 8, "val": 0.08 }, { "c": [0.86, 0.86, 1.00], "w": 1, "hue": 8, "val": 0.08 } ] },
+      "shrubs":   { "variants": 6, "fill": 0.30, "colors": [ { "c": [1.00, 1.00, 1.00], "w": 2, "hue": 4, "val": 0.06 }, { "c": [1.00, 0.94, 0.90], "w": 1, "hue": 4, "val": 0.06 }, { "c": [1.00, 0.98, 0.90], "w": 2, "hue": 4, "val": 0.06 }, { "c": [0.94, 1.00, 0.96], "w": 1, "hue": 4, "val": 0.06 } ] },
+      "render":   { "on": true, "grade": { "blur": 4.0, "brush": 0.04, "sat": 0.88, "val": 1.04, "contrast": 0.92, "lift": 0.025 }, "outline": { "busy": 0.9, "fadeM": 120, "px": 1.0, "color": [0.33, 0.24, 0.20], "soft": 0.40, "creases": false }, "toon": { "ratioMax": 1.35, "on": true, "ramp": "wrap", "wrap": 0.45, "amb": 0.40, "strength": 0.8 } },
+      "roleSurfaces": { "wood": "TM-BARKYKJ7", "stone": "TM-ROCKAPP6", "leaf": "TM-GRAS7NHK", "metal": "TM-META98HM", "rope": "TM-ROPE4VDH", "fabric": "TM-FABR8HC9" }
+    },
+    {
+      "styleId": "goldenstorybook",
+      "water":   { "deepMul": [1.04, 1.00, 0.90], "shallowMul": [1.08, 1.02, 0.88], "sat": 1.05 },
+      "fog":     { "mul": [1.00, 1.00, 0.97], "sat": 1.00, "densityMul": 0.45 },
+      "sky":     { "mode": "panorama", "sat": 1.05, "tint": [1.03, 1.00, 0.96] },
+      "snow":    { "color": [1.00, 0.97, 0.90] },
+      "grass":   { "baseMul": [1.00, 1.04, 0.95], "tipMul": [1.06, 1.06, 0.92], "sat": 1.05 },
+      "grassForm": { "widthMul": 1.35, "heightMul": 1.05, "bendMul": 1.40, "varianceMul": 1.10 },
+      "wind":      { "amp": 0.85, "hz": 0.85, "gust": 0.80 },
+      "moss":      { "moss": [1.12, 1.05, 0.82], "lichen": [1.10, 1.02, 0.85] },
+      "widgets": { "wood": [1.08, 1.00, 0.90], "glow": [1.06, 1.00, 0.88], "sat": 1.00 },
+      "weather": { "mul": [1.02, 1.00, 0.97], "sat": 1.00, "spriteSet": "goldenstorybook" },
+      "light":   { "colorMul": [1.12, 1.00, 0.80], "intensityMul": 1.10, "ambientMul": 0.95 },
+      "canopy":   { "variants": 6, "fill": 0.15, "colors": [ { "c": [0.98, 1.00, 0.80], "w": 2, "val": 0.08, "sat": 0.08 }, { "c": [1.12, 0.94, 0.68], "w": 2, "val": 0.08, "sat": 0.08 }, { "c": [0.86, 1.00, 0.92], "w": 1, "val": 0.08, "sat": 0.08 }, { "c": [1.10, 0.84, 0.70], "w": 1, "val": 0.08, "sat": 0.08 } ] },
+      "shrubs":   { "variants": 6, "fill": 0.12, "colors": [ { "c": [1.12, 0.98, 0.70], "w": 2, "val": 0.08, "sat": 0.08 }, { "c": [0.92, 0.98, 0.80], "w": 1, "val": 0.08, "sat": 0.08 }, { "c": [1.08, 0.88, 0.72], "w": 1, "val": 0.08, "sat": 0.08 } ] },
+      "render":   { "on": true, "grade": { "blur": 3.0, "brush": 0.10, "brushScale": 5, "sat": 1.20, "val": 1.03, "levels": 5, "pmix": 0.30, "warm": 0.05, "vignette": 0.30, "grain": 0.05 }, "outline": { "busy": 0.9, "fadeM": 140, "px": 1.0, "color": [0.30, 0.20, 0.13], "soft": 0.55, "creases": false }, "toon": { "ratioMax": 1.45, "on": true, "ramp": "bands", "L0": 0.28, "L1": 0.70, "L2": 1.0, "e0": 0.0, "e1": 0.45, "soft": 0.14, "rim": 0.30, "amb": 0.35, "strength": 0.85 } },
+      "roleSurfaces": { "wood": "TM-BARKYKJ7", "stone": "TM-ROCKAPP6", "leaf": "TM-GRAS7NHK", "metal": "TM-META98HM", "rope": "TM-ROPE4VDH", "fabric": "TM-FABR8HC9" }
+    },
+    {
+      "styleId": "sepiaink",
+      "water":   { "deepMul": [1.10, 0.95, 0.75], "shallowMul": [1.10, 0.95, 0.75], "sat": 0.10 },
+      "fog":     { "mul": [1.10, 0.95, 0.75], "sat": 0.10 },
+      "sky":     { "mode": "panorama", "sat": 0.10, "tint": [1.10, 0.95, 0.75] },
+      "snow":    { "color": [0.96, 0.90, 0.78] },
+      "grass":   { "baseMul": [1.10, 0.95, 0.75], "tipMul": [1.10, 0.95, 0.75], "sat": 0.10 },
+      "widgets": { "wood": [1.10, 0.95, 0.75], "metal": [1.10, 0.95, 0.75], "rope": [1.10, 0.95, 0.75], "stone": [1.10, 0.95, 0.75], "leaf": [1.10, 0.95, 0.75], "glow": [1.10, 0.95, 0.75], "fabric": [1.10, 0.95, 0.75], "sat": 0.10 },
+      "weather": { "mul": [1.10, 0.95, 0.75], "sat": 0.10, "spriteSet": "sepiaink" }
+    },
+    {
+      "styleId": "lookingglass",
+      "fog":     { "mul": [1.10, 0.95, 0.75], "sat": 0.10 },
+      "sky":     { "mode": "panorama", "sat": 0.10, "tint": [1.10, 0.95, 0.75] },
+      "snow":    { "color": [0.96, 0.90, 0.78] },
+      "weather": { "mul": [1.10, 0.95, 0.75], "sat": 0.10, "spriteSet": "sepiaink" },
+      "render":   { "on": true, "mode": "ink", "ink": { "keepLocal": 0.66, "paper": [0.96, 0.90, 0.78], "ink": [0.08, 0.065, 0.055], "accentHue": 0.965, "accentRange": 0.07, "accentMinSat": 0.35, "accentStrength": 1.0, "hatchDensity": 1.0, "hatchStrength": 0.9, "hatchPeriodPx": 6, "lineNearPx": 3.5, "grain": 0.06, "fibre": 0.05, "handTint": true, "mutedSat": 0.58, "sage": 0.25, "stoneWarm": 0.35, "lineMinPx": 1.2, "lineMaxPx": 5.0, "outlineStrength": 1.0, "groundInk": 0.3, "groundNear": 5, "groundFar": 20, "windowGlow": 0.0, "glowHdr": 1.5, "engrave": true } }
+    }
+  ]
+}
