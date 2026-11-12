@@ -287,7 +287,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import * as TA from './thalyn-atmos.js?v=20261108w1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
+import * as TA from './thalyn-atmos.js?v=20261112g1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
 import * as TG from './thalyn-together.js';
 import * as TF from './thalyn-fauna.js?v=20261108k1';   // A14133 · facing + stride-matched clip rate (bump on change)
 import * as TGR from './thalyn-grass.js?v=20261109v4';   // A5386 · the grass field grown from extras.thalyn.grass
@@ -303,6 +303,7 @@ import * as TXR from './thalyn-xr.js?v=20261108x2';        // A13560 · the head
 import * as TFL from './thalyn-floats.js?v=20261108b1';    // A13570 · boats that bob (extras.thalyn.floatsWeb + living.floats)
 import * as TW from './thalyn-water.js?v=20261021w1';       // A1232 · the game's water: flat, ONE shared mirror, ripples, opaque tone (bump on change)       // A5403 · I2 doors that open: E / click / tap, a closed leaf blocks (extras.thalyn.doorsWeb + the door rows)
 import * as TL from './thalyn-look.js?v=20261102a1';
+import * as TGD from './thalyn-grade.js?v=20261112g1';   // ★ A15440 · the walk's own grade (extras.thalyn.grade; bump on change)
 import * as TD from './thalyn-diorama.js?v=20261102a1';
 import * as TLR from './thalyn-lookrender.js?v=20261102a1';
 import * as TINK from './thalyn-ink.js?v=20261103c1';
@@ -419,6 +420,7 @@ let lookRender = null;
 let inkRender = null;          // ★ Looking-Glass live (thalyn-ink.js) - inert until an ink look that is not baked is worn
 let worldFieldMeshes = 0;      // meshes of this world carrying the hatch field (TEXCOORD_4), tagged on FIELD_LAYER at load
 let worldTagMeshes = 0;
+let fileGrade = null, gradeSetToneMap = false;   // ★ A15440 the walk's grade from the file (thalyn-grade.js); null = the per-tone table
 let zoneAtmo = null;           // ★ per-biome sky + fog (thalyn-zoneatmo.js) - null = one sky, the viewer exactly as before
 let zoneSkyKey = '';           // ★ (11-03) the zone sky the dome wears ('' = its own baked sky)
 const zoneSkyTex = new Map();  // key → { map, env } (decoded once)
@@ -557,6 +559,13 @@ function applyThalynBlock(tx) {
   zoneAtmo = TZA.makeZoneAtmo(tx);   // ★ per-biome sky + fog (null without extras.thalyn.zones)
   try {
     state = TA.stateFromBlock(tx, worldRadius);
+    // ★ A15440 the walk's grade (?grade=0 = ignore it, for an A/B against the old table): exposure 2^EV, tone mapping, sat / con / vignette / tint
+    const gradeOff = new URLSearchParams(location.search).get('grade') === '0';
+    fileGrade = gradeOff ? null : TGD.gradeFromBlock(tx);
+    if (fileGrade) state.exposure = fileGrade.exposure;
+    if (post) post.setFileGrade(fileGrade);
+    if (fileGrade) { setToneMapping(fileGrade.toneMapping); gradeSetToneMap = true; const ts = $('r-tone'); if (ts && [...ts.options].some(o => o.value === fileGrade.toneMapping)) ts.value = fileGrade.toneMapping; }
+    console.log(TGD.describeGrade(fileGrade, gradeOff ? '?grade=0 - the file grade ignored' : null));
     fogOn = state.fogDensity > 0;
     fileWeather = tx.weather || '';
     const wsel = $('r-weather'); if (wsel && !weatherOverride) wsel.value = '';
@@ -769,6 +778,8 @@ function resetAtmosphere() {
   if (lookRender) lookRender.set(null, tier.name, 'natural');   // ★ R1e: a new world starts natural until its own tag says otherwise
   if (inkRender) inkRender.set(null, tier.name, 'natural');
   wornLook = { row: null, id: 'natural' };
+  fileGrade = null; if (post) post.setFileGrade(null);   // ★ A15440 a new world starts on the table until its own grade says otherwise
+  if (gradeSetToneMap) { gradeSetToneMap = false; setToneMapping('aces'); const ts = $('r-tone'); if (ts) ts.value = 'aces'; }
   $('w-row').style.display = 'none'; $('w-sky').style.display = 'none';
   $('b-postcard').style.display = 'none'; $('b-shot').style.display = 'none';
   state = TA.defaultState(worldRadius); TA.sunFromElevation(state, 0.55);
@@ -1245,7 +1256,7 @@ $('share-send').onclick = async () => {
 $('share-close').onclick = () => $('share-panel').classList.remove('show');
 // Live colour controls — tone mapping shapes saturation/contrast; exposure = brightness.
 // (Tone mapping is compiled into each material's shader, so a change must flag loaded materials for recompile.)
-const TONEMAPS = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping, reinhard: THREE.ReinhardToneMapping, linear: THREE.LinearToneMapping, none: THREE.NoToneMapping };
+const TONEMAPS = { neutral: THREE.NeutralToneMapping ?? THREE.ACESFilmicToneMapping /* r162+; three@0.160 has none → ACES */, aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping, reinhard: THREE.ReinhardToneMapping, linear: THREE.LinearToneMapping, none: THREE.NoToneMapping };
 function setToneMapping(mode) {
   renderer.toneMapping = TONEMAPS[mode] ?? THREE.ACESFilmicToneMapping;
   worldRoot.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m) m.needsUpdate = true; }); });
@@ -1292,6 +1303,7 @@ function toast(msg, force) { if (card && card.quiet && !force) return;   // A136
 
 // ── Cinematic pass (bloom + per-tone grade) ──────────────────────────────────
 post = TA.makePost(renderer, scene, camera);
+post.setFileGrade(fileGrade);   // ★ A15440 (a world read before the pass existed)
 lookRender = TLR.makeLookRender(post, camera);   // ★ R1e · inert (disabled) until a look with a render block is worn
 inkRender = TINK.makeInk(post, camera, scene, renderer);   // ★ Looking-Glass live · inert until an ink look (not baked) is worn
 diorama = TD.makeDiorama({ scene, camera, renderer, controls, post, worldRoot, lights: L });   // ★ the diorama opening

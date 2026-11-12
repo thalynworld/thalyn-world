@@ -439,9 +439,17 @@ export function makePost(renderer, scene, camera) {
   composer.addPass(grade);
   composer.addPass(new OutputPass());
   let enabled = true, tone = 'serene', look = 'auto', shaftStrength = 0, shaftsAllowed = true;
-  function applyGrade() {
+  // ★ A15440 the walk's own grade from extras.thalyn.grade (thalyn-grade.js). null = the per-tone table, exactly as before.
+  // A HUD film look still wins over it; bloom STRENGTH stays the table's (spec §D OUT) unless the walk drew no post (bloom 0).
+  let fileGrade = null;
+  function current() {
+    if (look !== 'auto' && LOOKS[look]) return LOOKS[look];
     const t = TONE_GRADES[tone] || TONE_GRADES.serene;
-    const g = (look !== 'auto' && LOOKS[look]) ? LOOKS[look] : t;
+    return fileGrade ? Object.assign({}, t, fileGrade.grade) : t;
+  }
+  function applyGrade() {
+    const g = current();
+    bloom.threshold = (fileGrade && fileGrade.threshold != null) ? fileGrade.threshold : 0.92;
     grade.uniforms.uTint.value.set(g.tint[0], g.tint[1], g.tint[2]);
     grade.uniforms.uSat.value = g.sat; grade.uniforms.uVig.value = g.vig; grade.uniforms.uLift.value = g.lift;
     grade.uniforms.uCon.value = g.con || 1;
@@ -458,8 +466,9 @@ export function makePost(renderer, scene, camera) {
     get enabled() { return enabled; }, setEnabled(v) { enabled = !!v; },
     setTone, get tone() { return tone; },
     setLook, get look() { return look; },
+    setFileGrade(fg) { fileGrade = fg || null; applyGrade(); }, get fileGrade() { return fileGrade; },
     setNight(n) {
-      const g = (look !== 'auto' && LOOKS[look]) ? LOOKS[look] : (TONE_GRADES[tone] || TONE_GRADES.serene);
+      const g = current();
       bloom.strength = g.bloom * (1 + 0.6 * clamp(n, 0, 1));
     },
     // Call once per frame: the sun's screen position (0..1) and a target strength (0 = off).
