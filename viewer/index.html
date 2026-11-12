@@ -186,6 +186,7 @@
   <button id="b-postcard" style="display:none" title="Copy the postcard code — paste it into Thalyn to regrow this world">Copy postcard code</button>
   <button id="b-shot" style="display:none" title="Walk to where the picture was taken (V leaves)">Stand where the picture was taken</button>
   <button id="b-share-w" style="display:none" title="Copy a link + QR for this world">Share this world…</button>
+  <button id="b-card" style="display:none" title="The picture, re-shot in four looks - one PNG to share">Share card · 4 looks</button>
   <button id="b-report-w" style="display:none" title="Tell Thalyn about a problem with this world">Report this world…</button>
   <button id="b-together" style="display:none" title="Invite someone into this world with you — a link they open in any browser">Invite a friend here…</button>
   <div class="row"><label><input type="checkbox" id="t-sound" /> Sound</label>
@@ -286,7 +287,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import * as TA from './thalyn-atmos.js?v=20261108w1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
+import * as TA from './thalyn-atmos.js?v=20261112g1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
 import * as TG from './thalyn-together.js';
 import * as TF from './thalyn-fauna.js?v=20261108k1';   // A14133 · facing + stride-matched clip rate (bump on change)
 import * as TGR from './thalyn-grass.js?v=20261109v4';   // A5386 · the grass field grown from extras.thalyn.grass
@@ -301,6 +302,13 @@ import * as TAR from './thalyn-ar.js?v=20261108a2';        // A13550 · View on 
 import * as TXR from './thalyn-xr.js?v=20261108x2';        // A13560 · the headset: teleport / smooth, wrist menu, controllers, giant scale
 import * as TFL from './thalyn-floats.js?v=20261108b1';    // A13570 · boats that bob (extras.thalyn.floatsWeb + living.floats)
 import * as TW from './thalyn-water.js?v=20261021w1';       // A1232 · the game's water: flat, ONE shared mirror, ripples, opaque tone (bump on change)       // A5403 · I2 doors that open: E / click / tap, a closed leaf blocks (extras.thalyn.doorsWeb + the door rows)
+import * as TL from './thalyn-look.js?v=20261102a1';
+import * as TGD from './thalyn-grade.js?v=20261112g1';   // ★ A15440 · the walk's own grade (extras.thalyn.grade; bump on change)
+import * as TD from './thalyn-diorama.js?v=20261102a1';
+import * as TLR from './thalyn-lookrender.js?v=20261102a1';
+import * as TINK from './thalyn-ink.js?v=20261103c1';
+import * as TZA from './thalyn-zoneatmo.js?v=20261103b1';   // ★ per-biome sky + fog (extras.thalyn.zones; bump on change)   // ★ Looking-Glass drawn live (the app's ink look path; bump on change)
+import * as TSC from './thalyn-sharecard.js?v=20261102a1';   // ★ the share card × 4 looks (bump on change)   // ★ R1e · the look's RENDER layer (grade · flatten · toon · outline), the game's laws (bump on change)   // ★ LOOK ENGINE boost · THE DIORAMA OPENING: the shared world first appears as a model on a table (bump on change)      // ★ LOOK ENGINE slice 2 · extras.thalyn.look → the look's water grade by row id (bump on change)
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/';
 const $ = id => document.getElementById(id);
@@ -366,7 +374,9 @@ let post = null; // cinematic pass, created once the renderer is sized (below)
 let worldRadius = 100;
 let state = TA.defaultState(worldRadius);   // the applied state
 let fogOn = false, fogScale = 1;
-function apply() {
+// The fog / sun / ambient this frame: the block's state × the viewer's weather override × (★ 11-03) the per-biome ratios of the zone the camera
+// stands in. Shared by apply() and the per-biome cross-fade (which re-applies ONLY this, never the audio / kit / environment).
+function atmoState() {
   const s = Object.assign({}, state);
   // The exported fog / sun are the app's ALREADY-weathered values (AtmosphereRenderer folds the weather into
   // RenderSettings before the export reads them), so the profile's fog/sun multipliers apply only when the viewer
@@ -375,8 +385,22 @@ function apply() {
   s.fogDensity = state.fogDensity * fogScale * wFog;   // heavy weather thickens the haze
   s.sunIntensity = state.sunIntensity * wDim;          // …and dims the sun
   if (wFog > 1.05 && !(state.fogDensity > 0)) s.fogDensity = (1.2 / Math.max(1, worldRadius)) * (wFog - 1);
+  if (zoneAtmo) {
+    // the app's ratios are on its sRGB-authored colours; the viewer's colours are linear → a colour ratio applies as ratio^2.2
+    const m = zoneAtmo.mul, lin = (a) => new THREE.Color(Math.pow(a[0], 2.2), Math.pow(a[1], 2.2), Math.pow(a[2], 2.2));
+    s.fogColor = state.fogColor.clone().multiply(lin(m.fog));
+    s.fogDensity *= m.fogDensity;
+    s.sunColor = state.sunColor.clone().multiply(lin(m.sun));
+    s.sunIntensity *= m.sunI;
+    s.hemiIntensity = state.hemiIntensity * m.amb;
+  }
+  return { s, fogArg: fogOn || wFog > 1.05 };
+}
+
+function apply() {
+  const { s, fogArg } = atmoState();
   kit.uWindStrength.value = Math.max(kit.uWindStrength.value, weather.windFloor * 1.4); // storms lean the trees
-  TA.applyState(s, L, renderer, scene, fogOn || wFog > 1.05);
+  TA.applyState(s, L, renderer, scene, fogArg);
   kit.setNight(state.night);
   L.sky.visible = skyOn && !skyEnv.active;
   // No baked dome → the studio room IBL lights everything; at night that reads as a lit-from-nowhere ground. Drop it after dusk.
@@ -391,6 +415,49 @@ function apply() {
 // ── The Thalyn block ─────────────────────────────────────────────────────────
 let pendingThalyn = null, pendingAtmos = null;
 let anchorRoot = null, shotPose = null;
+let diorama = null, lastFrame = null;   // ★ the diorama opening (thalyn-diorama.js) + the last frameWorld box it stands on
+let lookRender = null;
+let inkRender = null;          // ★ Looking-Glass live (thalyn-ink.js) - inert until an ink look that is not baked is worn
+let worldFieldMeshes = 0;      // meshes of this world carrying the hatch field (TEXCOORD_4), tagged on FIELD_LAYER at load
+let worldTagMeshes = 0;
+let fileGrade = null, gradeSetToneMap = false;   // ★ A15440 the walk's grade from the file (thalyn-grade.js); null = the per-tone table
+let zoneAtmo = null;           // ★ per-biome sky + fog (thalyn-zoneatmo.js) - null = one sky, the viewer exactly as before
+let zoneSkyKey = '';           // ★ (11-03) the zone sky the dome wears ('' = its own baked sky)
+const zoneSkyTex = new Map();  // key → { map, env } (decoded once)
+let zoneSkyBase = null;        // the dome's own { maps: Map(material → map), env }
+
+// ★ (11-03, the sky's FORM per biome) swap the dome's texture (and the IBL) to a zone's baked sky, or back to the dome's own ('').
+// The JPEG is the dome texture's equirect in the same layout, so it takes the loaded map's sampling (flipY false + its UV transform).
+function useZoneSky(key) {
+  const domes = skyEnv.domes;
+  if (!domes.length || !zoneAtmo) return;
+  const mats = [];
+  for (const d of domes) for (const m of (Array.isArray(d.material) ? d.material : [d.material])) if (m && m.map !== undefined) mats.push(m);
+  if (!zoneSkyBase) { zoneSkyBase = { maps: new Map(mats.map(m => [m, m.map])), env: skyEnv.active }; }
+  const wear = (map, env) => {
+    for (const m of mats) { m.map = map || zoneSkyBase.maps.get(m) || null; m.needsUpdate = true; }
+    if (env) skyEnv.useDome(env, domes);
+  };
+  if (!key) { wear(null, zoneSkyBase.env); return; }
+  const have = zoneSkyTex.get(key);
+  if (have) { if (have.map) wear(have.map, have.env); return; }
+  const jpg = zoneAtmo.skyJpg(key);
+  if (!jpg) return;
+  const slot = { map: null, env: null };
+  zoneSkyTex.set(key, slot);
+  new THREE.TextureLoader().load('data:image/jpeg;base64,' + jpg, (tex) => {
+    const base = zoneSkyBase.maps.values().next().value;
+    tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace;
+    if (base) { tex.wrapS = base.wrapS; tex.wrapT = base.wrapT; tex.offset.copy(base.offset); tex.repeat.copy(base.repeat); tex.rotation = base.rotation; tex.center.copy(base.center); }
+    tex.needsUpdate = true;
+    const env = tex.clone(); env.mapping = THREE.EquirectangularReflectionMapping; env.colorSpace = THREE.SRGBColorSpace;
+    env.repeat.set(1, 1); env.offset.set(0, 0); env.rotation = 0; env.needsUpdate = true;
+    slot.map = tex; slot.env = env;
+    console.log(`[zoneatmo] zone sky '${key}' (${zoneAtmo ? zoneAtmo.skyMode(key) : ''}) decoded`);
+    if (zoneSkyKey === key) wear(tex, env);   // still wanted (the camera may have walked on)
+  }, undefined, () => console.warn(`[zoneatmo] zone sky '${key}' unreadable - the dome's own sky`));
+}        // ★ V3 meshes carrying the Looking-Glass node tags (lg_*), tagged on TAG_LAYER at load   // ★ R1e the look's render layer (thalyn-lookrender.js)
+let wornLook = { row: null, id: 'natural' };   // ★ the look the world wears (the share card puts it back after its four shots)
 const kit = TA.makeMaterialKit();
 const water = TW.makeWater();   // A1232
 const weather = TA.makeWeather(scene, camera);
@@ -489,8 +556,16 @@ async function fetchAtmos(url) {
 function applyThalynBlock(tx) {
   if (!TA.hasBlock(tx)) return;
   pendingThalyn = tx;
+  zoneAtmo = TZA.makeZoneAtmo(tx);   // ★ per-biome sky + fog (null without extras.thalyn.zones)
   try {
     state = TA.stateFromBlock(tx, worldRadius);
+    // ★ A15440 the walk's grade (?grade=0 = ignore it, for an A/B against the old table): exposure 2^EV, tone mapping, sat / con / vignette / tint
+    const gradeOff = new URLSearchParams(location.search).get('grade') === '0';
+    fileGrade = gradeOff ? null : TGD.gradeFromBlock(tx);
+    if (fileGrade) state.exposure = fileGrade.exposure;
+    if (post) post.setFileGrade(fileGrade);
+    if (fileGrade) { setToneMapping(fileGrade.toneMapping); gradeSetToneMap = true; const ts = $('r-tone'); if (ts && [...ts.options].some(o => o.value === fileGrade.toneMapping)) ts.value = fileGrade.toneMapping; }
+    console.log(TGD.describeGrade(fileGrade, gradeOff ? '?grade=0 - the file grade ignored' : null));
     fogOn = state.fogDensity > 0;
     fileWeather = tx.weather || '';
     const wsel = $('r-weather'); if (wsel && !weatherOverride) wsel.value = '';
@@ -502,6 +577,34 @@ function applyThalynBlock(tx) {
     const aw = tx.atmosphere && Number(tx.atmosphere.windStrength);
     if (aw > 0 && !reduceMotion.matches) { $('t-wind').checked = true; const w = Math.min(2, aw * 0.4); $('r-wind').value = w; kit.uWindStrength.value = Math.max(kit.uWindStrength.value, w); }
     if (tx.water && tx.water.present) TA.tintWater(tx.water, worldRoot, kit.lavaMats);
+    // ★ LOOK ENGINE slice 2 (2026-11-02): a world that wears a look carries extras.thalyn.look (absent = natural = nothing below runs).
+    // Sun/ambient/fog arrive already graded by the game; the water block does not, so grade it by the look's row (thalyn-look.js).
+    // ★ R1e: ?look=<id> previews a look's render layer on a world that carries no tag (a test / preview aid; the tag wins when present)
+    const lookQ = new URLSearchParams(location.search).get('look');
+    const look = TL.readLook(tx) || (lookQ ? { version: 1, sceneRecipeId: lookQ, renderRow: lookQ, byZone: [] } : null);
+    if (lookRender) lookRender.set(null, tier.name, 'natural');
+    if (inkRender) inkRender.set(null, tier.name, 'natural');
+    if (look) TL.palettes().then(table => {
+      if (pendingThalyn !== tx) return;   // another world loaded meanwhile
+      const row = TL.rowFor(look, table), applied = [];
+      if (tx.water && tx.water.present) {
+        const w = TL.lookWater(tx.water, row);
+        if (w !== tx.water) applied.push(`water ${TA.tintWater(w, worldRoot, kit.lavaMats)} material(s)`);
+      }
+      // ★ B3c (11-03): look.baked = the file's textures already WEAR the look (the game's export bake: Looking-Glass hand-tint + engraving).
+      // Never draw that look's live render layer on top (no second tint / engrave); the water grade above stays (water is not baked).
+      if (look.baked) {
+        wornLook = { row: null, id: look.renderRow || 'natural' };
+        if (lookRender) lookRender.set(null, tier.name, 'natural');
+        if (inkRender) inkRender.set(row ? row.render : null, tier.name, look.bakedLook || look.renderRow, { baked: true, fieldMeshes: worldFieldMeshes, tagMeshes: worldTagMeshes });
+        applied.push(`baked '${look.bakedLook || look.renderRow}' - no live layer`);
+      } else {
+        wornLook = { row: row ? row.render : null, id: look.renderRow || 'natural' };
+        if (lookRender) { const d = lookRender.set(wornLook.row, tier.name, wornLook.id); if (d.enqueue) applied.push('render layer'); }
+        if (inkRender) { const k = inkRender.set(wornLook.row, tier.name, wornLook.id, { fieldMeshes: worldFieldMeshes, tagMeshes: worldTagMeshes }); if (k.ink) applied.push('Looking-Glass ink (live)'); }
+      }
+      console.log(TL.describe(look, row, applied));
+    });
     if (anchorRoot && anchorRoot.parent) anchorRoot.parent.remove(anchorRoot);
     anchorRoot = TA.buildAnchors(tx.anchors, worldRoot, (typeof tier !== 'undefined' ? tier.table.fireLights : 48));
     // Living worlds: the falls the world measured run; water edges, falls and tree cover sound from where they are.
@@ -641,6 +744,12 @@ function clearWorld() {
   });
   worldRoot = new THREE.Group();
   scene.add(worldRoot);
+  worldFieldMeshes = 0;
+  worldTagMeshes = 0;
+  zoneAtmo = null;
+  zoneSkyKey = ''; zoneSkyBase = null;
+  for (const v of zoneSkyTex.values()) { if (v.map) v.map.dispose(); if (v.env) v.env.dispose(); }
+  zoneSkyTex.clear();
   walkMeshes.length = 0;
   kit.reset();
   skyEnv.useDome(null);
@@ -666,6 +775,11 @@ function resetWorld() {
 // (or fewer fields) does not inherit the previous world's atmosphere when switching.
 function resetAtmosphere() {
   pendingAtmos = null; pendingThalyn = null; anchorRoot = null; shotPose = null;
+  if (lookRender) lookRender.set(null, tier.name, 'natural');   // ★ R1e: a new world starts natural until its own tag says otherwise
+  if (inkRender) inkRender.set(null, tier.name, 'natural');
+  wornLook = { row: null, id: 'natural' };
+  fileGrade = null; if (post) post.setFileGrade(null);   // ★ A15440 a new world starts on the table until its own grade says otherwise
+  if (gradeSetToneMap) { gradeSetToneMap = false; setToneMapping('aces'); const ts = $('r-tone'); if (ts) ts.value = 'aces'; }
   $('w-row').style.display = 'none'; $('w-sky').style.display = 'none';
   $('b-postcard').style.display = 'none'; $('b-shot').style.display = 'none';
   state = TA.defaultState(worldRadius); TA.sunFromElevation(state, 0.55);
@@ -731,6 +845,9 @@ function ingest(gltf) {
   if (tx && tx.floatsWeb) floats.adopt(tx);   // A13570 (a second dropped part without a block never clears the boats)   // A5403 · I2 (a second dropped part without a block never clears the world's doors)
   if (tx && tx.atmosphere && !pendingAtmos && !TA.hasBlock(tx)) applyAtmosphere(tx.atmosphere);
   worldRoot.add(gltf.scene);
+  worldFieldMeshes += TINK.tagFieldMeshes(gltf.scene);   // ★ the hatch field (an older file: 0 → the world fallback, no errors)
+  worldTagMeshes += TINK.tagNodeTags(gltf.scene);         // ★ V3 the stained glass: glow / no rose / no hatch, per node
+  if (inkRender) { inkRender.setFieldMeshes(worldFieldMeshes); inkRender.setTagMeshes(worldTagMeshes); }
   if (sky.tex) { skyEnv.useDome(sky.tex, sky.domes); L.sky.visible = false; }
   if (tx) applyThalynBlock(tx); // after the meshes are under worldRoot (water tint / anchors need them)
   $('s-meshes').textContent = meshCount.toLocaleString();
@@ -784,6 +901,7 @@ function frameWorld(honourShot = true) {
   const center = box.getCenter(new THREE.Vector3());
   const radius = Math.max(size.x, size.y, size.z) * 0.5 || 10;
   const dist = radius / Math.sin(THREE.MathUtils.degToRad(camera.fov * 0.5));
+  lastFrame = { box: box.clone(), center: center.clone(), dist };
   camera.near = Math.max(0.05, radius / 1000);
   camera.far = Math.max(dist * 8, 20000);
   camera.updateProjectionMatrix();
@@ -884,7 +1002,7 @@ function loadFromURLNow(url, name, shareUrl) {
   loader.load(url, gltf => {
       if (bar) { bar.style.width = '100%'; setTimeout(() => { bar.style.width = '0'; }, 600); }
       currentModelURL = shareUrl || url;
-      $('b-share-w').style.display = ''; $('b-together').style.display = '';
+      $('b-share-w').style.display = ''; $('b-together').style.display = ''; $('b-card').style.display = '';
       $('b-report-w').style.display = /\/worlds\/[^/]+\/[^/]+\//i.test(currentModelURL || '') ? '' : 'none';   // A14134 · a shared world (cards carry their own Report)
       findPostcard(currentModelURL);
       armSoundOnFirstGesture(); if (!$('t-sound').checked) toast(currentSongURL ? "Tap anywhere to hear this world — and its maker's song" : "Tap anywhere to hear this world");
@@ -897,6 +1015,7 @@ function loadFromURLNow(url, name, shareUrl) {
         if (!fresh) return;              // another world started loading meanwhile
         frameWorld(); if (perf) perf.markLanding();
         if (card) card.worldReady();
+        if (!(card && card.active)) openDiorama();   // ★ the opening shot: the world on a table, then "Dive in" (?diorama=0 skips it) · a Christmas card owns its own opening (cover + globe), so no table under it
         toast('Loaded ' + (name || '') ); $('empty').style.display = 'none';
         tableAR.check();   // A13550 · offer the table only where AR exists and a small enough file does
         beaconShareView(currentModelURL);   // ML harvest §4 — a view, counted only on a world that LOADED
@@ -1009,14 +1128,41 @@ if (coarsePointer) $('b-walk').textContent = 'Walk';
     doors.clickAt(nx, ny, e.pointerType === 'touch' ? 'tap' : 'click');
   });
 }
+// ★ LOOK ENGINE boost · THE DIORAMA OPENING (2026-11-02): a shared world first appears as a model on a table (the cut base with strata,
+// plinth, tabletop, painted card, table lamp, macro DoF); "Dive in" flies down to the picture and steps into the walk. Skipped for
+// ?diorama=0, a Together join (?session=), a headset, and any world with no straight cut edge (thalyn-diorama.js decides).
+function openDiorama() {
+  if (!diorama || !lastFrame || renderer.xr.isPresenting) return false;
+  const q = new URLSearchParams(location.search);
+  if (q.get('diorama') === '0' || q.get('session')) return false;
+  // the cut follows the SCENE SQUARE the game exported (extras.thalyn.bounds: centre ± radius in x/z) — the frame box also holds birds in
+  // flight, walls and props past the edge, which would put the cut out in the air
+  const wb = pendingThalyn ? TA.worldBounds(pendingThalyn) : null;
+  let box = lastFrame.box;
+  if (wb && wb.radius > 0) {
+    const r = wb.radius, lo = Number.isFinite(wb.minY) ? wb.minY : box.min.y, hi = Number.isFinite(wb.maxY) ? wb.maxY : box.max.y;
+    box = new THREE.Box3(new THREE.Vector3(wb.center.x - r, lo, wb.center.z - r), new THREE.Vector3(wb.center.x + r, hi, wb.center.z + r));
+  }
+  return diorama.open(box, groundAt, {
+    reduceMotion: reduceMotion.matches,
+    onDive: {
+      pose: () => shotPose ? { position: shotPose.position.clone(), target: shotPose.position.clone().addScaledVector(shotPose.forward, 30) } : null,
+      done: () => {
+        if (shotPose && walkMeshes.length) walk.enterPose(shotPose);   // into the picture, on foot (as the 'From the picture' button)
+        else if (walkMeshes.length) toggleWalk();                        // no picture: step in where the dive landed
+      },
+    },
+  });
+}
 function toggleWalk() {
+  if (diorama && diorama.active) diorama.close();   // the table is put away the moment you walk
   if (walk.active) { walk.exit(); return; }
   if (!walkMeshes.length) { toast('Load a world first'); return; }
   const t = controls.target.clone();
   walk.enterAt(new THREE.Vector3(t.x, t.y, t.z + 6), new THREE.Vector3(t.x, t.y, t.z - 20));
 }
 $('b-walk').onclick = toggleWalk;
-$('b-shot').onclick = () => { if (shotPose && walkMeshes.length) walk.enterPose(shotPose); };
+$('b-shot').onclick = () => { if (diorama && diorama.active) diorama.close(); if (shotPose && walkMeshes.length) walk.enterPose(shotPose); };
 
 // ── UI wiring ────────────────────────────────────────────────────────────────
 const dropEl = $('drop');
@@ -1025,7 +1171,7 @@ addEventListener('dragleave', e => { if (e.target === document || e.relatedTarge
 addEventListener('drop', e => { e.preventDefault(); dropEl.classList.remove('show'); if (e.dataTransfer?.files?.length) loadFiles(e.dataTransfer.files); });
 $('b-open').onclick = () => $('file').click();
 $('file').onchange = e => loadFiles(e.target.files);
-$('b-reset').onclick = () => { walk.exit(); frameWorld(false); };
+$('b-reset').onclick = () => { if (diorama && diorama.active) diorama.close(); walk.exit(); frameWorld(false); };
 $('t-wind').onchange = e => { kit.uWindStrength.value = e.target.checked ? parseFloat($('r-wind').value) : 0; };
 $('r-wind').oninput = e => { if ($('t-wind').checked) kit.uWindStrength.value = parseFloat(e.target.value); };
 $('t-sky').onchange = e => setSky(e.target.checked);
@@ -1070,6 +1216,23 @@ function shareURL() {
   if (currentThumbURL) u.searchParams.set('img', currentThumbURL);  // W10.1 · and the postcard: the unfurl shows THIS world
   return u.toString();
 }
+// ★ THE SHARE CARD × 4 LOOKS: the picture's pose (else the current view) under Natural / Saturday / Toytown / Storybook → one PNG
+async function shareCardBlob() {
+  if (diorama && diorama.active) diorama.close();
+  if (walk.active) walk.exit();
+  const table = await TL.palettes();
+  return TSC.shootLookStrip({ renderer, post, camera, controls, lookRender, table, tierName: tier.name, pose: shotPose, sunDir: state.sunDir,
+                              restoreLook: () => lookRender.set(wornLook.row, tier.name, wornLook.id) });
+}
+$('b-card').onclick = async () => {
+  toast('Shooting the picture in four looks…');
+  const blob = await shareCardBlob();
+  if (!blob) { toast('The share card could not be made'); return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'thalyn_four_looks.png'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast('Saved thalyn_four_looks.png');
+};
 $('b-share-w').onclick = () => {
   if (!currentModelURL) { toast('Load a world from a link first — a local file has no address to share'); return; }
   const link = shareURL();
@@ -1093,7 +1256,7 @@ $('share-send').onclick = async () => {
 $('share-close').onclick = () => $('share-panel').classList.remove('show');
 // Live colour controls — tone mapping shapes saturation/contrast; exposure = brightness.
 // (Tone mapping is compiled into each material's shader, so a change must flag loaded materials for recompile.)
-const TONEMAPS = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping, reinhard: THREE.ReinhardToneMapping, linear: THREE.LinearToneMapping, none: THREE.NoToneMapping };
+const TONEMAPS = { neutral: THREE.NeutralToneMapping ?? THREE.ACESFilmicToneMapping /* r162+; three@0.160 has none → ACES */, aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping, reinhard: THREE.ReinhardToneMapping, linear: THREE.LinearToneMapping, none: THREE.NoToneMapping };
 function setToneMapping(mode) {
   renderer.toneMapping = TONEMAPS[mode] ?? THREE.ACESFilmicToneMapping;
   worldRoot.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m) m.needsUpdate = true; }); });
@@ -1140,6 +1303,11 @@ function toast(msg, force) { if (card && card.quiet && !force) return;   // A136
 
 // ── Cinematic pass (bloom + per-tone grade) ──────────────────────────────────
 post = TA.makePost(renderer, scene, camera);
+post.setFileGrade(fileGrade);   // ★ A15440 (a world read before the pass existed)
+lookRender = TLR.makeLookRender(post, camera);   // ★ R1e · inert (disabled) until a look with a render block is worn
+inkRender = TINK.makeInk(post, camera, scene, renderer);   // ★ Looking-Glass live · inert until an ink look (not baked) is worn
+diorama = TD.makeDiorama({ scene, camera, renderer, controls, post, worldRoot, lights: L });   // ★ the diorama opening
+if (new URLSearchParams(location.search).get('debug') === '1') window.__thalyn = { THREE, scene, camera, controls, worldRoot, diorama, shareCard: async () => { const b = await shareCardBlob(); return b ? await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); }) : null; }, get groundAt() { return groundAt; }, get lastFrame() { return lastFrame; }, get tx() { return pendingThalyn; } };   // dev only: headless checks
 function resizeToViewport() {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   const pr = cappedPixelRatio(prRow);   // A5397 · B4: the cap moves with the window width
@@ -1442,8 +1610,16 @@ renderer.setAnimationLoop(() => {
     renderer.render(scene, camera); // the cinematic pass doesn't run in a headset — raw stereo render
   } else {
     if (card) card.tick(dt);   // A13681 · the globe's snow + the flight through the glass
+    if (diorama) diorama.tick(dt);   // ★ the diorama opening: the dive + its fade (no-op once the table is put away)
     if (walk.active) { walk.step(dt); stepSpin(true); } else if (!(card && card.mode === 'flying')) { stepSpin(false); controls.update(); }
     water.update(renderer, scene, camera, clock.elapsedTime);   // A1232 · the one mirror, before the frame (never in a headset)
+    if (lookRender && lookRender.enabled) lookRender.update(state.sunDir, post.composer.renderTarget1.width, post.composer.renderTarget1.height);   // ★ R1e
+    if (inkRender) inkRender.update(post.composer.renderTarget1.width, post.composer.renderTarget1.height, state.night);   // every frame: cheap when off (the cost-line baseline)
+    if (zoneAtmo && zoneAtmo.update(dt, camera.position)) {   // ★ per-biome sky + fog
+      const a = atmoState(); TA.applyState(a.s, L, renderer, scene, a.fogArg);
+      const k = zoneAtmo.skyKey;   // ★ (11-03) the sky FORM: one switch at the fade's midpoint
+      if (k !== zoneSkyKey) { zoneSkyKey = k; console.log(`[zoneatmo] sky → ${k ? `'${k}' (${zoneAtmo.skyMode(k)})` : "the dome's own"} (the form switch: mid-fade on a border, at once on a snap)`); useZoneSky(k); }
+    }
     post.render();
   }
 });
