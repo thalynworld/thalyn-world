@@ -70,7 +70,8 @@ function fromExtras(tx, notes) {
       timeOfDay: num(tx.timeOfDay, -1, 1, -1), clock: cleanText(tx.clock, 8), weather: cleanText(tx.weather, 32),
       bounds: isObj(tx.bounds) && tx.bounds.present !== false ? { center: vec3(tx.bounds.center), radius: num(tx.bounds.radius, 0, 1e6, 0), minY: num(tx.bounds.minY, -1e5, 1e5, 0), maxY: num(tx.bounds.maxY, -1e5, 1e5, 0) } : null,
       camera: isObj(tx.camera) && tx.camera.present !== false ? tx.camera : null,
-      spawn: null,
+      // ★ phase 1: the client's A16040 extras.thalyn.spawn (the app's own GAP-7 landing, glTF frame) - absent / present:false on older exports
+      spawn: isObj(tx.spawn) && tx.spawn.present === true && vec3(tx.spawn.pos) ? { pos: vec3(tx.spawn.pos), yawDeg: num(tx.spawn.yawDeg, -720, 720, 0) } : null,
     },
     files: [],
     atmosphere: { sky: isObj(tx.sky) ? tx.sky : null, fog: isObj(tx.fog) ? tx.fog : null, nightSky: isObj(tx.nightSky) ? tx.nightSky : null,

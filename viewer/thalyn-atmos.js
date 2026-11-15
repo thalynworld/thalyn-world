@@ -10,12 +10,12 @@
 // Everything degrades silently: no block → viewer defaults, no dome → procedural sky.
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
-import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { TIERS } from './thalyn-tiers.js?v=20261115p1';   // the waterfalls' budget reads the table (it moved to thalyn-tiers.js)
 // BVH-accelerated raycasting: an optimised single-file world merges into a handful of huge meshes
 // (a 13M-triangle ground-cover mesh was measured), and a per-frame linear raycast against that is
 // seconds per step. Trees are built lazily, only for meshes the ground probe actually touches.
@@ -491,186 +491,12 @@ export function makePost(renderer, scene, camera) {
   };
 }
 
-// ── First-person walk (pointer lock + WASD + ground follow; on a touch screen, a thumb-stick + look-drag) ──
-// groundAt(x, z, fromY) → y or null. onState(walking) is called on lock/unlock.
-// opts.touch = true → no pointer lock: the left half of the screen is a thumb-stick (drag to walk, push far
-// to run), the right half looks (drag). The stick is drawn by this module (two rings) and only while walking.
-// A308 (founder 2026-09-08: "respect things like trees in the walk — I cannot simply walk through them"). The glb's
-// living.trunks is a flat [x, z, x, z, …] of every gathered tree's ground point (glTF frame, already X-negated by the
-// exporter, the same frame every other position here uses). Bucketed on an 8 m grid so a step tests a handful of
-// trunks, never thousands. resolve(x, z) pushes a point out of any trunk circle it stands in — a slide, not a stop.
-export function makeTrunkField(radius = 0.45) {
-  const CELL = 8; let cells = new Map(), count = 0;
-  const key = (cx, cz) => cx + ',' + cz;
-  function set(flat) {
-    cells = new Map(); count = 0;
-    if (!Array.isArray(flat)) return;
-    for (let i = 0; i + 1 < flat.length; i += 2) {
-      const x = +flat[i], z = +flat[i + 1]; if (!isFinite(x) || !isFinite(z)) continue;
-      const k = key(Math.floor(x / CELL), Math.floor(z / CELL));
-      let c = cells.get(k); if (!c) { c = []; cells.set(k, c); }
-      c.push(x, z); count++;
-    }
-  }
-  function resolve(x, z) {
-    if (!count) return null;
-    const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
-    let ox = x, oz = z, moved = false;
-    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
-      const c = cells.get(key(cx + dx, cz + dz)); if (!c) continue;
-      for (let i = 0; i < c.length; i += 2) {
-        const tx = c[i], tz = c[i + 1];
-        let ddx = ox - tx, ddz = oz - tz; const d2 = ddx * ddx + ddz * ddz;
-        if (d2 >= radius * radius) continue;
-        const d = Math.sqrt(d2) || 1e-4; if (d < 1e-4) { ddx = 1e-4; ddz = 0; }
-        ox = tx + ddx / d * radius; oz = tz + ddz / d * radius; moved = true;
-      }
-    }
-    return moved ? { x: ox, z: oz } : null;
-  }
-  return { set, resolve, get count() { return count; } };
-}
-
-export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
-  const EYE = 1.7;
-  const touch = !!opts.touch;
-  const ctl = new PointerLockControls(camera, dom);
-  const keys = new Set();
-  let walking = false, walkY = 0, fly = false, swimming = false;
-  // Touch state
-  let yaw = 0, pitch = 0, joyId = null, lookId = null, jx = 0, jy = 0, jox = 0, joy = 0, lx = 0, ly = 0;
-  let stickEl = null, knobEl = null;
-  ctl.addEventListener('lock', () => { walking = true; onState && onState(true); });
-  ctl.addEventListener('unlock', () => { walking = false; keys.clear(); onState && onState(false); });
-  document.addEventListener('pointerlockerror', () => { walking = false; onState && onState(false, 'refused'); });
-  function syncAngles() { const e = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ'); yaw = e.y; pitch = e.x; }
-  function begin() {
-    if (touch) { syncAngles(); walking = true; showStick(true); onState && onState(true); }
-    else ctl.lock();
-  }
-  function enterAt(pos, lookAt) {
-    const g = groundAt(pos.x, pos.z, pos.y + 50);
-    walkY = (g !== null ? g : pos.y - EYE) + EYE;
-    camera.position.set(pos.x, walkY, pos.z);
-    if (lookAt) camera.lookAt(lookAt.x, lookAt.y, lookAt.z);
-    fly = false;
-    begin();
-  }
-  function enterPose(pose) {
-    const g = groundAt(pose.position.x, pose.position.z, pose.position.y + 50);
-    // Keep the picture's height if it stood within a few metres of the ground (a crane shot stays a crane shot).
-    fly = g === null || Math.abs((pose.position.y - EYE) - g) > 4;
-    walkY = pose.position.y;
-    camera.position.copy(pose.position);
-    camera.lookAt(pose.position.clone().add(pose.forward));
-    begin();
-  }
-  function exit() {
-    if (!walking) return;
-    if (touch) { walking = false; joyId = lookId = null; jx = jy = 0; showStick(false); onState && onState(false); }
-    else ctl.unlock();
-  }
-  // Touch input — only installed for touch mode, only acted on while walking.
-  if (touch) {
-    const opt = { passive: false };
-    dom.addEventListener('touchstart', e => {
-      if (!walking) return;
-      for (const t of e.changedTouches) {
-        if (t.target && /^(INPUT|TEXTAREA|SELECT|BUTTON|A|LABEL)$/.test(t.target.tagName)) continue;
-        if (t.clientX < innerWidth * 0.5 && joyId === null) { joyId = t.identifier; jox = t.clientX; joy = t.clientY; jx = jy = 0; placeStick(jox, joy); }
-        else if (lookId === null) { lookId = t.identifier; lx = t.clientX; ly = t.clientY; }
-        else continue;
-        e.preventDefault();
-      }
-    }, opt);
-    dom.addEventListener('touchmove', e => {
-      if (!walking) return;
-      for (const t of e.changedTouches) {
-        if (t.identifier === joyId) {
-          const R = 56; const dx = t.clientX - jox, dy = t.clientY - joy; const d = Math.hypot(dx, dy) || 1; const k = Math.min(1, d / R);
-          jx = dx / d * k; jy = dy / d * k; moveKnob(jx * R, jy * R); e.preventDefault();
-        } else if (t.identifier === lookId) {
-          yaw -= (t.clientX - lx) * 0.0045; pitch -= (t.clientY - ly) * 0.0045;
-          pitch = clamp(pitch, -1.45, 1.45); lx = t.clientX; ly = t.clientY; e.preventDefault();
-        }
-      }
-    }, opt);
-    const end = e => { for (const t of e.changedTouches) { if (t.identifier === joyId) { joyId = null; jx = jy = 0; moveKnob(0, 0); } if (t.identifier === lookId) lookId = null; } };
-    dom.addEventListener('touchend', end); dom.addEventListener('touchcancel', end);
-  }
-  function showStick(on) {
-    if (!touch) return;
-    if (!stickEl) {
-      stickEl = document.createElement('div'); stickEl.id = 'thalyn-stick';
-      stickEl.style.cssText = 'position:fixed;left:24px;bottom:90px;width:112px;height:112px;border-radius:50%;border:1px solid rgba(232,198,106,0.45);background:rgba(13,20,17,0.35);z-index:9;pointer-events:none;display:none';
-      knobEl = document.createElement('div');
-      knobEl.style.cssText = 'position:absolute;left:36px;top:36px;width:40px;height:40px;border-radius:50%;background:rgba(232,198,106,0.55);box-shadow:0 0 10px rgba(232,198,106,0.5)';
-      stickEl.appendChild(knobEl); document.body.appendChild(stickEl);
-    }
-    stickEl.style.display = on ? 'block' : 'none';
-    if (on) { stickEl.style.left = '24px'; stickEl.style.bottom = '90px'; stickEl.style.top = ''; moveKnob(0, 0); }
-  }
-  function placeStick(x, y) { if (!stickEl) return; stickEl.style.left = (x - 56) + 'px'; stickEl.style.top = (y - 56) + 'px'; stickEl.style.bottom = ''; }
-  function moveKnob(dx, dy) { if (knobEl) knobEl.style.transform = `translate(${dx}px, ${dy}px)`; }
-  const _fwd = new THREE.Vector3(), _right = new THREE.Vector3();
-  function step(dt) {
-    if (!walking) return;
-    let f = 0, r = 0, u = 0, run = keys.has('ShiftLeft') || keys.has('ShiftRight');
-    if (keys.has('KeyW') || keys.has('ArrowUp')) f += 1;
-    if (keys.has('KeyS') || keys.has('ArrowDown')) f -= 1;
-    if (keys.has('KeyD') || keys.has('ArrowRight')) r += 1;
-    if (keys.has('KeyA') || keys.has('ArrowLeft')) r -= 1;
-    if (keys.has('KeyE') || keys.has('Space')) u += 1;
-    if (keys.has('KeyQ') || keys.has('KeyC')) u -= 1;
-    if (touch) {
-      camera.rotation.set(pitch, yaw, 0, 'YXZ');
-      if (Math.hypot(jx, jy) > 0.08) { f = -jy; r = jx; run = Math.hypot(jx, jy) > 0.85; }
-    }
-    const speed = (run ? 12 : 5) * (swimming ? 0.5 : 1);
-    const ox = camera.position.x, oz = camera.position.z;   // A5401 · I1: the wall rays start where the step began (no tunnelling at low fps)
-    if (f || r) {
-      const n = Math.max(1, Math.hypot(f, r));
-      if (touch) {
-        camera.getWorldDirection(_fwd); _fwd.y = 0; if (_fwd.lengthSq() > 1e-6) _fwd.normalize();
-        _right.set(-_fwd.z, 0, _fwd.x);
-        camera.position.addScaledVector(_fwd, f / n * speed * dt).addScaledVector(_right, r / n * speed * dt);
-      } else { ctl.moveForward(f / n * speed * dt); ctl.moveRight(r / n * speed * dt); }
-      // A308 · trunks: slide out of any tree you stepped into (a walker on the ground only — flying passes over).
-      if (!fly && opts.blockAt) { const b = opts.blockAt(camera.position.x, camera.position.z); if (b) { camera.position.x = b.x; camera.position.z = b.z; } }
-      // A5401 · I1 · walls INSIDE a resident building (3 chest-height rays, slide along the hit normal — the blockAt contract); null outdoors.
-      if (!fly && opts.indoor) { const w = opts.indoor.wall(ox, oz, camera.position.x, camera.position.z, walkY - EYE); if (w) { camera.position.x = w.x; camera.position.z = w.z; } }
-      // A5403 · I2 · a CLOSED door leaf (thalyn-doors.js) stops you, outdoors and in — past 50° open it lets you by (the game's BlockBelowDeg).
-      if (!fly && opts.doors) { const w = opts.doors.block(ox, oz, camera.position.x, camera.position.z, walkY - EYE); if (w) { camera.position.x = w.x; camera.position.z = w.z; } }
-    }
-    if (u) { fly = true; walkY += u * speed * dt; }
-    if (!fly) {
-      // A5401 · I1 · floor, not roof: inside a resident building the floor ray starts at feet + step height (undefined ⇒ outdoors, as before).
-      const gi = opts.indoor ? opts.indoor.floor(camera.position.x, walkY - EYE, camera.position.z) : undefined;
-      const g = gi !== undefined ? gi : groundAt(camera.position.x, camera.position.z, camera.position.y + 3);
-      // A171 · SWIMMING (founder 2026-09-02: "there's no water to swim in, only the surface"): where the bed lies
-      // under a liquid surface you float, chest-deep, and move at half pace — the app's own swim. Deeper than
-      // the eye's reach the ground is left alone (the surface carries you); wading is just walking.
-      const w = opts.waterAt ? opts.waterAt(camera.position.x, camera.position.z) : null;
-      if (g !== null && w !== null && w - g > 1.2) { walkY = w + EYE - 1.1; if (!swimming) { swimming = true; onState && onState(true, 'swim'); } }
-      else { if (g !== null) walkY = g + EYE; if (swimming) { swimming = false; onState && onState(true, 'walk'); } }
-    } else if (keys.has('KeyF')) { fly = false; }
-    camera.position.y += (walkY - camera.position.y) * Math.min(1, dt * (swimming ? 4 : 12));
-  }
-  // A5403 · I2 · E OPENS THE DOOR YOU FACE (the app's E) — only when a door takes it; otherwise E flies as before (Space always flies).
-  // A press a door took is ignored until its key-up, so holding E after opening never starts a flight.
-  let eTaken = false;
-  function onKey(e, down) {
-    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return false;
-    if (e.code === 'KeyE') {
-      if (!down) { eTaken = false; keys.delete(e.code); return true; }
-      if (eTaken) return true;
-      if (walking && !e.repeat && opts.doors && opts.doors.use()) { eTaken = true; keys.delete('KeyE'); return true; }
-    }
-    if (down) keys.add(e.code); else keys.delete(e.code);
-    return true;
-  }
-  return { enterAt, enterPose, exit, step, onKey, get active() { return walking; }, get flying() { return fly; }, get swimming() { return swimming; }, get touch() { return touch; }, ctl };
-}
+// ── First-person walk → MOVED (WORLD AS DATA phase 1, client 2, 2026-11-15) ──
+// The walk is thalyn-walk.js (the pointer-lock / touch adapter) on thalyn-body.js (the pure body: gravity, jump, step-up, swim) and
+// thalyn-collide.js (trunks A308, the NEW mesh side probe, indoor walls, doors, the card fence). Re-exported here so TA.makeWalk /
+// TA.makeTrunkField keep working for every viewer that imports this file.
+export { makeWalk } from './thalyn-walk.js?v=20261115p1';
+export { makeTrunkField, makeMeshSideProbe } from './thalyn-collide.js?v=20261115p1';
 
 // A171 · the liquid surface under a point, from the export's own liquid rectangles (APP frame — X is negated
 // here, the same read the soundscape and the fauna make). Returns the surface Y or null. Lava is never water.
@@ -1373,66 +1199,8 @@ export function steamLink(source) {
   return STEAM_URL + '?utm_source=thalyn_world&utm_medium=' + encodeURIComponent(source) + '&utm_campaign=share';
 }
 
-// ── Quality tiers: ONE table every effect budgets against ───────────────────
-// The scar this honours: individually cheap effects, added one at a time, are what sank a Cosy world's
-// frame rate in the app. Here nothing sizes itself — every effect registers with makeTier and reads
-// its numbers from the row below; a new effect adds a column, never a private constant.
-// ★ A5386 grass (thalyn-grass.js): radius × density × the distance past which a tuft drops to its 4-triangle far form.
-// Desktop = the app's own field (SpeciesCoordinator grassCullDistance 60 m, the High density cap).
-// ★ A5389 ivy (thalyn-ivy.js): ivyCull = the game's cell sleep distance, Overgrowth SleepBeyondM 150 m × TierReachMul
-// (1 / 0.85 / 0.6); ivyKeep = 1 − TierTriMul (0 / 0.4 / 0.65): Medium/Low build 60 % / 35 % of the cards. The 60 → 130 m
-// thinning itself is the game's on every tier.
-// ★ A5396 (perf P1, spec B1/B3): shadowHalf 150 → 120 / 100 → 80 (same map, sharper texel, fewer casters);
-// shadowMinHeight = the casters law — a mesh whose world AABB is shorter than this casts no sun shadow (ground cover,
-// strokes, small props; ivy cards and the terrain never cast). interiorFirst* = the first interior load waits until
-// the frame EMA is under EmaMs for CalmS seconds (or CapS at most) so it never lands on the landing frames;
-// worldCompileCapS = the longest the world stays hidden while compileAsync builds its shader programs (never fatal).
-// ★ A5397 (perf P2, spec B2/B4/§C): maxBufferW = the drawing buffer's widest (px): pixel ratio = min(dpr, pixelRatio,
-// maxBufferW / innerWidth) at boot, on tier apply and on resize (2560 desktop; laptop/phone never above today's).
-// bandBelowM/bandAboveM = the storey band (thalyn-interiors.js planBand: a shown building draws the meshes meeting
-// [camY − below, camY + above] + its storey ± 1); bandCapTris = §C's per-building cap (INFORMATIONAL — the band log flags it).
-// bvhSliceMs … chestM = INDOORS I1's walk knobs (thalyn-indoors.js reads them via interiors.knobs; INDOOR_DEFAULTS = fallback).
-// ★ A13681 globeFlakes = the snow globe's flake count (thalyn-globe.js; card spec §3.1.3: 6000 / 3000 / 1200; the phone raised to 2400 on the founder's walk, A14420).
-// ★ A5398 splitBinM = the storey split's bin height when a building row carries no storey count (thalyn-interiors.js splitByStorey).
-export const TIERS = {
-  high:   { label: 'Desktop', pixelRatio: 2.0, shadows: true,  shadowMap: 2048, shadowHalf: 120, shadowMinHeight: 1.5, msaa: 4, bloom: true,  shafts: true,  weather: 1.0,  sprayPerFall: 220, fallsMax: 24, sheetRows: 28, foam: true,  voices: 12, canopies: 6, wisps: 8, fireLights: 48, lanternLights: 16, creatures: 48, birdRoutes: 6, perched: 24, grassRadius: 60, grassDensity: 1.0,  grassLod: 15, ivyCull: 150, ivyKeep: 0, interiorFirstEmaMs: 20, interiorFirstCalmS: 1, interiorFirstCapS: 6, worldCompileCapS: 4, maxBufferW: 2560, bandBelowM: 7, bandAboveM: 12, bandCapTris: 350000, splitBinM: 4, bvhSliceMs: 8, stepUpM: 0.6, fallGuardM: 3, wallRayM: 0.45, wallSpreadDeg: 35, wallRadiusM: 0.25, chestM: 1.2, globeFlakes: 6000 },
-  laptop: { label: 'Laptop',  pixelRatio: 1.5, shadows: true,  shadowMap: 1024, shadowHalf: 80,  shadowMinHeight: 1.5, msaa: 2, bloom: true,  shafts: false, weather: 0.55, sprayPerFall: 90,  fallsMax: 12, sheetRows: 20, foam: true,  voices: 8,  canopies: 4, wisps: 8, fireLights: 20, lanternLights: 8,  creatures: 16, birdRoutes: 4, perched: 12, grassRadius: 40, grassDensity: 0.6,  grassLod: 10, ivyCull: 127.5, ivyKeep: 0.4, interiorFirstEmaMs: 20, interiorFirstCalmS: 1, interiorFirstCapS: 6, worldCompileCapS: 5, maxBufferW: 2160, bandBelowM: 7, bandAboveM: 12, bandCapTris: 250000, splitBinM: 4, bvhSliceMs: 8, stepUpM: 0.6, fallGuardM: 3, wallRayM: 0.45, wallSpreadDeg: 35, wallRadiusM: 0.25, chestM: 1.2, globeFlakes: 3000 },
-  lite:   { label: 'Phone',   pixelRatio: 1.0, shadows: false, shadowMap: 512,  shadowHalf: 0,   shadowMinHeight: 1.5, msaa: 0, bloom: false, shafts: false, weather: 0.30, sprayPerFall: 36,  fallsMax: 6,  sheetRows: 12, foam: false, voices: 5,  canopies: 3, wisps: 8, fireLights: 6,  lanternLights: 3,  creatures: 6,  birdRoutes: 2, perched: 6,  grassRadius: 25, grassDensity: 0.35, grassLod: 6, ivyCull: 90, ivyKeep: 0.65, interiorFirstEmaMs: 20, interiorFirstCalmS: 1, interiorFirstCapS: 6, worldCompileCapS: 8, maxBufferW: 1440, bandBelowM: 7, bandAboveM: 12, bandCapTris: 150000, splitBinM: 4, bvhSliceMs: 16, stepUpM: 0.6, fallGuardM: 3, wallRayM: 0.45, wallSpreadDeg: 35, wallRadiusM: 0.25, chestM: 1.2, globeFlakes: 2400 },
-};
-// ★ A13560 Quest (WebXR in the Meta Quest browser, spec §3.4): the Phone row's budgets (every module that keys a
-// table by tier name is handed `as` = 'lite') plus the headset's own columns: xrScale = framebuffer scale, foveation =
-// fixed foveation 0..1, teleport = default locomotion, smoothMps = the opt-in smooth walk's speed.
-TIERS.quest = Object.assign({}, TIERS.lite, { label: 'Quest', as: 'lite', xrScale: 0.9, foveation: 1, teleport: true, smoothMps: 2.0 });
-
-// Heuristic: what the device says about itself. Returns { name, why } so the HUD can show the reason.
-export function guessTier(renderer) {
-  const ua = navigator.userAgent || '';
-  const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua) && !/Chrome/.test(ua));
-  let gpu = '';
-  try { const gl = renderer.getContext(); const dbg = gl.getExtension('WEBGL_debug_renderer_info'); if (dbg) gpu = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || ''; } catch (e) {}
-  const g = gpu.toLowerCase();
-  if (/OculusBrowser|Quest/i.test(ua)) return { name: 'quest', why: 'Quest browser' };
-  if (mobile) return { name: 'lite', why: 'phone/tablet' };
-  if (/swiftshader|llvmpipe|software|basic render/.test(g)) return { name: 'lite', why: 'software GPU' };
-  if (/intel|iris|uhd|hd graphics|mali|adreno|apple gpu|apple m1|powervr/.test(g)) return { name: 'laptop', why: gpu.slice(0, 40) || 'integrated GPU' };
-  if ((navigator.hardwareConcurrency || 8) <= 4) return { name: 'laptop', why: 'few cores' };
-  return { name: 'high', why: gpu.slice(0, 40) || 'desktop' };
-}
-export function makeTier(renderer, forced) {
-  const listeners = [];
-  const guess = guessTier(renderer);
-  let name = TIERS[forced] ? forced : guess.name, auto = !TIERS[forced];
-  function set(n) {
-    if (n === 'auto' || !n) { auto = true; n = guess.name; } else auto = false;
-    if (!TIERS[n]) n = guess.name;
-    name = n;
-    for (const fn of listeners) { try { fn(TIERS[name], name); } catch (e) { console.warn('[tier]', e); } }
-  }
-  return {
-    on(fn) { listeners.push(fn); try { fn(TIERS[name], name); } catch (e) { console.warn('[tier]', e); } },
-    set, get name() { return name; }, get table() { return TIERS[name]; }, get auto() { return auto; }, get guess() { return guess; },
-  };
-}
+// ── Quality tiers → MOVED to thalyn-tiers.js (WORLD AS DATA phase 1, client 2, 2026-11-15), re-exported unchanged ──
+export { TIERS, guessTier, makeTier } from './thalyn-tiers.js?v=20261115p1';
 
 // ── Waterfalls: running water where the world says it falls ─────────────────
 // One sheet (a scrolling-noise ribbon, lip → plunge, over a free-fall arc), one foam disc at the plunge,

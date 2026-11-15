@@ -107,6 +107,14 @@ check('empty object reads as old extras', describeWorld({}).source === 'extras' 
   check('doc: unknown section named', r.notes.some(n => n.includes("unknown section 'futureThing'")) && !('futureThing' in d));
 }
 
+// ── phase 1: the client's spawn block (A16040) becomes world.spawn ──
+{
+  const r = describeWorld({ version: '1', spawn: { present: true, pos: [3, 4, 5], yawDeg: -90, source: 'server' } });
+  check('spawn: read from extras', r.doc.world.spawn && r.doc.world.spawn.pos[1] === 4 && r.doc.world.spawn.yawDeg === -90);
+  check('spawn: present false = null', describeWorld({ version: '1', spawn: { present: false, pos: [1, 2, 3] } }).doc.world.spawn === null);
+  check('spawn: bad pos = null', describeWorld({ version: '1', spawn: { present: true, pos: [1, 'x', 3] } }).doc.world.spawn === null);
+}
+
 // ── a document from the future ──
 {
   const r = describeWorld({ schema: 3, world: { tone: 'Joyful' } });

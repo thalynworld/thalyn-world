@@ -287,7 +287,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import * as TA from './thalyn-atmos.js?v=20261112g1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
+import * as TA from './thalyn-atmos.js?v=20261115p1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
 import * as TG from './thalyn-together.js';
 import * as TF from './thalyn-fauna.js?v=20261108k1';   // A14133 · facing + stride-matched clip rate (bump on change)
 import * as TGR from './thalyn-grass.js?v=20261109v4';   // A5386 · the grass field grown from extras.thalyn.grass
@@ -303,7 +303,8 @@ import * as TXR from './thalyn-xr.js?v=20261108x2';        // A13560 · the head
 import * as TFL from './thalyn-floats.js?v=20261108b1';    // A13570 · boats that bob (extras.thalyn.floatsWeb + living.floats)
 import * as TW from './thalyn-water.js?v=20261021w1';       // A1232 · the game's water: flat, ONE shared mirror, ripples, opaque tone (bump on change)       // A5403 · I2 doors that open: E / click / tap, a closed leaf blocks (extras.thalyn.doorsWeb + the door rows)
 import * as TL from './thalyn-look.js?v=20261102a1';
-import * as TGD from './thalyn-grade.js?v=20261112g1';   // ★ A15440 · the walk's own grade (extras.thalyn.grade; bump on change)
+import * as TGD from './thalyn-grade.js?v=20261112g1';
+import * as TDESC from './thalyn-describe.js?v=20261115p1';   // ★ WORLD AS DATA · the World Description reader (rules + spawn for the body, phase 1)   // ★ A15440 · the walk's own grade (extras.thalyn.grade; bump on change)
 import * as TD from './thalyn-diorama.js?v=20261102a1';
 import * as TLR from './thalyn-lookrender.js?v=20261102a1';
 import * as TINK from './thalyn-ink.js?v=20261103c1';
@@ -414,7 +415,7 @@ function apply() {
 
 // ── The Thalyn block ─────────────────────────────────────────────────────────
 let pendingThalyn = null, pendingAtmos = null;
-let anchorRoot = null, shotPose = null;
+let anchorRoot = null, shotPose = null, worldSpawn = null;   // ★ phase 1: worldSpawn = the World Description's world.spawn (client A16040), null on older exports
 let diorama = null, lastFrame = null;   // ★ the diorama opening (thalyn-diorama.js) + the last frameWorld box it stands on
 let lookRender = null;
 let inkRender = null;          // ★ Looking-Glass live (thalyn-ink.js) - inert until an ink look that is not baked is worn
@@ -645,6 +646,8 @@ function applyThalynBlock(tx) {
     pc.onclick = async () => { try { await navigator.clipboard.writeText(code); toast('Postcard code copied: ' + code); }
                                catch (e) { toast('Copy failed — ' + code); } };
     shotPose = TA.cameraPose(tx);
+    // ★ WORLD AS DATA phase 1: the description gives the body its rules (walk / run / jump / step / eye, fly off) and the arrival point
+    { const d = TDESC.describeWorld(tx); worldSpawn = d.doc ? d.doc.world.spawn : null; if (d.doc) walk.setRules(d.doc.rules); console.info(TDESC.summarize(d)); for (const n of d.notes) console.info(n); }
     $('b-shot').style.display = (shotPose && !coarsePointer) ? '' : 'none';
     showTitle(name, [tx.creator ? 'woven by ' + String(tx.creator).slice(0, 40) : '', tx.tone, tx.clock, tx.weather].filter(Boolean).join(' · '));
     $('cta').classList.add('show');
@@ -774,7 +777,7 @@ function resetWorld() {
 // Restore lighting/fog/wind/exposure to the viewer's defaults so a world with no atmosphere block
 // (or fewer fields) does not inherit the previous world's atmosphere when switching.
 function resetAtmosphere() {
-  pendingAtmos = null; pendingThalyn = null; anchorRoot = null; shotPose = null;
+  pendingAtmos = null; pendingThalyn = null; anchorRoot = null; shotPose = null; worldSpawn = null;
   if (lookRender) lookRender.set(null, tier.name, 'natural');   // ★ R1e: a new world starts natural until its own tag says otherwise
   if (inkRender) inkRender.set(null, tier.name, 'natural');
   wornLook = { row: null, id: 'natural' };
@@ -1109,10 +1112,12 @@ const walk = TA.makeWalk(camera, document.body, groundAt, (on, why) => {
   controls.enabled = !on;
   $('b-walk').textContent = on ? (coarsePointer ? 'Stop walking' : 'Orbit (V)') : (coarsePointer ? 'Walk' : 'Walk (V)');
   $('b-walk-m').textContent = on ? 'Stop' : 'Walk';
-  if (on) toast(coarsePointer ? 'Left thumb walks · right thumb looks · push far to run · tap a door to open it' : 'WASD to walk · Shift to run · E opens a door you face · E/Space up, Q down · F back to ground · Esc or V to leave');
+  if (on) toast(coarsePointer ? 'Left thumb walks · right thumb looks · push far to run · tap to jump · tap a door to open it' : (walk.allowFly ? 'WASD to walk · Shift to run · Space jumps · E opens a door you face · F flies (E/Space up, Q down) · Esc or V to leave' : 'WASD to walk · Shift to run · Space jumps · E opens a door you face · Esc or V to leave'));
   else if (why === 'refused') toast('Pointer lock refused — try V again in a second');
   else { const fwd = new THREE.Vector3(); camera.getWorldDirection(fwd); controls.target.copy(camera.position).addScaledVector(fwd, 30); controls.update(); }
-}, { touch: coarsePointer, waterAt: (x, z) => waterProbe(x, z), blockAt: (x, z) => { const b = trunkField.resolve(x, z), p = b || { x, z }, f = card && card.fence(p.x, p.z); return f || b; }, indoor, doors });   // A5401 · I1 · A5403 · I2 doors
+}, { touch: coarsePointer, allowFly: new URLSearchParams(location.search).get('fly') === '1',
+     sideProbe: TA.makeMeshSideProbe(THREE, walkMeshes, { radius: 0.35 }),   // ★ phase 1: walls, props, heroes, fences, rocks block (thalyn-collide.js)
+     waterAt: (x, z) => waterProbe(x, z), blockAt: (x, z) => { const b = trunkField.resolve(x, z), p = b || { x, z }, f = card && card.fence(p.x, p.z); return f || b; }, indoor, doors });   // A5401 · I1 · A5403 · I2 doors
 if (coarsePointer) $('b-walk').textContent = 'Walk';
 // ★ A5403 · I2: a click or a tap on a door leaf toggles it (phones have no E). A drag (orbit, look) is never a click: < 6 px and < 400 ms.
 {
@@ -1542,7 +1547,7 @@ card = TCARD.makeCard({
     return _cardLight;
   },
   hasShot: () => !!(shotPose && walkMeshes.length),
-  enterDefault: () => { if (shotPose && walkMeshes.length) walk.enterPose(shotPose); else if (!walk.active) toggleWalk(); },
+  enterDefault: () => { if (worldSpawn && walkMeshes.length) walk.enterSpawn(worldSpawn); else if (shotPose && walkMeshes.length) walk.enterPose(shotPose); else if (!walk.active) toggleWalk(); },   // ★ phase 1: the world's spawn first
 });
 { const w = TCARD.parseCardText(location.hash); if (w) card.setWords(w); }
 
