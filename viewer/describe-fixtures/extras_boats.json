@@ -1,0 +1,37 @@
+{
+ "version": "1",
+ "tone": "Serene",
+ "floatsWeb": {
+  "version": 1,
+  "frame": "gltf",
+  "file": "Interiors_998_web.glb",
+  "bytes": 1,
+  "nodes": [
+   "FloatHull_0",
+   "FloatHull_1"
+  ],
+  "boats": 1,
+  "rollHz": 0.23,
+  "pitchHz": 0.37
+ },
+ "living": {
+  "floats": [
+   {
+    "pos": [
+     0,
+     0,
+     8
+    ],
+    "draft": 0.5,
+    "amp": 0.3,
+    "freqA": 0.45,
+    "freqB": 0.31,
+    "tiltDeg": 6,
+    "phase": 0.7,
+    "ship": false,
+    "node": "FloatHull_0",
+    "file": "Interiors_998_web.glb"
+   }
+  ]
+ }
+}

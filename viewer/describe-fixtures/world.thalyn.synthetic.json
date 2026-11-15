@@ -1,0 +1,25 @@
+{
+ "schema": 1,
+ "world": { "worldId": "synthetic-0001", "seed": 42, "tone": "Serene", "sizeTier": "Glade", "worldName": "A test glade", "creator": "", "timeOfDay": 0.5,
+   "spawn": { "pos": [1, 2, 3], "yawDeg": 90 } },
+ "files": [
+  { "role": "world", "file": "World_web.glb", "bytes": 1000, "tris": 2000 },
+  { "role": "interior", "file": "Interiors_001_web.glb", "bytes": 500, "tris": 100, "building": "keep" },
+  { "role": "kit", "file": "Kit_forest.glb", "bytes": 300 },
+  { "role": "world", "file": "../escape.glb" },
+  { "role": "script", "file": "Evil.js" }
+ ],
+ "atmosphere": { "dayCurve": [ { "hour": 6, "sunIntensity": 0.4 }, { "hour": 12, "sunIntensity": 1.2 } ], "grade": { "present": true, "version": 9 } },
+ "kit": [ { "id": "TMN-oak-01", "class": "tree", "file": "Kit_forest.glb", "node": "oak_LOD0" }, { "id": "TMN-x", "class": "spaceship", "file": "Kit_forest.glb" } ],
+ "instances": [ { "kit": "TMN-oak-01", "count": 3, "encoding": "base64-f32", "columns": { "pos": "AAAA" } } ],
+ "lights": [ { "kind": "lantern", "pos": [0, 1, 0], "color": [1, 0.8, 0.5], "onAt": "night", "range": 9000 }, { "kind": "lantern", "pos": [0, 1, 0], "onAt": "disco" } ],
+ "interact": [
+  { "id": "zip:0", "type": "zip", "anchor": [0, 10, 0], "params": { "sagFraction": 0.015 }, "sync": "local" },
+  { "id": "door:0", "type": "door", "file": "Interiors_001_web.glb", "node": "Door_0" },
+  { "id": "bad:0", "type": "teleport", "anchor": [0, 0, 0] },
+  { "id": "bad:1", "type": "seat", "file": "Not_listed.glb" }
+ ],
+ "rules": { "walkMps": 99, "jumpM": 1.2, "edit": true, "allowed": ["zip", "door", "fireworks"] },
+ "stream": { "version": 1, "cellM": 128, "cells": [ { "aabb": [0, 0, 0, 1, 1, 1], "files": ["Kit_forest.glb", "Unlisted.glb", "../x.glb"] } ] },
+ "futureThing": { "x": 1 }
+}
