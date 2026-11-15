@@ -19,6 +19,7 @@ import { TIERS } from './thalyn-tiers.js?v=20261115p1';   // the waterfalls' bud
 // BVH-accelerated raycasting: an optimised single-file world merges into a handful of huge meshes
 // (a 13M-triangle ground-cover mesh was measured), and a per-frame linear raycast against that is
 // seconds per step. Trees are built lazily, only for meshes the ground probe actually touches.
+import { isFrozen } from './thalyn-liquid.js?v=20261115i1';   // ★ A17160 a frozen lake is walkable ice, never swum (bump with thalyn-liquid.js)
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.6/build/index.module.js';
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
 THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
@@ -504,6 +505,7 @@ export function makeWaterProbe(liquids) {
   const rects = [];
   for (const l of (liquids || [])) {
     if (!l || l.type !== 'water' || !Array.isArray(l.centerXZ) || !Array.isArray(l.sizeXZ)) continue;
+    if (isFrozen(l)) continue;   // ★ A17160 frozen solid (ice >= 0.55, the Thalyn_Ice_Baked sheet): the walk stands on the sheet, no swim
     rects.push({ cx: -l.centerXZ[0], cz: l.centerXZ[1], hx: Math.max(0.5, l.sizeXZ[0] * 0.5), hz: Math.max(0.5, l.sizeXZ[1] * 0.5), y: +l.surfaceY || 0 });
   }
   return (x, z) => {

@@ -287,7 +287,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import * as TA from './thalyn-atmos.js?v=20261115p1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer
+import * as TA from './thalyn-atmos.js?v=20261115m1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer (m1 = phase 1 body + A17140-A17160 merged)
 import * as TG from './thalyn-together.js';
 import * as TF from './thalyn-fauna.js?v=20261108k1';   // A14133 · facing + stride-matched clip rate (bump on change)
 import * as TGR from './thalyn-grass.js?v=20261109v4';   // A5386 · the grass field grown from extras.thalyn.grass
@@ -301,10 +301,12 @@ import * as TRP from './thalyn-report.js?v=20261108p1';    // A14134 · Report t
 import * as TAR from './thalyn-ar.js?v=20261108a2';        // A13550 · View on your table (phone AR via model-viewer, loaded on tap)
 import * as TXR from './thalyn-xr.js?v=20261108x2';        // A13560 · the headset: teleport / smooth, wrist menu, controllers, giant scale
 import * as TFL from './thalyn-floats.js?v=20261108b1';    // A13570 · boats that bob (extras.thalyn.floatsWeb + living.floats)
-import * as TW from './thalyn-water.js?v=20261021w1';       // A1232 · the game's water: flat, ONE shared mirror, ripples, opaque tone (bump on change)       // A5403 · I2 doors that open: E / click / tap, a closed leaf blocks (extras.thalyn.doorsWeb + the door rows)
+import * as TW from './thalyn-water.js?v=20261115i1';       // A1232 · the game's water: flat, ONE shared mirror, ripples, opaque tone (bump on change)       // A5403 · I2 doors that open: E / click / tap, a closed leaf blocks (extras.thalyn.doorsWeb + the door rows)
 import * as TL from './thalyn-look.js?v=20261102a1';
 import * as TGD from './thalyn-grade.js?v=20261112g1';
 import * as TDESC from './thalyn-describe.js?v=20261115p1';   // ★ WORLD AS DATA · the World Description reader (rules + spawn for the body, phase 1)   // ★ A15440 · the walk's own grade (extras.thalyn.grade; bump on change)
+import * as TLQ from './thalyn-liquid.js?v=20261115i1';   // ★ A17150 / A17160 · shore foam numbers + frozen lakes are ground (bump with thalyn-water / thalyn-atmos imports)
+import * as TVAR from './thalyn-variation.js?v=20261115i1';   // ★ A17140 · per-instance foliage variation from extras.thalyn.foliage (bump on change)   // ★ A15440 · the walk's own grade (extras.thalyn.grade; bump on change)
 import * as TD from './thalyn-diorama.js?v=20261102a1';
 import * as TLR from './thalyn-lookrender.js?v=20261102a1';
 import * as TINK from './thalyn-ink.js?v=20261103c1';
@@ -491,6 +493,25 @@ function buildGrass(tx) {
   grass.build(tx, TA.makeGroundProbe(terrain.length ? terrain : walkMeshes), kind);
   grass.setBudget(tier.table, tier.name);
 }
+// ★ A17150 SHORE FOAM: one top-down height map of the terrain (thalyn-water.js setShore), built once per world on the pass that has the walk meshes.
+let shoreFor = null;
+function buildShore(tx) {
+  if (!tx || shoreFor === tx || !walkMeshes.length) return;
+  shoreFor = tx;
+  const terrain = walkMeshes.filter(e => (Array.isArray(e.mesh.material) ? e.mesh.material : [e.mesh.material]).some(isTerrainMat)).map(e => e.mesh);
+  const at = tx.atmosphere || {};
+  water.setShore(renderer, scene, terrain, tx.liquids || [], at.windStrength, at.windSpeed);
+}
+// ★ A17140 PER-INSTANCE FOLIAGE VARIATION: the walk's leaf chain re-run per instance from extras.thalyn.foliage (thalyn-variation.js). ?variation=0 = off (A/B).
+let variationFor = null;
+function buildVariation(tx) {
+  if (!tx || variationFor === tx) return;
+  variationFor = tx;
+  const off = new URLSearchParams(location.search).get('variation') === '0';
+  const r = off ? null : TVAR.applyFoliageVariation(tx.foliage, worldRoot, foliageTime);
+  console.info(TVAR.describeVariation(tx.foliage, r, off));
+}
+const foliageTime = { value: 0 };   // ★ A17140 the clock the joyful / chaotic / eerie patterns animate on (the game's _Time.y)
 let fileWeather = '', weatherOverride = '', currentModelURL = null;
 // W10 · ?song=<https url to song.wav>: the maker's tune RENDERED in the app (the glb carries notes only).
 let currentSongURL = null;
@@ -614,10 +635,11 @@ function applyThalynBlock(tx) {
     const fallTint = shallow ? shallow.clone().lerp(new THREE.Color(0.92, 0.96, 0.98), 0.55) : new THREE.Color(0.62, 0.82, 0.9);
     const nFalls = waterfalls.build(lv ? lv.waterfalls : null, fallTint);
     const wbF = TA.worldBounds(tx);
-    const nFauna = fauna.build(lv ? lv.fauna : null, { tone: tx.tone, night: state.night, liquids: tx.liquids || [], worldRadius: wbF ? wbF.radius : worldRadius, center: wbF ? wbF.center : null });
+    const openLiq = TLQ.openLiquids(tx.liquids);   // ★ A17160 a frozen body is ground: no swim, no mirror, no foam, no water birds, no lapping sound
+    const nFauna = fauna.build(lv ? lv.fauna : null, { tone: tx.tone, night: state.night, liquids: openLiq, worldRadius: wbF ? wbF.radius : worldRadius, center: wbF ? wbF.center : null });
     const nLights = lanterns.build(lv ? lv.lights : null); lanterns.setNight(state.night);
     const song = tx.song && tx.song.present ? tx.song : null;   // THE LISTENING WOOD — the maker's hummed tune, notes only
-    audio.setWorld({ waterfalls: lv ? lv.waterfalls : [], liquids: tx.liquids || [], canopies: lv ? lv.canopies : [], anchors: tx.anchors || [], song, songUrl: currentSongURL });
+    audio.setWorld({ waterfalls: lv ? lv.waterfalls : [], liquids: openLiq, canopies: lv ? lv.canopies : [], anchors: tx.anchors || [], song, songUrl: currentSongURL });
     trunkField.set(lv ? lv.trunks : null); if (trunkField.count) console.info('[thalyn] ' + trunkField.count + ' trunk(s) block the walk');
     if (lv) console.info('[thalyn] living: ' + nFalls + ' waterfall(s) built of ' + ((lv.waterfalls || []).length) + ', ' + ((lv.canopies || []).length) + ' canopy zone(s), ' + nLights + ' lantern/bulb light(s), ' + audio.sources + ' sound source(s), ' + nFauna.creatures + ' creature(s) + ' + nFauna.birds + ' bird(s)' + (song ? ', the maker\'s tune (' + audio.song + ' notes, ' + song.voice + ', level ' + audio.songLevel + (audio.songTitle ? ', "' + audio.songTitle + '"' : '') + ')' : ''));
     if (song && audio.songTitle) setTimeout(() => toast('This wood sings "' + audio.songTitle + '" — turn Sound on to hear it'), 2500);
@@ -629,8 +651,11 @@ function applyThalynBlock(tx) {
     if (cinemaSeed) console.info('[thalyn] cinema: the world carries a screen (' + cinemaSeed.w.toFixed(1) + ' m wide' + (cinemaSeed.floating ? ', floating' : '') + (cs.count > 1 ? ', ' + cs.count + ' standing' : '') + ') — a shared session stands it there');
     if (together) together.setCinemaSeed(cinemaSeed);
     syncSoloScreen();
-    waterProbe = TA.makeWaterProbe(tx.liquids || []);   // A171 · swimming
-    water.setLiquids(tx.liquids || []);   // A1232 · the mirror's water rectangles (the sea ring never mirrors)
+    waterProbe = TA.makeWaterProbe(tx.liquids || []);   // A171 · swimming (★ A17160 frozen rows skipped inside: the walk stands on the ice sheet)
+    water.setLiquids(tx.liquids || []);   // A1232 · the mirror's water rectangles (the sea ring never mirrors; ★ A17160 nor a frozen sheet)
+    { const iceLine = TLQ.describeIce(tx.liquids); if (iceLine && shoreFor !== tx) console.info(iceLine); }
+    buildShore(tx);                                       // ★ A17150 · shore foam (needs the terrain meshes, so it builds on the frameWorld pass)
+    buildVariation(tx);                                   // ★ A17140 · per-instance foliage variation (extras.thalyn.foliage)
     buildGrass(tx);                                       // A5386 · needs the walk meshes, so it builds on the frameWorld pass
     // HUD: world name · tone · clock · weather, the postcard code, the shot.
     const name = String(tx.worldName || tx.sceneName || 'Thalyn world').slice(0, 40);
@@ -760,7 +785,7 @@ function clearWorld() {
   water.clear();   // A1232
   fauna.clear();
   lanterns.clear();
-  grass.clear(); grassFor = null;
+  grass.clear(); grassFor = null; shoreFor = null; variationFor = null;   // ★ A17150 / A17140
   ivy.clear();
   interiors.clear(); indoor.reset(); doors.clear(); floats.clear();
   audio.setWorld(null); trunkField.set(null);
@@ -1591,6 +1616,7 @@ renderer.setAnimationLoop(() => {
     weather.tick(dt, kit.uWindStrength.value);
     waterfalls.tick(dt, camera, scene.fog ? scene.fog.density : 0, scene.fog ? scene.fog.color : null);
     fauna.setNight(state.night); fauna.tick(dt, camera);
+    water.setNight(state.night); foliageTime.value += dt;   // ★ A17150 foam dims at night · ★ A17140 the patterns' clock
     lanterns.setNight(state.night); lanterns.tick(dt, camera);
     waterfalls.setLight(Math.max(0.08, 1 - state.night * 0.92) * Math.min(1, 0.4 + state.sunIntensity / 2.2 * weather.sunDim));
   }
