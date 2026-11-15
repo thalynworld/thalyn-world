@@ -17,6 +17,8 @@ const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
 // groundAt(x, z, fromY) → y or null. onState(walking, why) is called on lock/unlock and on a swim/walk change.
 // opts: touch · waterAt(x, z) · blockAt(x, z) (trunks + a card's fence, a point resolver) · indoor (thalyn-indoors.js) · doors (thalyn-doors.js)
 //       sideProbe(ox, oz, nx, nz, feetY) (thalyn-collide.js makeMeshSideProbe) · rules (World Description rules) · allowFly (bool)
+//       ★ phase 2: interact (thalyn-interact.js makeInteract) · claimTap(clientX, clientY) -> bool (THE TAP LAW: a claimed still tap never jumps) ·
+//       onPrompt(text) ('' = none) · onToast(text) · onBoat({id, x, y, z, yawDeg, row}) (the hull follows the rower)
 export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
   let R = bodyRules(opts.rules);
   let allowFly = !!opts.allowFly || !!(opts.rules && opts.rules.fly);
@@ -25,6 +27,7 @@ export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
   const keys = new Set();
   const body = makeBody();
   let walking = false, fly = false, flyY = 0, jumpQueued = false, lastLog = 0;
+  let pressedEdge = false, promptT = 0, promptText = '';   // ★ phase 2: a move key / Space went down this frame (a seat stands you up) · the shown prompt
   // Touch state
   let yaw = 0, pitch = 0, joyId = null, lookId = null, jx = 0, jy = 0, jox = 0, joy = 0, lx = 0, ly = 0, lookT0 = 0, lookMoved = 0;
   let stickEl = null, knobEl = null;
@@ -91,10 +94,13 @@ export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
   }
   function exit() {
     if (!walking) return;
+    if (opts.interact && opts.interact.riding) opts.interact.abort('left the walk');
+    showPrompt('');
     if (touch) { walking = false; joyId = lookId = null; jx = jy = 0; showStick(false); onState && onState(false); }
     else ctl.unlock();
   }
   // Touch input — only installed for touch mode, only acted on while walking.
+  const evT = e => (e && e.timeStamp > 0 ? e.timeStamp : performance.now());   // the event's own time (same clock as performance.now)
   if (touch) {
     const opt = { passive: false };
     dom.addEventListener('touchstart', e => {
@@ -102,7 +108,7 @@ export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
       for (const t of e.changedTouches) {
         if (t.target && /^(INPUT|TEXTAREA|SELECT|BUTTON|A|LABEL)$/.test(t.target.tagName)) continue;
         if (t.clientX < innerWidth * 0.5 && joyId === null) { joyId = t.identifier; jox = t.clientX; joy = t.clientY; jx = jy = 0; placeStick(jox, joy); }
-        else if (lookId === null) { lookId = t.identifier; lx = t.clientX; ly = t.clientY; lookT0 = performance.now(); lookMoved = 0; }
+        else if (lookId === null) { lookId = t.identifier; lx = t.clientX; ly = t.clientY; lookT0 = evT(e); lookMoved = 0; }
         else continue;
         e.preventDefault();
       }
@@ -123,7 +129,10 @@ export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
     const end = e => {
       for (const t of e.changedTouches) {
         if (t.identifier === joyId) { joyId = null; jx = jy = 0; moveKnob(0, 0); }
-        if (t.identifier === lookId) { if (lookMoved < 8 && performance.now() - lookT0 < 250) jumpQueued = true; lookId = null; }   // a quick still tap jumps
+        // a quick still tap jumps - unless something claims it first (THE TAP LAW, thalyn-interact.js claimTap: a ride, the thing you stand by, a door leaf)
+        // (a tap is timed by the EVENTS' own timestamps - when the finger touched and lifted - never by when the handler ran: a slow frame between the two must not
+        //  turn a tap into a "hold". Found by the phase-2 headless smoke at 0.1 fps; a phone hitch does the same.)
+        if (t.identifier === lookId) { if (e.type === 'touchend' && lookMoved < 8 && evT(e) - lookT0 < 250 && !(opts.claimTap && opts.claimTap(t.clientX, t.clientY))) jumpQueued = true; lookId = null; }
       }
     };
     dom.addEventListener('touchend', end); dom.addEventListener('touchcancel', end);
@@ -162,6 +171,9 @@ export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
     const n = Math.max(1, Math.hypot(f, r));
     const mx = (_fwd.x * f - _fwd.z * r) / n, mz = (_fwd.z * f + _fwd.x * r) / n;
 
+    if (opts.interact && opts.interact.riding) { rideFrame(f, r, run, dt); return; }   // ★ phase 2: a ride owns the frame (zip · seat · rope · boat)
+    if (opts.interact && (promptT -= dt) <= 0) { promptT = 0.2; const off = opts.interact.offer([body.x, body.y, body.z], [_fwd.x, _fwd.z]); showPrompt(opts.interact.promptFor(off, touch)); }
+
     if (fly) {   // ?fly=1 only: the old free flight (no gravity, no blockers but the ground)
       let u = 0;
       if (keys.has('KeyE') || keys.has('Space')) u += 1;
@@ -187,14 +199,64 @@ export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
     if (!body.grounded || body.swimming && Math.abs(body.y - beforeY) > 0.5) camera.position.y = eyeY;
     else camera.position.y += (eyeY - camera.position.y) * Math.min(1, dt * (body.swimming ? 4 : 12));
   }
+  // ── ★ phase 2 · the rides ──
+  const finiteN = v => typeof v === 'number' && Number.isFinite(v);
+  function showPrompt(t) { if (t !== promptText) { promptText = t; if (opts.onPrompt) opts.onPrompt(t); } }
+  function faceYaw(deg) {   // glTF frame: forward = (sin, cos)
+    const a = deg * Math.PI / 180;
+    camera.lookAt(camera.position.x + Math.sin(a), camera.position.y, camera.position.z + Math.cos(a));
+    if (touch) syncAngles();
+  }
+  function finishRide(d) {
+    const f = d && d.feet;
+    if (Array.isArray(f)) land(f[0], f[2], f[1] + 1.0, f[1]);   // grounded like the app's stand / step-off raycast
+    if (d && finiteN(d.yawDeg)) faceYaw(d.yawDeg);
+    jumpQueued = false; pressedEdge = false; promptT = 0;
+  }
+  function rideFrame(f, r, run, dt) {
+    const out = opts.interact.step({ f, r, run, pressed: pressedEdge }, env, dt);
+    pressedEdge = false; jumpQueued = false;
+    if (!out) return;
+    if (out.toast && opts.onToast) opts.onToast(out.toast);
+    if (out.boat && opts.onBoat) opts.onBoat(out.boat);
+    if (out.eye) camera.position.set(out.eye[0], out.eye[1], out.eye[2]);
+    else if (out.feet) camera.position.set(out.feet[0], out.feet[1] + R.eyeM, out.feet[2]);
+    if (finiteN(out.yawDeg)) faceYaw(out.yawDeg);
+    if (out.done) finishRide(out.done);
+  }
+  /** E / a claimed tap: while riding = stand up / step ashore / let go (always ours); else start the offered ride. True = taken. */
+  function useInteract() {
+    const it = opts.interact;
+    if (!it || !walking || fly) return false;
+    if (it.riding) {
+      const res = it.press(env, [camera.position.x, camera.position.y, camera.position.z], R.eyeM);
+      if (res && res.toast && opts.onToast) opts.onToast(res.toast);
+      if (res && res.done) finishRide(res.done);
+      return true;
+    }
+    camera.getWorldDirection(_fwd); _fwd.y = 0; if (_fwd.lengthSq() < 1e-8) _fwd.set(0, 0, -1); _fwd.normalize();
+    const off = it.offer([body.x, body.y, body.z], [_fwd.x, _fwd.z]);
+    if (!off || !it.begin(off)) return false;
+    body.vx = body.vz = body.vy = 0; keys.delete('Space'); showPrompt('');
+    return true;
+  }
+
   // A5403 · I2 · E OPENS THE DOOR YOU FACE (the app's E). Space jumps. A press a door took is ignored until its key-up.
+  // ★ phase 2: E first offers the ride you stand by (or ends the one you are on); then the door; a press either took is ignored until its key-up.
   let eTaken = false;
   function onKey(e, down) {
     if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return false;
     if (e.code === 'KeyE') {
       if (!down) { eTaken = false; keys.delete(e.code); return true; }
       if (eTaken) return true;
+      if (walking && !e.repeat && useInteract()) { eTaken = true; keys.delete('KeyE'); return true; }
       if (walking && !e.repeat && opts.doors && opts.doors.use()) { eTaken = true; keys.delete('KeyE'); return true; }
+    }
+    if (opts.interact && opts.interact.riding) {   // riding: a move key / Space is a 'pressed' edge (a seat stands you up); never a jump, never flight
+      if (down && !e.repeat && /^(KeyW|KeyA|KeyS|KeyD|Arrow(Up|Down|Left|Right)|Space)$/.test(e.code)) pressedEdge = true;
+      if (e.code === 'Space' && e.preventDefault) e.preventDefault();
+      if (down) keys.add(e.code); else keys.delete(e.code);
+      return true;
     }
     if (e.code === 'Space' && down && walking && !e.repeat && !fly) { jumpQueued = true; if (e.preventDefault) e.preventDefault(); }
     if (e.code === 'KeyF' && down && walking && !e.repeat && allowFly) {
@@ -205,7 +267,8 @@ export function makeWalk(camera, dom, groundAt, onState, opts = {}) {
     return true;
   }
   function setRules(rules) { R = bodyRules(rules); allowFly = !!opts.allowFly || !!(rules && rules.fly); }
-  return { enterAt, enterPose, enterSpawn, exit, step, onKey, setRules, body,
+  return { enterAt, enterPose, enterSpawn, exit, step, onKey, setRules, body, use: useInteract,
+    get riding() { return !!(opts.interact && opts.interact.riding); },
     get active() { return walking; }, get flying() { return fly; }, get swimming() { return body.swimming; }, get grounded() { return body.grounded; },
     get touch() { return touch; }, get allowFly() { return allowFly; }, ctl };
 }

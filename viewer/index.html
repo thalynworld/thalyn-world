@@ -70,6 +70,10 @@
     background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
     padding: 9px 16px; font-size: 13px; color: #e8efe9; opacity: 0; transition: opacity .3s; pointer-events: none; }
   #toast.show { opacity: 1; }
+  /* ★ phase 2: the 'E - ride the zip wire' chip (thalyn-interact.js offers; the walk shows it while you stand by something usable) */
+  #act-prompt { position: fixed; bottom: 64px; left: 50%; transform: translateX(-50%); z-index: 19; background: var(--panel); border: 1px solid var(--gold);
+    border-radius: 999px; padding: 7px 14px; font-size: 13px; color: var(--gold); opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100vw - 32px); }
+  #act-prompt.show { opacity: 1; }
   #empty { position: fixed; inset: 0; display: flex; flex-direction: column; gap: 8px;
     align-items: center; justify-content: center; text-align: center; color: var(--ash); pointer-events: none; }
   #empty .big { font-size: 20px; color: var(--gold); }
@@ -225,6 +229,7 @@
     <input type="range" id="r-fog" min="0" max="2" step="0.02" value="1" /></div>
   <div class="row"><label><input type="checkbox" id="t-rotate" /> Auto-rotate</label></div>
   <div class="row"><label>Sun</label><input type="range" id="r-sun" min="0.05" max="0.95" step="0.01" value="0.55" /></div>
+  <div class="row" id="row-time" style="display:none" title="Move the clock: the app's own day (lamps light at dusk)"><label>Time <span id="s-time"></span></label><input type="range" id="r-time" min="0" max="1" step="0.0035" value="0.5" /></div>
   <div class="row"><label>Look</label>
     <select id="r-look" title="Film look — Auto lets the world's mood choose">
       <option value="auto">Auto (mood)</option>
@@ -259,6 +264,7 @@
 </div>
 <div id="drop">Release to load</div>
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+<div id="act-prompt" role="status" aria-live="polite"></div>
 <a id="cta" href="https://store.steampowered.com/app/4581800/Thalyn/" target="_blank" rel="noopener">Built in Thalyn — make yours ↗</a>
 <button id="b-hud" class="fab" type="button" aria-label="Hide or show the panels" title="Hide / show panels (H)">&#x2715;</button>
 <button id="b-walk-m" class="fab" type="button" aria-label="Walk">Walk</button>
@@ -287,7 +293,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import * as TA from './thalyn-atmos.js?v=20261115m1';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer (m1 = phase 1 body + A17140-A17160 merged)
+import * as TA from './thalyn-atmos.js?v=20261115i2';   // ⚠ bump on every atmos change: GitHub Pages caches modules 10 min and phones longer (m1 = phase 1 body + A17140-A17160 merged)
 import * as TG from './thalyn-together.js';
 import * as TF from './thalyn-fauna.js?v=20261108k1';   // A14133 · facing + stride-matched clip rate (bump on change)
 import * as TGR from './thalyn-grass.js?v=20261109v4';   // A5386 · the grass field grown from extras.thalyn.grass
@@ -300,11 +306,13 @@ import * as TPB from './thalyn-postbox.js?v=20261108p1';   // A13830 · I4 the m
 import * as TRP from './thalyn-report.js?v=20261108p1';    // A14134 · Report this world (read by a person)
 import * as TAR from './thalyn-ar.js?v=20261108a2';        // A13550 · View on your table (phone AR via model-viewer, loaded on tap)
 import * as TXR from './thalyn-xr.js?v=20261108x2';        // A13560 · the headset: teleport / smooth, wrist menu, controllers, giant scale
-import * as TFL from './thalyn-floats.js?v=20261108b1';    // A13570 · boats that bob (extras.thalyn.floatsWeb + living.floats)
+import * as TFL from './thalyn-floats.js?v=20261115i2';    // A13570 · boats that bob (extras.thalyn.floatsWeb + living.floats)
 import * as TW from './thalyn-water.js?v=20261115i1';       // A1232 · the game's water: flat, ONE shared mirror, ripples, opaque tone (bump on change)       // A5403 · I2 doors that open: E / click / tap, a closed leaf blocks (extras.thalyn.doorsWeb + the door rows)
 import * as TL from './thalyn-look.js?v=20261102a1';
 import * as TGD from './thalyn-grade.js?v=20261112g1';
-import * as TDESC from './thalyn-describe.js?v=20261115p1';   // ★ WORLD AS DATA · the World Description reader (rules + spawn for the body, phase 1)   // ★ A15440 · the walk's own grade (extras.thalyn.grade; bump on change)
+import * as TINT from './thalyn-interact.js?v=20261115i2';   // ★ WORLD AS DATA phase 2 · the rides: zip wire · seats · rope · rowboat (+ THE TAP LAW)
+import * as TCLK from './thalyn-clock.js?v=20261115i2';     // ★ phase 2 · the day curve: move the clock, lamps light at dusk
+import * as TDESC from './thalyn-describe.js?v=20261115i2';   // ★ WORLD AS DATA · the World Description reader (rules + spawn for the body, phase 1)   // ★ A15440 · the walk's own grade (extras.thalyn.grade; bump on change)
 import * as TLQ from './thalyn-liquid.js?v=20261115i1';   // ★ A17150 / A17160 · shore foam numbers + frozen lakes are ground (bump with thalyn-water / thalyn-atmos imports)
 import * as TVAR from './thalyn-variation.js?v=20261115i1';   // ★ A17140 · per-instance foliage variation from extras.thalyn.foliage (bump on change)   // ★ A15440 · the walk's own grade (extras.thalyn.grade; bump on change)
 import * as TD from './thalyn-diorama.js?v=20261102a1';
@@ -404,6 +412,7 @@ function apply() {
   const { s, fogArg } = atmoState();
   kit.uWindStrength.value = Math.max(kit.uWindStrength.value, weather.windFloor * 1.4); // storms lean the trees
   TA.applyState(s, L, renderer, scene, fogArg);
+  if (clockNight) { const u = L.sky.material.uniforms['sunPosition'].value; u.y = -Math.abs(u.y); }   // ★ phase 2: the moon lights the world; the sky stays a night sky
   kit.setNight(state.night);
   L.sky.visible = skyOn && !skyEnv.active;
   // No baked dome → the studio room IBL lights everything; at night that reads as a lit-from-nowhere ground. Drop it after dusk.
@@ -417,6 +426,7 @@ function apply() {
 
 // ── The Thalyn block ─────────────────────────────────────────────────────────
 let pendingThalyn = null, pendingAtmos = null;
+let dayCurve = null, clockBase = null, clockNight = false;   // ★ phase 2: the world's day curve (thalyn-clock.js) + the file's own lighting it is applied relative to
 let anchorRoot = null, shotPose = null, worldSpawn = null;   // ★ phase 1: worldSpawn = the World Description's world.spawn (client A16040), null on older exports
 let diorama = null, lastFrame = null;   // ★ the diorama opening (thalyn-diorama.js) + the last frameWorld box it stands on
 let lookRender = null;
@@ -672,7 +682,8 @@ function applyThalynBlock(tx) {
                                catch (e) { toast('Copy failed — ' + code); } };
     shotPose = TA.cameraPose(tx);
     // ★ WORLD AS DATA phase 1: the description gives the body its rules (walk / run / jump / step / eye, fly off) and the arrival point
-    { const d = TDESC.describeWorld(tx); worldSpawn = d.doc ? d.doc.world.spawn : null; if (d.doc) walk.setRules(d.doc.rules); console.info(TDESC.summarize(d)); for (const n of d.notes) console.info(n); }
+    { const d = TDESC.describeWorld(tx); worldSpawn = d.doc ? d.doc.world.spawn : null; if (d.doc) walk.setRules(d.doc.rules); console.info(TDESC.summarize(d)); for (const n of d.notes) console.info(n);
+      if (d.doc) { interact.setItems(d.doc.interact, d.doc.rules.allowed); setDayCurve(TCLK.readDayCurve(d.doc.atmosphere.dayCurve)); } }   // ★ phase 2: the rides + the clock
     $('b-shot').style.display = (shotPose && !coarsePointer) ? '' : 'none';
     showTitle(name, [tx.creator ? 'woven by ' + String(tx.creator).slice(0, 40) : '', tx.tone, tx.clock, tx.weather].filter(Boolean).join(' · '));
     $('cta').classList.add('show');
@@ -803,6 +814,7 @@ function resetWorld() {
 // (or fewer fields) does not inherit the previous world's atmosphere when switching.
 function resetAtmosphere() {
   pendingAtmos = null; pendingThalyn = null; anchorRoot = null; shotPose = null; worldSpawn = null;
+  interact.clear(); setDayCurve(null); showActPrompt('');   // ★ phase 2
   if (lookRender) lookRender.set(null, tier.name, 'natural');   // ★ R1e: a new world starts natural until its own tag says otherwise
   if (inkRender) inkRender.set(null, tier.name, 'natural');
   wornLook = { row: null, id: 'natural' };
@@ -1130,6 +1142,45 @@ async function loadFiles(fileList) {
 // ── Walk mode ────────────────────────────────────────────────────────────────
 let waterProbe = () => null;   // A171 · rebuilt from extras.thalyn.liquids on every world (the walker swims where the bed lies under water)
 const trunkField = TA.makeTrunkField();   // A308 · the trees you cannot walk through (living.trunks)
+// ★ WORLD AS DATA phase 2 · the rides (thalyn-interact.js) + the clock (thalyn-clock.js)
+const interact = TINT.makeInteract();
+let promptOn = '';
+function showActPrompt(t) { if (t === promptOn) return; promptOn = t; const el = $('act-prompt'); el.textContent = t || ''; el.classList.toggle('show', !!t); }
+// THE TAP LAW (lead 11-15: "a tap that opens a door must not also hop"): a still tap on the walk is offered to the ride / the thing you stand by,
+// then to a door leaf under the finger; only an unclaimed tap jumps (thalyn-walk.js). The canvas pointerup below stands down while the walk owns taps.
+function walkTapClaim(cx, cy) {
+  return TINT.claimTap([
+    { name: 'interact', fn: () => walk.use() },
+    { name: 'door', fn: (x, y) => { if (!doors.count) return false; const r = canvas.getBoundingClientRect(); return doors.clickAt(((x - r.left) / r.width) * 2 - 1, -(((y - r.top) / r.height) * 2 - 1), 'tap'); } },
+  ], cx, cy);
+}
+function setDayCurve(c) {
+  dayCurve = c; clockNight = false;
+  lanterns.setCurve(c);
+  $('row-time').style.display = c ? '' : 'none';
+  if (!c) { clockBase = null; return; }
+  // the file's own lighting = the clock at its export hour (stateAt is relative to it)
+  clockBase = { sunDir: state.sunDir.toArray(), sunColor: state.sunColor.toArray(), sunIntensity: state.sunIntensity, hemiIntensity: state.hemiIntensity,
+    exposure: state.exposure, fogColor: state.fogColor.toArray(), fogDensity: state.fogDensity, night: state.night };
+  const t0 = c.exportT >= 0 ? c.exportT : 0.5;
+  $('r-time').value = t0; $('s-time').textContent = TCLK.clockText(t0);
+  console.info(`[thalyn-clock] the day curve: ${c.keys.length} keys · peak ${c.peakDeg.toFixed(0)}° · lamps from night ${c.nightOnset} to ${c.nightFull} · exported at ${c.exportT >= 0 ? TCLK.clockText(c.exportT) : 'an unknown hour'}`);
+}
+function setClock(t) {
+  if (!dayCurve || !clockBase) return;
+  const t0 = dayCurve.exportT >= 0 ? dayCurve.exportT : 0.5;
+  $('s-time').textContent = TCLK.clockText(t);
+  if (Math.abs(t - t0) < 1e-4) {   // back at the export hour: the file's own state, exactly
+    state.sunDir.fromArray(clockBase.sunDir); state.sunColor.fromArray(clockBase.sunColor); state.sunIntensity = clockBase.sunIntensity; state.hemiIntensity = clockBase.hemiIntensity;
+    state.exposure = clockBase.exposure; state.fogColor.fromArray(clockBase.fogColor); state.fogDensity = clockBase.fogDensity; state.night = clockBase.night; clockNight = false;
+  } else {
+    const s2 = TCLK.stateAt(dayCurve, clockBase, t);
+    state.sunDir.fromArray(s2.sunDir).normalize(); state.sunColor.fromArray(s2.sunColor); state.sunIntensity = s2.sunIntensity; state.hemiIntensity = s2.hemiIntensity;
+    state.exposure = s2.exposure; state.fogColor.fromArray(s2.fogColor); state.fogDensity = s2.fogDensity; state.night = s2.night; clockNight = !s2.sun;
+    if (Math.random() < 0.05) console.info(`[thalyn-clock] ${TCLK.clockText(t)} · sun ${s2.sunIntensity.toFixed(2)} · night ${s2.night.toFixed(2)} · ${s2.sun ? 'sun' : 'moon'}`);
+  }
+  apply();
+}
 const walk = TA.makeWalk(camera, document.body, groundAt, (on, why) => {
   if (on && (why === 'swim' || why === 'walk')) { if (why === 'swim') toast('Swimming — you float at the surface, half pace'); return; }   // A171 · a swim/walk change, not an enter/exit
   if (card) card.onWalk(on, why);   // A13683 · leaving the walk brings the card's end line
@@ -1142,7 +1193,8 @@ const walk = TA.makeWalk(camera, document.body, groundAt, (on, why) => {
   else { const fwd = new THREE.Vector3(); camera.getWorldDirection(fwd); controls.target.copy(camera.position).addScaledVector(fwd, 30); controls.update(); }
 }, { touch: coarsePointer, allowFly: new URLSearchParams(location.search).get('fly') === '1',
      sideProbe: TA.makeMeshSideProbe(THREE, walkMeshes, { radius: 0.35 }),   // ★ phase 1: walls, props, heroes, fences, rocks block (thalyn-collide.js)
-     waterAt: (x, z) => waterProbe(x, z), blockAt: (x, z) => { const b = trunkField.resolve(x, z), p = b || { x, z }, f = card && card.fence(p.x, p.z); return f || b; }, indoor, doors });   // A5401 · I1 · A5403 · I2 doors
+     waterAt: (x, z) => waterProbe(x, z), blockAt: (x, z) => { const b = trunkField.resolve(x, z), p = b || { x, z }, f = card && card.fence(p.x, p.z); return f || b; }, indoor, doors,   // A5401 · I1 · A5403 · I2 doors
+     interact, claimTap: walkTapClaim, onPrompt: showActPrompt, onToast: m => toast(m, true), onBoat: pose => floats.drive(pose) });   // ★ phase 2   // A5401 · I1 · A5403 · I2 doors
 if (coarsePointer) $('b-walk').textContent = 'Walk';
 // ★ A5403 · I2: a click or a tap on a door leaf toggles it (phones have no E). A drag (orbit, look) is never a click: < 6 px and < 400 ms.
 {
@@ -1152,6 +1204,7 @@ if (coarsePointer) $('b-walk').textContent = 'Walk';
     if (!pd || pd.id !== e.pointerId) return;
     const moved = Math.hypot(e.clientX - pd.x, e.clientY - pd.y), dtMs = performance.now() - pd.t; pd = null;
     if (moved > 6 || dtMs > 400 || !doors.count) return;
+    if (walk.active && walk.touch) return;   // ★ phase 2 · THE TAP LAW: the walk's touch handler offers this tap (ride → door → jump) - never twice
     const locked = walk.active && !walk.touch;   // pointer lock: the click aims where you look
     const r = canvas.getBoundingClientRect();
     const nx = locked ? 0 : ((e.clientX - r.left) / r.width) * 2 - 1, ny = locked ? 0 : -(((e.clientY - r.top) / r.height) * 2 - 1);
@@ -1209,6 +1262,7 @@ $('t-fog').onchange = e => { fogOn = e.target.checked; if (fogOn && !(state.fogD
 $('r-fog').oninput = e => { fogScale = parseFloat(e.target.value); apply(); };
 $('t-rotate').onchange = e => { controls.autoRotate = e.target.checked; controls.autoRotateSpeed = 0.6; };
 $('r-sun').oninput = e => { TA.sunFromElevation(state, parseFloat(e.target.value)); apply(); };
+$('r-time').oninput = e => setClock(parseFloat(e.target.value));   // ★ phase 2: the app's day (thalyn-clock.js)
 $('t-cinema').onchange = e => { post.setEnabled(e.target.checked); };
 $('r-weather').onchange = e => { weatherOverride = e.target.value; setWeather(); toast(weatherOverride ? 'Weather: ' + e.target.options[e.target.selectedIndex].text : 'Weather: as exported'); };
 $('r-look').onchange = e => { post.setLook(e.target.value); post.setNight(state.night); toast('Look: ' + e.target.options[e.target.selectedIndex].text); };
@@ -1337,7 +1391,7 @@ post.setFileGrade(fileGrade);   // ★ A15440 (a world read before the pass exis
 lookRender = TLR.makeLookRender(post, camera);   // ★ R1e · inert (disabled) until a look with a render block is worn
 inkRender = TINK.makeInk(post, camera, scene, renderer);   // ★ Looking-Glass live · inert until an ink look (not baked) is worn
 diorama = TD.makeDiorama({ scene, camera, renderer, controls, post, worldRoot, lights: L });   // ★ the diorama opening
-if (new URLSearchParams(location.search).get('debug') === '1') window.__thalyn = { THREE, scene, camera, controls, worldRoot, diorama, shareCard: async () => { const b = await shareCardBlob(); return b ? await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); }) : null; }, get groundAt() { return groundAt; }, get lastFrame() { return lastFrame; }, get tx() { return pendingThalyn; } };   // dev only: headless checks
+if (new URLSearchParams(location.search).get('debug') === '1') window.__thalyn = { THREE, scene, camera, controls, worldRoot, diorama, shareCard: async () => { const b = await shareCardBlob(); return b ? await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); }) : null; }, get groundAt() { return groundAt; }, get lastFrame() { return lastFrame; }, get tx() { return pendingThalyn; }, interact, walk, setClock, setDayCurve, TCLK, lanterns, get dayCurve() { return dayCurve; } };   // dev only: headless checks
 function resizeToViewport() {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   const pr = cappedPixelRatio(prRow);   // A5397 · B4: the cap moves with the window width

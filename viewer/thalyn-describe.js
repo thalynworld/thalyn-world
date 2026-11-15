@@ -14,7 +14,7 @@
 export const SCHEMA = 1;
 
 /** Section versions this reader understands (a higher one is skipped, not guessed at). */
-export const KNOWN_VERSIONS = { grass: 1, zones: 1, interiors: 1, doorsWeb: 1, floatsWeb: 1, song: 1, grade: 1, skyDome: 1, water: 1, interact: 1, kit: 1, instances: 1, stream: 1 };
+export const KNOWN_VERSIONS = { grass: 1, zones: 1, interiors: 1, doorsWeb: 1, floatsWeb: 1, song: 1, grade: 1, skyDome: 1, water: 1, interact: 1, dayCurve: 1, kit: 1, instances: 1, stream: 1 };
 
 /** The document's top-level sections (schema v1). Anything else is kept out and named in a note. */
 export const SECTIONS = ['schema', 'world', 'files', 'atmosphere', 'look', 'kit', 'instances', 'water', 'paths', 'lights', 'living', 'interact', 'audio', 'rules',
@@ -26,7 +26,8 @@ export const KIT_CLASSES = ['tree', 'rock', 'shrub', 'flower', 'deadwood', 'prop
 export const ON_AT = ['always', 'night', 'switch'];
 
 /** Today's viewer numbers (thalyn-atmos.js makeWalk); jump + gravity are PROPOSED (phase 1 adds the body - there is no jump today). */
-export const DEFAULT_RULES = Object.freeze({ walkMps: 5, runMps: 12, jumpM: 1.1, gravity: 9.81, eyeM: 1.7, stepUpM: 0.6, swim: true, fly: false, allowed: ['door', 'cinema'], edit: false });
+// ★ phase 2 (11-15, Mike: zip wire, seats, rope, lamps, BOATS; NO balloon, NO world views): the ride types join doors + the cinema. 'balloon' / 'swing' stay out.
+export const DEFAULT_RULES = Object.freeze({ walkMps: 5, runMps: 12, jumpM: 1.1, gravity: 9.81, eyeM: 1.7, stepUpM: 0.6, swim: true, fly: false, allowed: ['door', 'cinema', 'zip', 'seat', 'rope', 'boat', 'lamp'], edit: false });
 const RULE_RANGE = { walkMps: [0.5, 20], runMps: [1, 40], jumpM: [0, 5], gravity: [0, 30], eyeM: [0.3, 3], stepUpM: [0, 1.5] };
 
 // ── small pure helpers ──
@@ -76,7 +77,9 @@ function fromExtras(tx, notes) {
     files: [],
     atmosphere: { sky: isObj(tx.sky) ? tx.sky : null, fog: isObj(tx.fog) ? tx.fog : null, nightSky: isObj(tx.nightSky) ? tx.nightSky : null,
       skyDome: versioned('skyDome', tx.skyDome, notes), grade: versioned('grade', tx.grade, notes), zones: versioned('zones', tx.zones, notes),
-      water: versioned('water', tx.water, notes), wind: isObj(tx.atmosphere) ? tx.atmosphere : null, dayCurve: [] },
+      water: versioned('water', tx.water, notes), wind: isObj(tx.atmosphere) ? tx.atmosphere : null,
+      // ★ phase 2: the client's extras.thalyn.dayCurve (TimeOfDayModifier keyframes + SunArc + the lamp ramp; thalyn-clock.js readDayCurve cleans it)
+      dayCurve: isObj(tx.dayCurve) && tx.dayCurve.present === true ? versioned('dayCurve', tx.dayCurve, notes) : null },
     look: isObj(tx.look) ? tx.look : null,
     kit: [], instances: [],
     water: { liquids: Array.isArray(tx.liquids) ? tx.liquids.filter(isObj) : [], tone: isObj(tx.water) ? tx.water : null, bodies: [] },
@@ -104,6 +107,16 @@ function fromExtras(tx, notes) {
   // interact: doors and the cinema by COPY (their rows stay where they are for old readers)
   if (Array.isArray(tx.doors))
     tx.doors.forEach((d, i) => { if (isObj(d)) doc.interact.push({ id: `door:${i}`, type: 'door', node: d.glbNode || d.node, file: doorsWeb ? doorsWeb.file : undefined, anchor: d.center || d.hinge, params: d, sync: 'shared' }); });
+  // ★ phase 2: the client's extras.thalyn.interact typed rows (Unity GltfInteractExtras.cs) -> interact[] items. Anchors: the zip's high post, the seat,
+  // the rope foot, the boat's root. `sync`: boats shared (visit-together host wins), the rest local (design §4).
+  const ix = isObj(tx.interact) && tx.interact.present === true ? versioned('interact', tx.interact, notes) : null;
+  if (ix) {
+    const rows = (k, type, anchor, reach, prompt, sync) => { for (const r of Array.isArray(ix[k]) ? ix[k] : []) if (isObj(r)) doc.interact.push({ id: r.id, type, anchor: r[anchor], reachM: r[reach], prompt, params: r, sync }); };
+    rows('zips', 'zip', 'highBase', 'highRangeM', 'ride the zip wire', 'local');
+    rows('seats', 'seat', 'seat', 'reachM', 'sit', 'local');
+    rows('ropes', 'rope', 'foot', 'rangeM', 'climb the rope', 'local');
+    rows('boats', 'boat', 'pos', 'boardRangeM', 'board the rowboat', 'shared');
+  }
   if (isObj(tx.cinema) && tx.cinema.present === true)
     doc.interact.push({ id: 'cinema:0', type: 'cinema', anchor: tx.cinema.position, params: { facing: tx.cinema.facing, yawDeg: tx.cinema.yawDeg, pitchDeg: tx.cinema.pitchDeg, width: tx.cinema.width, height: tx.cinema.height, floating: tx.cinema.floating }, sync: 'shared' });
   return doc;
@@ -161,7 +174,8 @@ function validate(doc, notes) {
   // lights: new optional fields clamped / closed
   doc.lights = (Array.isArray(doc.lights) ? doc.lights : []).filter(isObj).map(l => {
     const o = { ...l };
-    if (l.onAt != null && !ON_AT.includes(l.onAt)) { delete o.onAt; notes.push(`[describe] light onAt '${cleanText(String(l.onAt), 20)}' ignored`); }
+    if (l.onAt === '') delete o.onAt;   // JsonUtility writes "" for an unstamped light (gate Thalyn_GltfDayCurve off): absent, not an error
+    else if (l.onAt != null && !ON_AT.includes(l.onAt)) { delete o.onAt; notes.push(`[describe] light onAt '${cleanText(String(l.onAt), 20)}' ignored`); }
     if (l.range != null) o.range = num(l.range, 0, 500, 0);
     if (l.intensity != null) o.intensity = num(l.intensity, 0, 1e4, 0);
     if (l.color != null) o.color = rgb(l.color) || [1, 1, 1];

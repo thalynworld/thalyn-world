@@ -20,6 +20,7 @@ import { TIERS } from './thalyn-tiers.js?v=20261115p1';   // the waterfalls' bud
 // (a 13M-triangle ground-cover mesh was measured), and a per-frame linear raycast against that is
 // seconds per step. Trees are built lazily, only for meshes the ground probe actually touches.
 import { isFrozen } from './thalyn-liquid.js?v=20261115i1';   // ★ A17160 a frozen lake is walkable ice, never swum (bump with thalyn-liquid.js)
+import { lampLevel } from './thalyn-clock.js?v=20261115i2';   // ★ phase 2: lights[].onAt on the app's NightLit ramp (makeLanterns)
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.6/build/index.module.js';
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
 THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
@@ -496,7 +497,7 @@ export function makePost(renderer, scene, camera) {
 // The walk is thalyn-walk.js (the pointer-lock / touch adapter) on thalyn-body.js (the pure body: gravity, jump, step-up, swim) and
 // thalyn-collide.js (trunks A308, the NEW mesh side probe, indoor walls, doors, the card fence). Re-exported here so TA.makeWalk /
 // TA.makeTrunkField keep working for every viewer that imports this file.
-export { makeWalk } from './thalyn-walk.js?v=20261115p1';
+export { makeWalk } from './thalyn-walk.js?v=20261115i2';   // ★ phase 2: rides + the tap law (bump with index's atmos import)
 export { makeTrunkField, makeMeshSideProbe } from './thalyn-collide.js?v=20261115p1';
 
 // A171 · the liquid surface under a point, from the export's own liquid rectangles (APP frame — X is negated
@@ -1501,7 +1502,8 @@ export function makeLanterns(scene) {
         disc = new THREE.Mesh(discGeometry(), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }));
         disc.rotation.x = -Math.PI / 2; disc.position.set(p.x, p.y + 0.03, p.z); disc.renderOrder = 7; root.add(disc);
       }
-      points.push({ pos: p.clone(), base: p, color: col, kind, sprite, disc, mul: clamp(+e.mul || 1, 0.5, 2), priority: +e.priority || 0, phase: Math.random() * 6.28, light: null });
+      points.push({ pos: p.clone(), base: p, color: col, kind, sprite, disc, mul: clamp(+e.mul || 1, 0.5, 2), priority: +e.priority || 0, phase: Math.random() * 6.28, light: null,
+        onAt: e.onAt === 'always' || e.onAt === 'night' ? e.onAt : null });   // ★ phase 2: 'always' (a real lamp) · 'night' (a glow point) · null (an older export)
     }
     ensurePool();
     return points.length;
@@ -1512,11 +1514,15 @@ export function makeLanterns(scene) {
   }
   function setBudget(t) { poolSize = Math.max(0, (t && t.lanternLights) | 0); ensurePool(); }
   function setNight(n) { night = clamp(n, 0, 1); }
+  let curve = null;   // ★ phase 2: the world's day curve (thalyn-clock.js readDayCurve) - with it a lamp follows the app's NightLit ramp
+  function setCurve(c) { curve = c || null; }
   function tick(dt, camera) {
     if (!points.length) return;
     const t = performance.now() / 1000;
-    const glow = 0.18 + 0.82 * night;                 // lanterns come alive with the dark
+    const glow0 = 0.18 + 0.82 * night;                 // lanterns come alive with the dark (an older export: no onAt, no curve - exactly as before)
     for (const pt of points) {
+      // ★ phase 2: an 'always' lamp burns at every hour; with a day curve a 'night' lamp follows LanternGlow.NightLit (dark at noon, full by deep dusk)
+      const glow = pt.onAt === 'always' ? 1 : (curve ? lampLevel(pt.onAt, night, curve) : glow0);
       if (pt.kind === 'water') { pt.pos.y = pt.base.y + Math.sin(t * 0.9 + pt.phase) * 0.04; pt.sprite.position.y = pt.pos.y; }
       const flick = 0.92 + 0.08 * Math.sin(t * 6.3 + pt.phase) * Math.sin(t * 2.1 + pt.phase * 1.7);
       pt.sprite.material.opacity = 0.62 * glow * flick;
@@ -1540,5 +1546,5 @@ export function makeLanterns(scene) {
     }
   }
   function clear() { for (const pt of points) { root.remove(pt.sprite); pt.sprite.material.dispose(); if (pt.disc) { root.remove(pt.disc); pt.disc.material.dispose(); } } points.length = 0; for (const l of pool) l.visible = false; }
-  return { build, tick, setBudget, setNight, clear, root, get count() { return points.length; }, get lit() { let n = 0; for (const pt of points) if (pt.light) n++; return n; } };
+  return { build, tick, setBudget, setNight, setCurve, clear, root, get count() { return points.length; }, get lit() { let n = 0; for (const pt of points) if (pt.light) n++; return n; } };
 }

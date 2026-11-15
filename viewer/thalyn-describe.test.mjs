@@ -128,5 +128,30 @@ check('sections list starts with schema', SECTIONS[0] === 'schema' && SECTIONS.i
 check('interact types closed list (9)', INTERACT_TYPES.length === 9);
 check('default rules frozen', Object.isFrozen(DEFAULT_RULES));
 
+// ── ★ phase 2: extras.thalyn.interact typed rows + dayCurve + lights onAt ──
+{
+  const tx = { version: '1', interact: { present: true, version: 1,
+      zips: [{ id: 'zip:0', pts: [0, 10, 0, 0, 5, 40], highBase: [0, 8, 0], highRangeM: 4 }], seats: [{ id: 'seat:0', seat: [1, 0.5, 2], reachM: 2.4 }],
+      ropes: [{ id: 'rope:0', foot: [3, 0, 3], land: [3, 6, 4], rangeM: 3 }], boats: [{ id: 'boat:0', pos: [5, 0, 9], boardRangeM: 3.5 }] },
+    dayCurve: { present: true, version: 1, keys: [{ t: 0 }, { t: 0.5 }], exportT: 0.5 },
+    living: { lights: [{ kind: 'lantern', pos: [0, 1, 0], onAt: 'night' }, { kind: 'lantern', pos: [1, 1, 0], onAt: '' }, { kind: 'bulb', pos: [2, 1, 0], onAt: 'sometimes' }] } };
+  const r = describeWorld(tx), d = r.doc;
+  const types = d.interact.map(i => i.type).join();
+  check('phase 2: typed rows -> interact[] (zip, seat, rope, boat)', types === 'zip,seat,rope,boat', types);
+  check('phase 2: anchors = high post / seat / rope foot / boat root', d.interact[0].anchor.join() === '0,8,0' && d.interact[1].anchor.join() === '1,0.5,2' && d.interact[2].anchor.join() === '3,0,3' && d.interact[3].anchor.join() === '5,0,9');
+  check('phase 2: reach from each row (4 / 2.4 / 3 / 3.5)', d.interact.map(i => i.reachM).join() === '4,2.4,3,3.5');
+  check('phase 2: boats shared, rides local', d.interact.map(i => i.sync).join() === 'local,local,local,shared');
+  check('phase 2: the row rides along as params', Array.isArray(d.interact[0].params.pts) && d.interact[0].params.pts.length === 6);
+  check('phase 2: dayCurve carried', d.atmosphere.dayCurve && d.atmosphere.dayCurve.keys.length === 2);
+  check('phase 2: onAt night kept', d.lights[0].onAt === 'night');
+  check('phase 2: onAt "" (unstamped) = absent, no note', !('onAt' in d.lights[1]) && !r.notes.some(n => /onAt ''/.test(n)));
+  check('phase 2: an unknown onAt is dropped with a note', !('onAt' in d.lights[2]) && r.notes.some(n => /onAt 'sometimes' ignored/.test(n)));
+  check('phase 2: default rules allow the rides, never balloon / swing', ['zip', 'seat', 'rope', 'boat', 'lamp'].every(t => d.rules.allowed.includes(t)) && !d.rules.allowed.includes('balloon') && !d.rules.allowed.includes('swing'));
+  const off = describeWorld({ version: '1', interact: { present: false, zips: [{ id: 'z', pts: [0, 0, 0, 1, 1, 1] }] }, dayCurve: { present: false, keys: [] } }).doc;
+  check('phase 2: present:false (gates off) = no rides, no day curve', off.interact.length === 0 && off.atmosphere.dayCurve === null);
+  const v2 = describeWorld({ version: '1', interact: { present: true, version: 2, zips: [{ id: 'z' }] } });
+  check('phase 2: a newer interact version is skipped with a note', v2.doc.interact.length === 0 && v2.notes.some(n => /skipped interact v2/.test(n)));
+}
+
 console.log(fails === 0 ? `ALL PASS (${passes})` : `${fails} FAIL / ${passes} pass`);
 process.exit(fails === 0 ? 0 : 1);
