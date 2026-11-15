@@ -14,6 +14,12 @@
 //      grazing angle (Fresnel), so the bed shows only looking straight down near you.
 // Lava is untouched (thalyn-atmos.js upgradeLiquid keeps its heave + glow).
 import * as THREE from 'three';
+import { isFrozen, foamBodies, foamWind, FOAM_DEFAULTS, FOAM_MAX_BODIES } from './thalyn-liquid.js?v=20261115i1';   // ★ A17150 / A17160 (bump with thalyn-liquid.js)
+//   5. ★ A17150 SHORE FOAM (Mike 2026-11-15) — the game's band where the water meets the bed (ThalynWater.shader :1415-1440): water depth
+//      over the terrain, from ONE top-down height map of the Thalyn_Terrain_Baked meshes rendered at load (a half-float target, height
+//      relative to the mean water level so the shore keeps its precision). Each body's own width / intensity / colour (liquids[] A17150,
+//      else the shader defaults), widened and strengthened by the file's wind like the game. Tier column shoreFoam = the map's size;
+//      Phone = 0 = no foam. ?foam=0 turns it off for an A/B.
 
 const MIRROR_RANGE = 320;     // m — the game's MirrorRangeM order: beyond it, no surface takes the mirror
 const BAND_IN = 0.35, BAND_GONE = 1.2;   // m — the mirror is full within BAND_IN of its plane, gone by BAND_GONE (A1216)
@@ -44,6 +50,52 @@ function makeRippleTexture(size = 256) {
   return t;
 }
 
+const SHORE_LAYER = 9;   // ★ A17150 the terrain is enabled on this layer only while the height map renders
+
+// ★ A17150 the game's shore band (ThalynWater.shader :1415-1440), ported: primary mask² × wave pulse × soft noise threshold × intensity ×
+// wind boost × detail fade, a secondary band out to 2.5× the width, capped at 0.45. water_vnoise → a smooth value noise; detail fade 30 → 200 m
+// (the material defaults _DetailFadeStart / _DetailFadeEnd). Depth = the water pixel's height over the bed from the top-down map (the game
+// uses the eye-depth difference; vertical depth is the same band on flat water). Returns 0 when the map is off or the pixel is off-map.
+// The map's G channel is coverage (1 where terrain drew); a filtered edge texel divides R by G so a half-covered texel keeps its height.
+export const SHORE_FOAM_GLSL = `
+uniform sampler2D uShoreTex; uniform vec4 uShoreBox; uniform float uShoreRef; uniform float uShoreOn;
+uniform vec4 uFoamRect[${FOAM_MAX_BODIES}]; uniform vec4 uFoamPar[${FOAM_MAX_BODIES}]; uniform int uFoamN; uniform vec4 uFoamWorld;
+uniform vec3 uFoamColor; uniform vec3 uFoamWind; uniform float uFoamLight;
+float thalynFoamHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float thalynFoamNoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(thalynFoamHash(i), thalynFoamHash(i + vec2(1.0, 0.0)), f.x), mix(thalynFoamHash(i + vec2(0.0, 1.0)), thalynFoamHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float thalynShoreFoam(vec3 wp) {
+  if (uShoreOn < 0.5) return 0.0;
+  vec2 suv = vec2((wp.x - uShoreBox.x) / uShoreBox.z, (uShoreBox.y - wp.z) / uShoreBox.w);
+  if (suv.x <= 0.0 || suv.y <= 0.0 || suv.x >= 1.0 || suv.y >= 1.0) return 0.0;
+  vec4 sh = texture2D(uShoreTex, suv);
+  if (sh.g < 0.5) return 0.0;
+  float depth = wp.y - (sh.r / max(sh.g, 1e-3) + uShoreRef);
+  if (depth < 0.0) return 0.0;
+  vec2 par = uFoamWorld.xy;
+  for (int i = 0; i < ${FOAM_MAX_BODIES}; i++) {
+    if (i >= uFoamN) break;
+    vec4 r = uFoamRect[i];
+    if (abs(wp.x - r.x) <= r.z && abs(wp.z - r.y) <= r.w) { par = uFoamPar[i].xy; break; }
+  }
+  float boost = uFoamWind.x, fw = par.x * uFoamWind.y, scroll = uFoamWind.z;
+  float camDist = distance(cameraPosition, wp);
+  float df = clamp(1.0 - (camDist - 30.0) / 170.0, 0.0, 1.0); df = df * df * (3.0 - 2.0 * df);
+  float m1 = 1.0 - clamp(depth / fw, 0.0, 1.0);
+  float pulse = sin(uWTime * 1.5 * scroll + wp.x * 0.3 + wp.z * 0.2) * 0.3 + 0.7;
+  vec2 fp = wp.xz * (${FOAM_DEFAULTS.noiseScale.toFixed(1)} * 0.2);
+  float n1 = thalynFoamNoise(fp + uWTime * 0.3 * scroll);
+  float n2 = thalynFoamNoise(fp * 2.1 + 17.3 - uWTime * 0.2 * scroll);
+  float fn = n1 * 0.6 + n2 * 0.4;
+  float foam = m1 * m1 * pulse * smoothstep(0.55, 0.8, fn) * par.y * boost * df;
+  float m2 = (1.0 - clamp(depth / (fw * 2.5), 0.0, 1.0)) * clamp(depth / fw, 0.0, 1.0);
+  float foam2 = m2 * smoothstep(0.55, 0.8, n1) * par.y * 0.3 * boost * df;
+  return min(max(foam, foam2), 0.45);
+}
+`;
+
 export function makeWater() {
   const ripple = makeRippleTexture();
   const uTime = { value: 0 };
@@ -59,6 +111,14 @@ export function makeWater() {
   const _n = new THREE.Vector3(), _p = new THREE.Vector3(), _v = new THREE.Vector3(), _t = new THREE.Vector3(),
         _look = new THREE.Vector3(), _rot = new THREE.Matrix4(), _q = new THREE.Vector4(), _plane = new THREE.Plane(),
         _clip = new THREE.Vector4(), _size = new THREE.Vector2();
+  // ★ A17150 shore foam state (shared by every adopted surface)
+  const uShoreTex = { value: null }, uShoreBox = { value: new THREE.Vector4(0, 0, 1, 1) }, uShoreRef = { value: 0 }, uShoreOn = { value: 0 };
+  const uFoamRect = { value: Array.from({ length: FOAM_MAX_BODIES }, () => new THREE.Vector4()) };
+  const uFoamPar = { value: Array.from({ length: FOAM_MAX_BODIES }, () => new THREE.Vector4()) };
+  const uFoamN = { value: 0 }, uFoamWorld = { value: new THREE.Vector4(FOAM_DEFAULTS.width, FOAM_DEFAULTS.intensity, 0, 0) };
+  const uFoamColor = { value: new THREE.Color(...FOAM_DEFAULTS.color) }, uFoamWind = { value: new THREE.Vector3(1, 1, 1) }, uFoamLight = { value: 1 };
+  let shoreRT = null, shoreRes = 0, shoreArgs = null;
+  const shoreOff = (() => { try { return new URLSearchParams(location.search).get('foam') === '0'; } catch (e) { return false; } })();
 
   /** Take over a water mesh's material (the one thalyn-atmos upgradeLiquid made): flat, ripples, the shared mirror. */
   function adopt(mesh) {
@@ -66,13 +126,14 @@ export function makeWater() {
     const mat = mats[0]; if (!mat) return false;
     const uOn = { value: 0 };
     mat.onBeforeCompile = (shader) => {
-      Object.assign(shader.uniforms, { uWTime: uTime, uMirror, uTexMat, uMirrorOn: uOn, uPlaneY, uRipple: { value: ripple } });
+      Object.assign(shader.uniforms, { uWTime: uTime, uMirror, uTexMat, uMirrorOn: uOn, uPlaneY, uRipple: { value: ripple },
+        uShoreTex, uShoreBox, uShoreRef, uShoreOn, uFoamRect, uFoamPar, uFoamN, uFoamWorld, uFoamColor, uFoamWind, uFoamLight });
       shader.vertexShader = 'uniform mat4 uTexMat;\nvarying vec4 vMirrorCoord;\nvarying vec3 vWorldPosW;\n' + shader.vertexShader;
       shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
         vec4 _wp = modelMatrix * vec4(transformed, 1.0);
         vWorldPosW = _wp.xyz;
         vMirrorCoord = uTexMat * _wp;`);
-      shader.fragmentShader = 'uniform float uWTime;\nuniform sampler2D uMirror;\nuniform float uMirrorOn;\nuniform float uPlaneY;\nuniform sampler2D uRipple;\nvarying vec4 vMirrorCoord;\nvarying vec3 vWorldPosW;\n' + shader.fragmentShader;
+      shader.fragmentShader = 'uniform float uWTime;\nuniform sampler2D uMirror;\nuniform float uMirrorOn;\nuniform float uPlaneY;\nuniform sampler2D uRipple;\nvarying vec4 vMirrorCoord;\nvarying vec3 vWorldPosW;\n' + SHORE_FOAM_GLSL + shader.fragmentShader;
       shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         vec2 _uvA = vWorldPosW.xz / ${RIPPLE_TILE.toFixed(1)} + vec2(uWTime * 0.021, uWTime * 0.013);
         vec2 _uvB = vWorldPosW.xz / ${(RIPPLE_TILE * 0.37).toFixed(2)} - vec2(uWTime * 0.017, -uWTime * 0.025);
@@ -90,9 +151,12 @@ export function makeWater() {
           outgoingLight = mix(outgoingLight, _refl, clamp(0.55 + 0.45 * _fres, 0.0, 0.92) * _band);
         }
         diffuseColor.a = mix(max(diffuseColor.a, 0.9), 1.0, _fres);
+        float _foam = thalynShoreFoam(vWorldPosW);   // ★ A17150 the game's composite: lerp(finalColor, _FoamColor, foam)
+        outgoingLight = mix(outgoingLight, uFoamColor * uFoamLight, _foam);
+        diffuseColor.a = max(diffuseColor.a, _foam);
         #include <opaque_fragment>`);
     };
-    mat.customProgramCacheKey = () => 'thalyn-water-a1232';
+    mat.customProgramCacheKey = () => 'thalyn-water-a1232-a17150';
     mat.needsUpdate = true;
     const box = new THREE.Box3().setFromObject(mesh);
     surfaces.push({ mesh, mat, uOn, box });
@@ -105,7 +169,74 @@ export function makeWater() {
     hz = (t && typeof t.mirrorHz === 'number') ? t.mirrorHz : (name === 'laptop' ? 15 : 30);
     if (scale <= 0 && rt) { rt.dispose(); rt = null; uMirror.value = null; }
     console.info(`[thalyn] water A1232: mirror ${scale > 0 ? `${Math.round(scale * 100)} % res @${hz} Hz` : 'OFF (sky reflection only)'} · tier ${name}`);
+    // ★ A17150 the shore map's size rides the tier (TIERS.shoreFoam; Phone 0 = no foam)
+    const res = shoreOff ? 0 : ((t && typeof t.shoreFoam === 'number') ? t.shoreFoam : (name === 'lite' ? 0 : name === 'laptop' ? 512 : 1024));
+    if (res !== shoreRes) { shoreRes = res; if (shoreArgs) buildShore(shoreArgs); else if (res <= 0) dropShore(); }
   }
+
+  function dropShore() { if (shoreRT) { shoreRT.dispose(); shoreRT = null; } uShoreTex.value = null; uShoreOn.value = 0; }
+
+  /** ★ A17150 the top-down terrain height map the foam reads. terrain = the Thalyn_Terrain_Baked meshes; liquids = extras.thalyn.liquids. */
+  function setShore(renderer, scene, terrain, liquids, windStrength, windSpeed) {
+    shoreArgs = { renderer, scene, terrain: terrain || [], liquids: liquids || [], windStrength, windSpeed };
+    return buildShore(shoreArgs);
+  }
+  function buildShore(a) {
+    const fb = foamBodies(a.liquids);
+    uFoamN.value = fb.bodies.length;
+    fb.bodies.forEach((b, i) => { uFoamRect.value[i].set(b.cx, b.cz, b.hx, b.hz); uFoamPar.value[i].set(b.width, b.intensity, 0, 0); });
+    uFoamWorld.value.set(fb.world.width, fb.world.intensity, 0, 0);
+    uFoamColor.value.setRGB(fb.world.color[0], fb.world.color[1], fb.world.color[2]);
+    const w = foamWind(a.windStrength, a.windSpeed); uFoamWind.value.set(w.boost, w.widthMul, w.scroll);
+    if (shoreRes <= 0 || !a.terrain.length || !fb.total || !surfaces.length) {
+      dropShore();
+      const why = shoreOff ? '?foam=0' : shoreRes <= 0 ? 'tier' : !fb.total ? 'no open water in the file' : !surfaces.length ? 'no animated water surface' : 'no Thalyn_Terrain_Baked mesh';
+      console.info('[thalyn] water A17150 shore foam OFF (' + why + ')');
+      return 0;
+    }
+    const t0 = performance.now();
+    const box = new THREE.Box3();
+    for (const m of a.terrain) box.expandByObject(m);
+    if (box.isEmpty()) { dropShore(); return 0; }
+    const open = a.liquids.filter(l => l && l.type === 'water' && !isFrozen(l));
+    const ref = open.length ? open.reduce((s, l) => s + (+l.surfaceY || 0), 0) / open.length : 0;
+    const sx = Math.max(1, box.max.x - box.min.x), sz = Math.max(1, box.max.z - box.min.z);
+    const cam = new THREE.OrthographicCamera(-sx / 2, sx / 2, sz / 2, -sz / 2, 0.5, (box.max.y - box.min.y) + 20);
+    cam.position.set((box.min.x + box.max.x) / 2, box.max.y + 10, (box.min.z + box.max.z) / 2);
+    cam.up.set(0, 0, -1); cam.lookAt(cam.position.x, box.min.y, cam.position.z);   // screen right = +X, screen up = -Z (uv.y = (maxZ - z) / sz)
+    cam.updateMatrixWorld(); cam.layers.set(SHORE_LAYER);
+    for (const m of a.terrain) m.layers.enable(SHORE_LAYER);
+    const res = shoreRes;
+    if (!shoreRT || shoreRT.width !== res) {
+      if (shoreRT) shoreRT.dispose();
+      shoreRT = new THREE.WebGLRenderTarget(res, res, { type: THREE.HalfFloatType, format: THREE.RGBAFormat, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true });
+    }
+    const hm = new THREE.ShaderMaterial({ uniforms: { uRef: { value: ref } }, side: THREE.DoubleSide,
+      vertexShader: 'varying float vY; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vY = w.y; gl_Position = projectionMatrix * viewMatrix * w; }',
+      fragmentShader: 'uniform float uRef; varying float vY; void main(){ gl_FragColor = vec4(vY - uRef, 1.0, 0.0, 1.0); }' });
+    const r = a.renderer, prevTarget = r.getRenderTarget(), prevXr = r.xr.enabled, prevShadow = r.shadowMap.autoUpdate;
+    const prevOverride = a.scene.overrideMaterial, prevBg = a.scene.background, prevFog = a.scene.fog, prevClear = r.getClearColor(new THREE.Color()), prevAlpha = r.getClearAlpha();
+    try {
+      r.xr.enabled = false; r.shadowMap.autoUpdate = false;
+      a.scene.overrideMaterial = hm; a.scene.background = null; a.scene.fog = null;
+      r.setRenderTarget(shoreRT); r.setClearColor(0x000000, 0); r.clear(); r.render(a.scene, cam);
+    } finally {
+      r.setRenderTarget(prevTarget); r.xr.enabled = prevXr; r.shadowMap.autoUpdate = prevShadow; r.setClearColor(prevClear, prevAlpha);
+      a.scene.overrideMaterial = prevOverride; a.scene.background = prevBg; a.scene.fog = prevFog;
+      for (const m of a.terrain) m.layers.disable(SHORE_LAYER);
+      hm.dispose();
+    }
+    uShoreTex.value = shoreRT.texture; uShoreRef.value = ref;
+    uShoreBox.value.set(box.min.x, box.max.z, sx, sz);
+    uShoreOn.value = 1;
+    console.info(`[thalyn] water A17150 shore foam ON: ${res}² height map over ${sx.toFixed(0)}×${sz.toFixed(0)} m (${(sx / res).toFixed(2)} m/texel) · ` +
+      `${fb.total} open body(ies), ${fb.own} with their own foam numbers (the rest the shader defaults ${FOAM_DEFAULTS.width} m × ${FOAM_DEFAULTS.intensity}) · ` +
+      `wind ×${w.boost.toFixed(2)} · ${(performance.now() - t0).toFixed(0)} ms`);
+    return res;
+  }
+
+  /** ★ A17150 the foam is flat colour (the game's lerp); dim it with the night like the rest of the viewer's unlit accents. */
+  function setNight(n) { uFoamLight.value = 1 - 0.7 * Math.min(1, Math.max(0, +n || 0)); }
 
   /** The export's water rectangles (extras.thalyn.liquids, APP frame: X negated — the same read as makeWaterProbe). The
    *  sea ring is left out: it never takes the mirror. Absent (a non-Thalyn glb) ⇒ each water mesh's own box. */
@@ -114,6 +245,7 @@ export function makeWater() {
     for (const l of (liquids || [])) {
       if (!l || l.type !== 'water' || !Array.isArray(l.centerXZ) || !Array.isArray(l.sizeXZ)) continue;
       if (/Horizon|Infinite|Sea|Ocean/i.test(l.name || '')) continue;
+      if (isFrozen(l)) continue;   // ★ A17160 a frozen sheet is ground, never a mirror plane
       rects.push({ name: l.name || 'water', cx: -l.centerXZ[0], cz: l.centerXZ[1], hx: Math.max(0.5, l.sizeXZ[0] * 0.5), hz: Math.max(0.5, l.sizeXZ[1] * 0.5), y: +l.surfaceY || 0 });
     }
   }
@@ -207,8 +339,9 @@ export function makeWater() {
 
   function clear() {
     surfaces.length = 0; rects = []; active = null; uPlaneY.value = -1e6;
+    shoreArgs = null; dropShore();   // ★ A17150
     if (rt) { rt.dispose(); rt = null; uMirror.value = null; }
   }
 
-  return { adopt, setLiquids, setBudget, update, clear, get count() { return surfaces.length; }, get active() { return active; } };
+  return { adopt, setLiquids, setBudget, update, clear, setShore, setNight, get count() { return surfaces.length; }, get active() { return active; }, get shoreOn() { return uShoreOn.value > 0.5; } };
 }
